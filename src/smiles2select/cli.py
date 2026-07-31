@@ -22,6 +22,7 @@ from smiles2select.export import docking, excel, parquet
 from smiles2select.io.importer import ColumnMapping, SourceFile, guess_mapping, preview_columns
 from smiles2select.pipeline import presets
 from smiles2select.pipeline.config import RunConfig
+from smiles2select.pipeline.diagnostics import ParallelDiagnosticsConfig, safe_mode_config
 from smiles2select.pipeline.runner import RunResult, run
 from smiles2select.profiles.loader import builtin_registry
 from smiles2select.scores.qed import QedSelection
@@ -126,8 +127,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--compact", action="store_true", help="single RULE_FAILURES sheet instead of one per rule"
     )
-    parser.add_argument("--jobs", type=int, default=-1, help="worker processes (-1 = all cores)")
-    parser.add_argument("--chunk-size", type=int, default=2000)
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=-1,
+        help="worker processes (-1 = auto, sized from available memory and CPU count)",
+    )
+    parser.add_argument(
+        "--chunk-size", type=int, default=2000, help="initial chunk size (adapts during the run)"
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        default=None,
+        help="checkpoint file; rerunning the same command resumes from the last completed chunk",
+    )
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help="safe-diagnostics mode: 1 worker, small chunks, full fault/memory logging",
+    )
     parser.add_argument(
         "--preset", type=Path, default=None, help="load a saved preset (profiles, roles, alerts)"
     )
@@ -239,7 +258,13 @@ def _build_config(args: argparse.Namespace) -> RunConfig:
         parquet_path=args.parquet,
         cache_path=args.cache,
         detailed_export=not args.compact,
+        checkpoint_path=args.checkpoint,
+        diagnostics=_build_diagnostics(args),
     )
+
+
+def _build_diagnostics(args: argparse.Namespace) -> ParallelDiagnosticsConfig:
+    return safe_mode_config() if args.diagnose else ParallelDiagnosticsConfig()
 
 
 def _config_from_preset(args: argparse.Namespace, preset: presets.RunPreset) -> RunConfig:
@@ -265,6 +290,8 @@ def _config_from_preset(args: argparse.Namespace, preset: presets.RunPreset) -> 
         parquet_path=args.parquet,
         cache_path=args.cache,
         detailed_export=preset.detailed_export and not args.compact,
+        checkpoint_path=args.checkpoint,
+        diagnostics=_build_diagnostics(args),
     )
 
 
@@ -397,4 +424,9 @@ def _print_report(result: RunResult, *, quiet: bool) -> None:
 
 
 if __name__ == "__main__":
+    # See gui/app.py for why this is required before anything touches
+    # multiprocessing: a frozen build re-executes this module per worker.
+    from multiprocessing import freeze_support
+
+    freeze_support()
     raise SystemExit(main())

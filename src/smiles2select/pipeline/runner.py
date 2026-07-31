@@ -10,22 +10,29 @@ the selected profiles, scores and alerts actually need are computed at all.
 
 from __future__ import annotations
 
+import functools
+import hashlib
+import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
-from joblib import Parallel, delayed
 
 from smiles2select.alerts import engine as alert_engine
 from smiles2select.chemistry.descriptor_planner import DescriptorPlan, DescriptorPlanner
 from smiles2select.chemistry.descriptor_registry import default_registry
 from smiles2select.chemistry.duplicates import find_duplicates
 from smiles2select.chemistry.scaffolds import scaffolds_from_smiles
+from smiles2select.chemistry.standardization import StandardizationConfig
 from smiles2select.decision.engine import DecisionEngine, DecisionResult
 from smiles2select.io.importer import load_records
+from smiles2select.pipeline.checkpoint_store import ChunkCheckpointStore
+from smiles2select.pipeline.chunking import MoleculeChunk
 from smiles2select.pipeline.config import RunConfig
-from smiles2select.pipeline.workers import alerts_to_tuples, process_chunk
+from smiles2select.pipeline.resource_estimation import estimate_worker_count
+from smiles2select.pipeline.streaming import run_streaming
+from smiles2select.pipeline.workers import RecordResult, alerts_to_tuples, process_chunk
 from smiles2select.profiles.loader import builtin_registry
 from smiles2select.profiles.registry import Profile
 from smiles2select.profiles.validator import validate_all
@@ -253,6 +260,7 @@ def _calculate(
     pairs = list(zip(records.index.tolist(), records["original_smiles"].tolist(), strict=True))
     smiles_by_record = dict(pairs)
     custom_alerts = alerts_to_tuples(config.custom_alerts)
+    input_hash = _hash_records(pairs)
 
     cache = _open_cache(config)
     cached = cache.fetch((smiles for _, smiles in pairs), plan.descriptor_ids) if cache else {}
@@ -261,7 +269,15 @@ def _calculate(
 
     report(len(reused), len(pairs), "Calculando descritores")
     computed = _run_workers(
-        config, pending, plan, substructure_rules, custom_alerts, report, len(reused), len(pairs)
+        config,
+        pending,
+        plan,
+        substructure_rules,
+        custom_alerts,
+        report,
+        len(reused),
+        len(pairs),
+        input_hash,
     )
 
     stats: tuple[int, int] | None = None
@@ -294,32 +310,118 @@ def _run_workers(
     report: ProgressCallback,
     already_done: int,
     total: int,
+    input_hash: str,
 ) -> list:
-    """Compute the records the cache could not supply."""
+    """Compute the records the cache could not supply.
+
+    Streams chunk-by-chunk instead of collecting every worker result before
+    returning: each finished chunk is committed to a checkpoint immediately,
+    so a crash here loses at most one in-flight window of chunks, not the
+    whole run, and a second attempt with the same input and config resumes
+    instead of recomputing everything.
+    """
     if not pending:
         return []
 
-    chunks = [
-        list(pending[index : index + config.chunk_size])
-        for index in range(0, len(pending), config.chunk_size)
-    ]
-    batches = Parallel(n_jobs=config.n_jobs, prefer="processes")(
-        delayed(process_chunk)(
-            chunk,
-            plan.descriptor_ids,
-            config.standardization,
-            config.alert_catalogs,
-            custom_alerts,
-            substructure_rules,
-        )
-        for chunk in chunks
+    run_chunk = functools.partial(
+        _run_chunk,
+        descriptor_ids=plan.descriptor_ids,
+        standardization=config.standardization,
+        catalog_ids=config.alert_catalogs,
+        custom_alerts=custom_alerts,
+        substructure_rules=substructure_rules,
     )
 
-    results: list = []
-    for batch in batches:
-        results.extend(batch)
-        report(already_done + len(results), total, "Calculando descritores")
-    return results
+    diagnostics = config.diagnostics
+    n_jobs = diagnostics.resolved_n_jobs(_resolve_n_jobs(config))
+    chunk_size = diagnostics.resolved_chunk_size(config.chunk_size)
+    log_directory = resolve_log_directory(config)
+    checkpoint_path = resolve_checkpoint_path(config)
+    keep_checkpoint = config.checkpoint_path is not None
+
+    checkpoint = ChunkCheckpointStore(
+        checkpoint_path, input_hash=input_hash, config_hash=config.fingerprint()
+    )
+    try:
+        streaming_report = run_streaming(
+            pending,
+            run_chunk,
+            checkpoint=checkpoint,
+            n_jobs=n_jobs,
+            initial_chunk_size=chunk_size,
+            log_directory=log_directory,
+            log_memory=diagnostics.log_memory,
+            report=report,
+            already_done=already_done,
+            total=total,
+        )
+    finally:
+        checkpoint.close()
+
+    if not keep_checkpoint:
+        Path(checkpoint_path).unlink(missing_ok=True)
+
+    return streaming_report.results
+
+
+def _run_chunk(
+    chunk: MoleculeChunk,
+    *,
+    descriptor_ids: tuple[str, ...],
+    standardization: StandardizationConfig,
+    catalog_ids: tuple[str, ...],
+    custom_alerts: tuple[tuple[str, str, str, str], ...],
+    substructure_rules: tuple[tuple[str, str], ...],
+) -> list[RecordResult]:
+    """Adapts ``process_chunk`` (a plain sequence of pairs) to ``MoleculeChunk``.
+
+    Must stay a module-level function, never a closure or lambda: it is
+    pickled and sent to worker processes, including on Windows where that
+    requires the target to be importable by name.
+    """
+    return process_chunk(
+        chunk.records,
+        descriptor_ids,
+        standardization,
+        catalog_ids,
+        custom_alerts,
+        substructure_rules,
+    )
+
+
+def _resolve_n_jobs(config: RunConfig) -> int:
+    """An explicit positive n_jobs is honored exactly; -1/0/None auto-sizes
+    from available memory and CPU count instead of handing joblib every core.
+    """
+    if config.n_jobs is not None and config.n_jobs > 0:
+        return config.n_jobs
+    return estimate_worker_count(None)
+
+
+def resolve_log_directory(config: RunConfig) -> str:
+    if config.diagnostics.log_directory is not None:
+        return str(config.diagnostics.log_directory)
+    if config.database_path is not None:
+        return str(config.database_path.parent / f"{config.database_path.stem}_logs")
+    return str(Path(tempfile.gettempdir()) / "smiles2select_logs")
+
+
+def resolve_checkpoint_path(config: RunConfig) -> Path:
+    if config.checkpoint_path is not None:
+        return config.checkpoint_path
+    if config.database_path is not None:
+        return config.database_path.with_suffix(".checkpoint.sqlite")
+    return Path(tempfile.gettempdir()) / f"smiles2select_{config.fingerprint()}.checkpoint.sqlite"
+
+
+def _hash_records(pairs: Sequence[tuple[int, str]]) -> str:
+    """Identity of the input for checkpoint resume: order-sensitive, so a
+    reordered or edited source file is treated as different input, not a
+    partially-completed one."""
+    digest = hashlib.sha256()
+    for record_id, smiles in pairs:
+        digest.update(f"{record_id}\x00{smiles}\n".encode())
+    return digest.hexdigest()
 
 
 def _descriptor_frame(

@@ -29,4 +29,12 @@ def workspace_main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # Required before anything else touches multiprocessing: this is the
+    # PyInstaller entrypoint (packaging/smiles2select.spec), and on Windows a
+    # frozen build re-executes this same module in every worker process. Without
+    # freeze_support(), that re-execution would open a second GUI window in
+    # each worker instead of running as a plain worker.
+    from multiprocessing import freeze_support
+
+    freeze_support()
     raise SystemExit(main())

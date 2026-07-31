@@ -18,6 +18,7 @@ from smiles2select.chemistry.fingerprints import FingerprintConfig
 from smiles2select.chemistry.standardization import StandardizationConfig
 from smiles2select.decision.policies import DecisionPolicy, recommended_policy
 from smiles2select.io.importer import SourceFile
+from smiles2select.pipeline.diagnostics import ParallelDiagnosticsConfig
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,9 @@ class RunConfig:
     #: Process only the first N records. Used by the sample impact analysis;
     #: None means the whole library.
     max_records: int | None = None
+    #: -1 or 0 means "decide automatically from available memory and CPU
+    #: count" (see pipeline.resource_estimation); it is never passed to
+    #: joblib as a literal -1, which would ignore memory entirely.
     n_jobs: int = -1
     chunk_size: int = 2000
     database_path: Path | None = None
@@ -56,6 +60,11 @@ class RunConfig:
     cache_path: Path | None = None
     detailed_export: bool = True
     profile_directories: tuple[Path, ...] = ()
+    diagnostics: ParallelDiagnosticsConfig = field(default_factory=ParallelDiagnosticsConfig)
+    #: Per-chunk checkpoint for resuming a crashed run. None derives a path
+    #: next to database_path (or a temp file) and discards it on success;
+    #: set explicitly to keep it around for a later --resume.
+    checkpoint_path: Path | None = None
 
     def __post_init__(self) -> None:
         if not self.profile_ids:
@@ -131,6 +140,9 @@ class RunConfig:
             ("per_scaffold_limit", str(self.per_scaffold_limit or "-")),
             ("fingerprint", self.fingerprint_config.label()),
             ("cache", str(self.cache_path) if self.cache_path else "desativado"),
+            ("n_jobs", str(self.n_jobs) if self.n_jobs and self.n_jobs > 0 else "automático"),
+            ("chunk_size_inicial", str(self.chunk_size)),
+            ("modo_diagnostico", "seguro" if self.diagnostics.enabled else "padrão"),
             ("config_hash", self.fingerprint()),
         ]
 

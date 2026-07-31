@@ -35,6 +35,11 @@ class RecordResult:
     descriptors: dict[str, Any]
     substructure_flags: dict[str, bool]
     alert_rows: list[dict[str, Any]]
+    #: None for an ordinary invalid/valid result. "PYTHON_ERROR" or
+    #: "MEMORY_ERROR" when a worker-local exception was caught mid-record;
+    #: "WORKER_NATIVE_CRASH" is set by the crash-isolation layer, never here,
+    #: since a native crash kills the process before this field could be set.
+    error_code: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -125,19 +130,46 @@ def process_chunk(
 
     Batching amortises the inter-process handoff: sending 2000 molecules at
     once costs one pickle round trip instead of 2000.
+
+    Each record is wrapped individually: a Python-level bug or an
+    out-of-memory condition on one molecule must not lose every other result
+    already computed in this chunk. A native crash (segfault) cannot be
+    caught here at all - the process dies before ``except`` runs - which is
+    why the orchestrator (``crash_isolation``) handles that case separately.
     """
-    return [
-        process_record(
-            record_id,
-            smiles,
-            descriptor_ids,
-            standardization,
-            catalog_ids,
-            custom_alerts,
-            substructure_rules,
-        )
-        for record_id, smiles in chunk
-    ]
+    results = []
+    for record_id, smiles in chunk:
+        try:
+            results.append(
+                process_record(
+                    record_id,
+                    smiles,
+                    descriptor_ids,
+                    standardization,
+                    catalog_ids,
+                    custom_alerts,
+                    substructure_rules,
+                )
+            )
+        except MemoryError as exc:
+            results.append(_error_result(record_id, "MEMORY_ERROR", exc))
+        except Exception as exc:  # noqa: BLE001 - one bad molecule must not abort the chunk
+            results.append(_error_result(record_id, "PYTHON_ERROR", exc))
+    return results
+
+
+def _error_result(record_id: int, error_code: str, exc: Exception) -> RecordResult:
+    return RecordResult(
+        record_id=record_id,
+        valid=False,
+        invalid_reason=f"{error_code}: {exc}",
+        standardized_smiles="",
+        canonical_smiles="",
+        descriptors={},
+        substructure_flags={},
+        alert_rows=[],
+        error_code=error_code,
+    )
 
 
 def alerts_to_tuples(alerts: Sequence[SmartsAlert]) -> tuple[tuple[str, str, str, str], ...]:

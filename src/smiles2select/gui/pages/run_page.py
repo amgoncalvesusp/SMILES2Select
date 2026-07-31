@@ -34,7 +34,10 @@ class RunPage(WizardPage):
         self.jobs_spin = QSpinBox()
         self.jobs_spin.setRange(-1, 128)
         self.jobs_spin.setValue(-1)
-        self.jobs_spin.setSpecialValueText("todos os núcleos")
+        # -1 no longer means "every core": it is resolved from available
+        # memory and CPU count at run time (see pipeline.resource_estimation),
+        # specifically to avoid the OOM risk of always maxing out n_jobs.
+        self.jobs_spin.setSpecialValueText("automático (memória + CPU)")
 
         self.chunk_spin = QSpinBox()
         self.chunk_spin.setRange(100, 100000)
