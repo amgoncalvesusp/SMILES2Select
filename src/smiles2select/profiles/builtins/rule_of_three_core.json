@@ -1,0 +1,51 @@
+{
+  "id": "ro3_core",
+  "name": "Rule of Three — Core",
+  "short_name": "RuleOfThree",
+  "category": "fragment_space",
+  "version": "1.0.0",
+  "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+  "reference": "10.1016/S1359-6446(03)02831-9",
+  "notes": "Not a drug-likeness filter. Its purpose is selecting molecules suitable for fragment libraries and fragment-based drug discovery; passing molecules are fragments, not oral drug candidates.",
+  "pass_policy": {
+    "type": "all_rules"
+  },
+  "rules": [
+    {
+      "id": "ro3_mw_max",
+      "descriptor": "mol_wt",
+      "operator": "<=",
+      "threshold": 300,
+      "severity": "hard",
+      "failure_code": "RO3_MW_HIGH",
+      "label": "Molecular weight"
+    },
+    {
+      "id": "ro3_logp_max",
+      "descriptor": "rdkit_wlogp",
+      "operator": "<=",
+      "threshold": 3,
+      "severity": "hard",
+      "failure_code": "RO3_LOGP_HIGH",
+      "label": "LogP"
+    },
+    {
+      "id": "ro3_hbd_max",
+      "descriptor": "hbd_lipinski",
+      "operator": "<=",
+      "threshold": 3,
+      "severity": "hard",
+      "failure_code": "RO3_HBD_HIGH",
+      "label": "H-bond donors"
+    },
+    {
+      "id": "ro3_hba_max",
+      "descriptor": "hba_lipinski",
+      "operator": "<=",
+      "threshold": 3,
+      "severity": "hard",
+      "failure_code": "RO3_HBA_HIGH",
+      "label": "H-bond acceptors"
+    }
+  ]
+}

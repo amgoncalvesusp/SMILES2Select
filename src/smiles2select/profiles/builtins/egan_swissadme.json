@@ -1,0 +1,35 @@
+{
+  "id": "egan",
+  "name": "Egan — implementação compatível com SwissADME",
+  "short_name": "Egan",
+  "category": "oral_druglikeness",
+  "version": "1.0.0",
+  "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+  "reference": "10.1021/jm000292e",
+  "notes": "NOT a reproduction of the original model. Egan et al. built a passive intestinal absorption model from PSA and AlogP98; this profile applies fixed WLOGP and TPSA cut-offs the way SwissADME does. Verdicts depend on the descriptor definitions and will differ from the published model.",
+  "pass_policy": {
+    "type": "all_rules"
+  },
+  "rules": [
+    {
+      "id": "ega_logp_max",
+      "descriptor": "rdkit_wlogp",
+      "operator": "<=",
+      "threshold": 5.88,
+      "severity": "hard",
+      "failure_code": "EGA_LOGP_HIGH",
+      "label": "WLOGP",
+      "reference": "10.1021/jm000292e"
+    },
+    {
+      "id": "ega_tpsa_max",
+      "descriptor": "tpsa",
+      "operator": "<=",
+      "threshold": 131.6,
+      "severity": "hard",
+      "failure_code": "EGA_TPSA_HIGH",
+      "label": "TPSA",
+      "reference": "10.1021/jm000292e"
+    }
+  ]
+}

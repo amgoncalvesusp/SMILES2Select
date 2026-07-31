@@ -1,0 +1,56 @@
+{
+  "id": "lipinski",
+  "name": "Lipinski",
+  "short_name": "Lipinski",
+  "category": "oral_druglikeness",
+  "version": "1.0.0",
+  "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+  "reference": "10.1016/S0169-409X(96)00423-1",
+  "notes": "Rule of Five. Ships with the classical policy (one violation tolerated); switch pass_policy to {\"type\": \"all_rules\"} for the strict reading. The rule indicates a higher chance of absorption or permeation problems beyond these limits; it does not assert that every molecule inside them is an oral drug. LogP here is the Wildman-Crippen estimate, not ClogP or MLOGP.",
+  "pass_policy": {
+    "type": "max_violations",
+    "value": 1
+  },
+  "rules": [
+    {
+      "id": "lip_mw_max",
+      "descriptor": "mol_wt",
+      "operator": "<=",
+      "threshold": 500,
+      "severity": "hard",
+      "failure_code": "LIP_MW_HIGH",
+      "label": "Molecular weight",
+      "reference": "10.1016/S0169-409X(96)00423-1"
+    },
+    {
+      "id": "lip_logp_max",
+      "descriptor": "rdkit_wlogp",
+      "operator": "<=",
+      "threshold": 5,
+      "severity": "hard",
+      "failure_code": "LIP_LOGP_HIGH",
+      "label": "LogP (WLOGP)",
+      "reference": "10.1016/S0169-409X(96)00423-1"
+    },
+    {
+      "id": "lip_hbd_max",
+      "descriptor": "hbd_lipinski",
+      "operator": "<=",
+      "threshold": 5,
+      "severity": "hard",
+      "failure_code": "LIP_HBD_HIGH",
+      "label": "H-bond donors",
+      "reference": "10.1016/S0169-409X(96)00423-1"
+    },
+    {
+      "id": "lip_hba_max",
+      "descriptor": "hba_lipinski",
+      "operator": "<=",
+      "threshold": 10,
+      "severity": "hard",
+      "failure_code": "LIP_HBA_HIGH",
+      "label": "H-bond acceptors",
+      "reference": "10.1016/S0169-409X(96)00423-1"
+    }
+  ]
+}

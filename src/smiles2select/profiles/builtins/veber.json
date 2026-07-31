@@ -1,0 +1,34 @@
+{
+  "id": "veber",
+  "name": "Veber",
+  "short_name": "Veber",
+  "category": "oral_druglikeness",
+  "version": "1.0.0",
+  "reference": "10.1021/jm020017n",
+  "notes": "Complements Lipinski with molecular flexibility and polar surface area. The original study associated these two criteria with a higher probability of good oral bioavailability in its own experimental set.",
+  "pass_policy": {
+    "type": "all_rules"
+  },
+  "rules": [
+    {
+      "id": "veber_rotb_max",
+      "descriptor": "rotatable_bonds",
+      "operator": "<=",
+      "threshold": 10,
+      "severity": "hard",
+      "failure_code": "VEB_ROTB_HIGH",
+      "label": "Rotatable bonds",
+      "reference": "10.1021/jm020017n"
+    },
+    {
+      "id": "veber_tpsa_max",
+      "descriptor": "tpsa",
+      "operator": "<=",
+      "threshold": 140,
+      "severity": "hard",
+      "failure_code": "VEB_TPSA_HIGH",
+      "label": "TPSA",
+      "reference": "10.1021/jm020017n"
+    }
+  ]
+}

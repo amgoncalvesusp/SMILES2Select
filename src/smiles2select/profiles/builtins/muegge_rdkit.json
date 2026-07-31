@@ -1,0 +1,114 @@
+{
+  "id": "muegge",
+  "name": "Muegge — adaptação RDKit",
+  "short_name": "Muegge",
+  "category": "oral_druglikeness",
+  "version": "1.0.0",
+  "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+  "reference": "10.1021/jm015507e",
+  "notes": "The SwissADME implementation of this filter uses XLOGP3. This profile uses the RDKit Wildman-Crippen LogP, so it is an adaptation, not an XLOGP3-compatible reproduction: Muegge-RDKit != Muegge-XLOGP3. The filter combines physicochemical ranges with minimum functionalisation requirements (carbon and heteroatom counts) to separate drug-like matter from under-functionalised structures.",
+  "pass_policy": {
+    "type": "all_rules"
+  },
+  "rules": [
+    {
+      "id": "mue_mw_min",
+      "descriptor": "mol_wt",
+      "operator": ">=",
+      "threshold": 200,
+      "severity": "hard",
+      "failure_code": "MUE_MW_LOW",
+      "label": "Molecular weight"
+    },
+    {
+      "id": "mue_mw_max",
+      "descriptor": "mol_wt",
+      "operator": "<=",
+      "threshold": 600,
+      "severity": "hard",
+      "failure_code": "MUE_MW_HIGH",
+      "label": "Molecular weight"
+    },
+    {
+      "id": "mue_logp_min",
+      "descriptor": "rdkit_wlogp",
+      "operator": ">=",
+      "threshold": -2,
+      "severity": "hard",
+      "failure_code": "MUE_LOGP_LOW",
+      "label": "LogP (RDKit adaptation)"
+    },
+    {
+      "id": "mue_logp_max",
+      "descriptor": "rdkit_wlogp",
+      "operator": "<=",
+      "threshold": 5,
+      "severity": "hard",
+      "failure_code": "MUE_LOGP_HIGH",
+      "label": "LogP (RDKit adaptation)"
+    },
+    {
+      "id": "mue_tpsa_max",
+      "descriptor": "tpsa",
+      "operator": "<=",
+      "threshold": 150,
+      "severity": "hard",
+      "failure_code": "MUE_TPSA_HIGH",
+      "label": "TPSA"
+    },
+    {
+      "id": "mue_rings_max",
+      "descriptor": "ring_count",
+      "operator": "<=",
+      "threshold": 7,
+      "severity": "hard",
+      "failure_code": "MUE_RINGS_HIGH",
+      "label": "Rings"
+    },
+    {
+      "id": "mue_carbon_min",
+      "descriptor": "carbon_count",
+      "operator": ">",
+      "threshold": 4,
+      "severity": "hard",
+      "failure_code": "MUE_CARBON_LOW",
+      "label": "Carbon atoms"
+    },
+    {
+      "id": "mue_hetero_min",
+      "descriptor": "heteroatom_count",
+      "operator": ">",
+      "threshold": 1,
+      "severity": "hard",
+      "failure_code": "MUE_HETERO_LOW",
+      "label": "Heteroatoms"
+    },
+    {
+      "id": "mue_rotb_max",
+      "descriptor": "rotatable_bonds",
+      "operator": "<=",
+      "threshold": 15,
+      "severity": "hard",
+      "failure_code": "MUE_ROTB_HIGH",
+      "label": "Rotatable bonds"
+    },
+    {
+      "id": "mue_hba_max",
+      "descriptor": "hba_lipinski",
+      "operator": "<=",
+      "threshold": 10,
+      "severity": "hard",
+      "failure_code": "MUE_HBA_HIGH",
+      "label": "H-bond acceptors"
+    },
+    {
+      "id": "mue_hbd_max",
+      "descriptor": "hbd_lipinski",
+      "operator": "<=",
+      "threshold": 5,
+      "severity": "hard",
+      "failure_code": "MUE_HBD_HIGH",
+      "label": "H-bond donors"
+    }
+  ]
+}

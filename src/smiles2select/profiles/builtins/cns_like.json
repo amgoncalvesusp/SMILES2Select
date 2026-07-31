@@ -1,0 +1,79 @@
+{
+  "id": "cns_like",
+  "name": "CNS-like — heurística físico-química",
+  "short_name": "CNSLike",
+  "category": "cns_space",
+  "version": "1.0.0",
+  "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+  "reference": "10.1021/cn100008c",
+  "notes": "NOT the CNS MPO score of Wager et al. That model needs cLogD(7.4) and the pKa of the most basic centre, neither of which RDKit computes, and it returns a continuous desirability score rather than a pass/fail verdict. This profile applies the physicochemical trends commonly reported for CNS-penetrant compounds (smaller, less polar, fewer donors) as explicit cut-offs. Treat it as a coarse filter on chemical space, not as a prediction of brain penetration.",
+  "pass_policy": {
+    "type": "max_violations",
+    "value": 1
+  },
+  "rules": [
+    {
+      "id": "cns_mw_max",
+      "descriptor": "mol_wt",
+      "operator": "<=",
+      "threshold": 400,
+      "severity": "hard",
+      "failure_code": "CNS_MW_HIGH",
+      "label": "Molecular weight"
+    },
+    {
+      "id": "cns_tpsa_max",
+      "descriptor": "tpsa",
+      "operator": "<=",
+      "threshold": 90,
+      "severity": "hard",
+      "failure_code": "CNS_TPSA_HIGH",
+      "label": "TPSA"
+    },
+    {
+      "id": "cns_hbd_max",
+      "descriptor": "hbd_lipinski",
+      "operator": "<=",
+      "threshold": 3,
+      "severity": "hard",
+      "failure_code": "CNS_HBD_HIGH",
+      "label": "H-bond donors"
+    },
+    {
+      "id": "cns_logp_min",
+      "descriptor": "rdkit_wlogp",
+      "operator": ">=",
+      "threshold": 1,
+      "severity": "hard",
+      "failure_code": "CNS_LOGP_LOW",
+      "label": "WLOGP"
+    },
+    {
+      "id": "cns_logp_max",
+      "descriptor": "rdkit_wlogp",
+      "operator": "<=",
+      "threshold": 4,
+      "severity": "hard",
+      "failure_code": "CNS_LOGP_HIGH",
+      "label": "WLOGP"
+    },
+    {
+      "id": "cns_rotb_max",
+      "descriptor": "rotatable_bonds",
+      "operator": "<=",
+      "threshold": 8,
+      "severity": "hard",
+      "failure_code": "CNS_ROTB_HIGH",
+      "label": "Rotatable bonds"
+    },
+    {
+      "id": "cns_no_max",
+      "descriptor": "nitrogen_oxygen_count",
+      "operator": "<=",
+      "threshold": 5,
+      "severity": "hard",
+      "failure_code": "CNS_NO_HIGH",
+      "label": "N + O atoms"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "id": "ro3_extended",
+  "name": "Rule of Three — Extended",
+  "short_name": "RuleOfThreeExt",
+  "category": "fragment_space",
+  "version": "1.0.0",
+  "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+  "reference": "10.1016/S1359-6446(03)02831-9",
+  "notes": "Core Rule of Three plus the optional flexibility and polarity criteria (RotB <= 3, TPSA <= 60). Fragment-library selection, not drug-likeness.",
+  "pass_policy": {
+    "type": "all_rules"
+  },
+  "rules": [
+    {
+      "id": "ro3x_mw_max",
+      "descriptor": "mol_wt",
+      "operator": "<=",
+      "threshold": 300,
+      "severity": "hard",
+      "failure_code": "RO3_MW_HIGH",
+      "label": "Molecular weight"
+    },
+    {
+      "id": "ro3x_logp_max",
+      "descriptor": "rdkit_wlogp",
+      "operator": "<=",
+      "threshold": 3,
+      "severity": "hard",
+      "failure_code": "RO3_LOGP_HIGH",
+      "label": "LogP"
+    },
+    {
+      "id": "ro3x_hbd_max",
+      "descriptor": "hbd_lipinski",
+      "operator": "<=",
+      "threshold": 3,
+      "severity": "hard",
+      "failure_code": "RO3_HBD_HIGH",
+      "label": "H-bond donors"
+    },
+    {
+      "id": "ro3x_hba_max",
+      "descriptor": "hba_lipinski",
+      "operator": "<=",
+      "threshold": 3,
+      "severity": "hard",
+      "failure_code": "RO3_HBA_HIGH",
+      "label": "H-bond acceptors"
+    },
+    {
+      "id": "ro3x_rotb_max",
+      "descriptor": "rotatable_bonds",
+      "operator": "<=",
+      "threshold": 3,
+      "severity": "hard",
+      "failure_code": "RO3_ROTB_HIGH",
+      "label": "Rotatable bonds"
+    },
+    {
+      "id": "ro3x_tpsa_max",
+      "descriptor": "tpsa",
+      "operator": "<=",
+      "threshold": 60,
+      "severity": "hard",
+      "failure_code": "RO3_TPSA_HIGH",
+      "label": "TPSA"
+    }
+  ]
+}

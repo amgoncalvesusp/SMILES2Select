@@ -1,0 +1,78 @@
+{
+  "id": "beyond_ro5",
+  "name": "Beyond Rule of Five — espaço estendido",
+  "short_name": "bRo5",
+  "category": "beyond_ro5",
+  "version": "1.0.0",
+  "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+  "reference": "10.1016/j.chembiol.2014.08.013",
+  "notes": "Bounds the chemical space explored by orally absorbed compounds that sit outside the Rule of Five - macrocycles, peptidomimetics and other large modalities. It describes where such compounds have been found; it does not predict that a molecule inside these bounds is orally absorbed, since absorption in this space depends on conformational behaviour no descriptor here captures. Use it to keep large candidates in the report instead of discarding them as Lipinski failures.",
+  "pass_policy": {
+    "type": "all_rules"
+  },
+  "rules": [
+    {
+      "id": "bro5_mw_max",
+      "descriptor": "mol_wt",
+      "operator": "<=",
+      "threshold": 1000,
+      "severity": "hard",
+      "failure_code": "BRO5_MW_HIGH",
+      "label": "Molecular weight"
+    },
+    {
+      "id": "bro5_logp_min",
+      "descriptor": "rdkit_wlogp",
+      "operator": ">=",
+      "threshold": -2,
+      "severity": "hard",
+      "failure_code": "BRO5_LOGP_LOW",
+      "label": "WLOGP"
+    },
+    {
+      "id": "bro5_logp_max",
+      "descriptor": "rdkit_wlogp",
+      "operator": "<=",
+      "threshold": 10,
+      "severity": "hard",
+      "failure_code": "BRO5_LOGP_HIGH",
+      "label": "WLOGP"
+    },
+    {
+      "id": "bro5_hbd_max",
+      "descriptor": "hbd_lipinski",
+      "operator": "<=",
+      "threshold": 6,
+      "severity": "hard",
+      "failure_code": "BRO5_HBD_HIGH",
+      "label": "H-bond donors"
+    },
+    {
+      "id": "bro5_hba_max",
+      "descriptor": "hba_lipinski",
+      "operator": "<=",
+      "threshold": 15,
+      "severity": "hard",
+      "failure_code": "BRO5_HBA_HIGH",
+      "label": "H-bond acceptors"
+    },
+    {
+      "id": "bro5_rotb_max",
+      "descriptor": "rotatable_bonds",
+      "operator": "<=",
+      "threshold": 20,
+      "severity": "hard",
+      "failure_code": "BRO5_ROTB_HIGH",
+      "label": "Rotatable bonds"
+    },
+    {
+      "id": "bro5_tpsa_max",
+      "descriptor": "tpsa",
+      "operator": "<=",
+      "threshold": 250,
+      "severity": "hard",
+      "failure_code": "BRO5_TPSA_HIGH",
+      "label": "TPSA"
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "id": "ghose",
+  "name": "Ghose",
+  "short_name": "Ghose",
+  "category": "chemical_space",
+  "version": "1.0.0",
+  "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+  "atom_count_definition": "total_atom_count: all atoms including hydrogens (Chem.AddHs)",
+  "reference": "10.1021/cc9800071",
+  "notes": "Qualifying range derived from known-drug databases for medicinal chemistry library design. Each bound is a separate rule so the report can name the side that was crossed.",
+  "pass_policy": {
+    "type": "all_rules"
+  },
+  "rules": [
+    {
+      "id": "gho_mw_min",
+      "descriptor": "mol_wt",
+      "operator": ">=",
+      "threshold": 160,
+      "severity": "hard",
+      "failure_code": "GHO_MW_LOW",
+      "label": "Molecular weight"
+    },
+    {
+      "id": "gho_mw_max",
+      "descriptor": "mol_wt",
+      "operator": "<=",
+      "threshold": 480,
+      "severity": "hard",
+      "failure_code": "GHO_MW_HIGH",
+      "label": "Molecular weight"
+    },
+    {
+      "id": "gho_logp_min",
+      "descriptor": "rdkit_wlogp",
+      "operator": ">=",
+      "threshold": -0.4,
+      "severity": "hard",
+      "failure_code": "GHO_LOGP_LOW",
+      "label": "WLOGP"
+    },
+    {
+      "id": "gho_logp_max",
+      "descriptor": "rdkit_wlogp",
+      "operator": "<=",
+      "threshold": 5.6,
+      "severity": "hard",
+      "failure_code": "GHO_LOGP_HIGH",
+      "label": "WLOGP"
+    },
+    {
+      "id": "gho_mr_min",
+      "descriptor": "mol_mr",
+      "operator": ">=",
+      "threshold": 40,
+      "severity": "hard",
+      "failure_code": "GHO_MR_LOW",
+      "label": "Molar refractivity"
+    },
+    {
+      "id": "gho_mr_max",
+      "descriptor": "mol_mr",
+      "operator": "<=",
+      "threshold": 130,
+      "severity": "hard",
+      "failure_code": "GHO_MR_HIGH",
+      "label": "Molar refractivity"
+    },
+    {
+      "id": "gho_atoms_min",
+      "descriptor": "total_atom_count",
+      "operator": ">=",
+      "threshold": 20,
+      "severity": "hard",
+      "failure_code": "GHO_ATOMS_LOW",
+      "label": "Atom count (with H)"
+    },
+    {
+      "id": "gho_atoms_max",
+      "descriptor": "total_atom_count",
+      "operator": "<=",
+      "threshold": 70,
+      "severity": "hard",
+      "failure_code": "GHO_ATOMS_HIGH",
+      "label": "Atom count (with H)"
+    }
+  ]
+}

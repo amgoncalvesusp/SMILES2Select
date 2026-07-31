@@ -1,0 +1,17 @@
+name: smiles2select
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - rdkit
+  - pandas
+  - numpy
+  - openpyxl
+  - joblib
+  - matplotlib
+  - pyside6
+  - pytest
+  - pytest-cov
+  - pip
+  - pip:
+      - ruff

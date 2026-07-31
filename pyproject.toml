@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smiles2select"
+version = "2.0.0"
+description = "Multi-rule drug-likeness selector for large SMILES libraries"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Adriano Marques Gonçalves", email = "adrianogoncalves.bio@gmail.com" },
+]
+maintainers = [{ name = "Adriano Marques Gonçalves" }]
+keywords = ["cheminformatics", "drug-likeness", "rdkit", "virtual screening", "pareto"]
+dependencies = [
+    "rdkit>=2023.9",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "openpyxl>=3.1",
+    "joblib>=1.3",
+    "PySide6>=6.5",
+    "matplotlib>=3.7",
+    "pyqtgraph>=0.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.1"]
+parquet = ["pyarrow>=14.0"]
+maps = ["umap-learn>=0.5"]
+fastsearch = ["hnswlib>=0.8"]
+build = ["pyinstaller>=6.0"]
+
+[project.scripts]
+smiles2select = "smiles2select.cli:main"
+smiles2select-gui = "smiles2select.gui.app:main"
+smiles2select-workspace = "smiles2select.gui.app:workspace_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+smiles2select = ["profiles/builtins/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+    "slow: slow tests",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
