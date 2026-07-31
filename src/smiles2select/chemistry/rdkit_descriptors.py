@@ -14,7 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from rdkit import Chem
-from rdkit.Chem import Crippen, Descriptors, QED, RDConfig, rdMolDescriptors
+from rdkit.Chem import QED, Crippen, Descriptors, RDConfig, rdMolDescriptors
 
 
 def mol_wt(mol: Chem.Mol) -> float:

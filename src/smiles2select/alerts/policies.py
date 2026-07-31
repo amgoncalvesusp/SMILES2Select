@@ -51,7 +51,7 @@ class AlertPolicy:
     def excluding_catalogs(self) -> tuple[str, ...]:
         return tuple(sorted(cid for cid in self.actions if self.excludes(cid)))
 
-    def with_action(self, catalog_id: str, action: AlertAction) -> "AlertPolicy":
+    def with_action(self, catalog_id: str, action: AlertAction) -> AlertPolicy:
         if action not in ACTION_LABELS:
             raise ValueError(f"unknown alert action '{action}'")
         updated = dict(self.actions)

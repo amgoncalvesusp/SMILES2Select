@@ -47,7 +47,7 @@ def validate_profile(profile: Profile, descriptors: DescriptorRegistry) -> list[
         elif (
             rule.operator not in operators.SUBSTRUCTURE_OPERATORS
             and rule.operator not in _NON_NUMERIC_OPERATORS
-            and not isinstance(rule.threshold, (int, float))
+            and not isinstance(rule.threshold, int | float)
         ):
             issues.append(
                 f"rule '{rule.id}': operator '{rule.operator}' needs a numeric threshold, "

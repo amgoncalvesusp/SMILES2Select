@@ -7,7 +7,7 @@ million times.
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache
 
 from rdkit import Chem
 from rdkit.Chem import FilterCatalog
@@ -62,7 +62,7 @@ def available_catalogs() -> tuple[str, ...]:
     )
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_catalog(catalog_id: str) -> FilterCatalog.FilterCatalog:
     """Build (once) and return the RDKit catalogue for ``catalog_id``."""
     try:

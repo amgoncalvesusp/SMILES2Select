@@ -7,9 +7,8 @@ which published method it is - or is not - compatible with.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Callable
 
 from rdkit import Chem
 

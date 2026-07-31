@@ -37,7 +37,7 @@ class Viewport:
         )
 
     @classmethod
-    def around(cls, coordinates: pd.DataFrame, margin: float = 0.05) -> "Viewport":
+    def around(cls, coordinates: pd.DataFrame, margin: float = 0.05) -> Viewport:
         """Viewport covering everything, with a small margin."""
         if coordinates.empty:
             return cls(-1.0, 1.0, -1.0, 1.0)

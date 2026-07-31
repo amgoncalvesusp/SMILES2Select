@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.1"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.9,<0.15"]
 parquet = ["pyarrow>=14.0"]
 maps = ["umap-learn>=0.5"]
 fastsearch = ["hnswlib>=0.8"]
@@ -54,3 +54,11 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+# Rules are pinned explicitly: without a select list every ruff version applies
+# its own defaults, so the same code passes locally and fails in CI.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "C4"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["smiles2select"]

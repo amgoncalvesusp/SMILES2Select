@@ -64,7 +64,7 @@ class Profile:
     def rules_by_id(self) -> dict[str, Rule]:
         return {rule.id: rule for rule in self.rules}
 
-    def with_pass_policy(self, policy: Mapping[str, Any]) -> "Profile":
+    def with_pass_policy(self, policy: Mapping[str, Any]) -> Profile:
         """Return a copy under a different policy (e.g. strict vs classical Lipinski)."""
         return replace(self, pass_policy=dict(policy))
 

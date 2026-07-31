@@ -95,11 +95,11 @@ class MoleculeState:
         status: SelectionStatus,
         origin: SelectionOrigin,
         note: str = "",
-    ) -> "MoleculeState":
+    ) -> MoleculeState:
         """Return a copy with a new decision; the chemical verdict is untouched."""
         return replace(self, selection_status=status, origin=origin, note=note or self.note)
 
-    def with_pin(self, pinned: bool) -> "MoleculeState":
+    def with_pin(self, pinned: bool) -> MoleculeState:
         return replace(self, pinned=pinned)
 
     def as_row(self) -> dict[str, object]:

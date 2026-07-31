@@ -70,7 +70,7 @@ class DescriptorCache:
         self._misses = 0
         self._store_meta()
 
-    def __enter__(self) -> "DescriptorCache":
+    def __enter__(self) -> DescriptorCache:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

@@ -95,7 +95,7 @@ class SelectionStore:
         self._connection.executescript(SCHEMA)
         self._connection.commit()
 
-    def __enter__(self) -> "SelectionStore":
+    def __enter__(self) -> SelectionStore:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

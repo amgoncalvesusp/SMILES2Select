@@ -85,7 +85,7 @@ class DecisionPolicy:
     def excludes_on_alert(self) -> bool:
         return bool(self.alert_policy.excluding_catalogs())
 
-    def with_role(self, profile_id: str, role: ProfileRole) -> "DecisionPolicy":
+    def with_role(self, profile_id: str, role: ProfileRole) -> DecisionPolicy:
         updated = dict(self.roles)
         updated[profile_id] = role
         return DecisionPolicy(

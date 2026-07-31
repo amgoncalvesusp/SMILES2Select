@@ -20,7 +20,7 @@ Comparator = Callable[[pd.Series, Any], pd.Series]
 
 
 def _as_pair(threshold: Any) -> tuple[float, float]:
-    if not isinstance(threshold, Sequence) or isinstance(threshold, (str, bytes)):
+    if not isinstance(threshold, Sequence) or isinstance(threshold, str | bytes):
         raise ValueError(f"range operator needs [lower, upper], got {threshold!r}")
     if len(threshold) != 2:
         raise ValueError(f"range operator needs exactly two bounds, got {threshold!r}")
@@ -65,7 +65,7 @@ def _between_exclusive(values: pd.Series, threshold: Any) -> pd.Series:
 
 
 def _in(values: pd.Series, threshold: Any) -> pd.Series:
-    if not isinstance(threshold, Sequence) or isinstance(threshold, (str, bytes)):
+    if not isinstance(threshold, Sequence) or isinstance(threshold, str | bytes):
         raise ValueError(f"'in' needs a list of allowed values, got {threshold!r}")
     return values.isin(list(threshold))
 

@@ -147,7 +147,7 @@ class SqliteStore:
         self._connection.executescript(SCHEMA)
         self._connection.commit()
 
-    def __enter__(self) -> "SqliteStore":
+    def __enter__(self) -> SqliteStore:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

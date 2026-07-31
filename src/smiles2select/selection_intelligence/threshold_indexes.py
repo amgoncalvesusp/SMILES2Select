@@ -172,6 +172,6 @@ class ThresholdIndexSet:
         return {rule_id: index.original_threshold for rule_id, index in self._indexes.items()}
 
     @classmethod
-    def from_rules(cls, rules: Sequence[Rule], descriptors: pd.DataFrame) -> "ThresholdIndexSet":
+    def from_rules(cls, rules: Sequence[Rule], descriptors: pd.DataFrame) -> ThresholdIndexSet:
         built = (build_index(rule, descriptors) for rule in rules)
         return cls(index for index in built if index is not None)
