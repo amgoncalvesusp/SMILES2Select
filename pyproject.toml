@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.9,<0.15"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff==0.14.5"]
 parquet = ["pyarrow>=14.0"]
 maps = ["umap-learn>=0.5"]
 fastsearch = ["hnswlib>=0.8"]

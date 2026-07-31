@@ -282,7 +282,7 @@ def _build_sources(args: argparse.Namespace) -> list[SourceFile]:
 
 
 def _build_policy(args: argparse.Namespace, profile_ids: tuple[str, ...]) -> DecisionPolicy:
-    roles: dict[str, ProfileRole] = {profile_id: "informative" for profile_id in profile_ids}
+    roles: dict[str, ProfileRole] = dict.fromkeys(profile_ids, "informative")
     consensus_min: int | None = None
 
     for profile_id in _split(args.mandatory):

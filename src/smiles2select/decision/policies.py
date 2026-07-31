@@ -160,7 +160,7 @@ def all_profiles_policy(profile_ids: Sequence[str]) -> DecisionPolicy:
     """Approve only when every listed profile passes (an intentionally strict choice)."""
     return DecisionPolicy(
         id="all_profiles",
-        roles={profile_id: "mandatory" for profile_id in profile_ids},
+        roles=dict.fromkeys(profile_ids, "mandatory"),
     )
 
 
@@ -168,6 +168,6 @@ def consensus_policy(profile_ids: Sequence[str], min_pass: int) -> DecisionPolic
     """Approve on N of M profiles."""
     return DecisionPolicy(
         id=f"consensus:{min_pass}_of_{len(profile_ids)}",
-        roles={profile_id: "consensus" for profile_id in profile_ids},
+        roles=dict.fromkeys(profile_ids, "consensus"),
         consensus_min_pass=min_pass,
     )
