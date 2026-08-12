@@ -61,6 +61,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[build]"
 
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        run: choco install innosetup --no-progress --yes
+
       # Qt needs these X libraries present even for a headless import check.
       - name: Install Qt runtime libraries (Linux)
         if: runner.os == 'Linux'
@@ -74,6 +78,19 @@ jobs:
       - name: Check the bundle exists
         shell: bash
         run: test -d dist/SMILES2Select
+
+      - name: Verify Windows native dependencies
+        if: runner.os == 'Windows'
+        run: python tools/verify_windows_bundle.py dist/SMILES2Select --manifest dist/SMILES2Select-manifest.json
+
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "/DAppVersion=$version" "/DSourceDir=$PWD\dist\SMILES2Select" "/DOutputDir=$PWD\dist" packaging\smiles2select.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -89,6 +106,8 @@ jobs:
           path: |
             ${{ matrix.artifact }}.zip
             ${{ matrix.artifact }}.tar.gz
+            dist/SMILES2Select-Setup-*.exe
+            dist/SMILES2Select-manifest.json
           if-no-files-found: error
 
   publish:
@@ -106,13 +125,13 @@ jobs:
           files: artifacts/**/*
           generate_release_notes: true
           body: |
-            SMILES2Select — seletor multirregra de drug-likeness.
+            See the repository CHANGELOG for the complete release notes.
 
-            Autoria: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA).
+            **Downloads**
+            - Windows portable bundle: `SMILES2Select-windows.zip`.
+            - Windows installer: `SMILES2Select-Setup-*.exe`.
+            - Linux portable bundle: `SMILES2Select-linux.tar.gz`.
 
-            **Instaladores**
-            - Windows: `SMILES2Select-windows.zip` — extrair e executar `SMILES2Select.exe`.
-            - Linux: `SMILES2Select-linux.tar.gz` — extrair e executar `./SMILES2Select`.
-
-            As regras de drug-likeness implementadas são heurísticas e não predizem
-            biodisponibilidade, eficácia ou segurança.
+            The Windows dependency manifest is published with the release and
+            verifies that all non-system imports from the EXE, DLL and PYD files
+            are included in the bundle.

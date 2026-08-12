@@ -27,6 +27,11 @@ Optional capabilities are available as extras:
 pip install -e ".[maps,fastsearch,parquet]"
 ```
 
+On Windows, the release provides a portable bundle and a Setup executable.
+The Setup package installs the complete PyInstaller bundle, including Qt,
+RDKit, NumPy and all bundled DLL/PYD files. The published dependency manifest
+records the native import verification performed during the build.
+
 ## Quick start
 
 The graphical application has seven English steps:

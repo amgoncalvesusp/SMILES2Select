@@ -10,7 +10,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 PROJECT_ROOT = Path(SPECPATH).parent
 SOURCE_ROOT = PROJECT_ROOT / "src"
@@ -28,6 +28,43 @@ datas = [
 # the importable package tree.
 datas += collect_data_files("rdkit")
 
+# Keep native runtime libraries that RDKit and NumPy load dynamically. The
+# normal import graph catches most of these, but explicit collection prevents
+# a clean machine without Python from missing a transitive DLL.
+binaries = [
+    *collect_dynamic_libs("rdkit"),
+    *collect_dynamic_libs("numpy"),
+]
+
+# Python's extension modules may depend on runtime DLLs that PyInstaller does
+# not discover when the interpreter comes from conda. Include the active
+# environment's copies so the bundle also works on a clean Windows machine.
+if sys.platform == "win32":
+    runtime_dll_names = {
+        "ffi.dll",
+        "libmpdec-4.dll",
+        "msvcp140.dll",
+        "msvcp140_1.dll",
+        "msvcp140_2.dll",
+        "msvcp140_atomic_wait.dll",
+        "msvcp140_codecvt_ids.dll",
+        "vcruntime140.dll",
+        "vcruntime140_1.dll",
+    }
+    runtime_roots = [
+        Path(sys.prefix) / "DLLs",
+        Path(sys.prefix) / "Library" / "bin",
+        Path(sys.prefix),
+    ]
+    runtime_dlls = {
+        path.name.casefold(): path
+        for root in runtime_roots
+        if root.is_dir()
+        for path in root.glob("*.dll")
+        if path.name.casefold() in {name.casefold() for name in runtime_dll_names}
+    }
+    binaries += [(str(path), ".") for path in runtime_dlls.values()]
+
 hiddenimports = [
     *collect_submodules("rdkit.Chem"),
     "smiles2select.gui.workspace.workspace_window",
@@ -37,7 +74,7 @@ hiddenimports = [
 analysis = Analysis(
     [str(SOURCE_ROOT / "smiles2select" / "gui" / "app.py")],
     pathex=[str(SOURCE_ROOT)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],

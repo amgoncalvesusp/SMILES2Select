@@ -15,6 +15,8 @@ All notable changes to SMILES2Select are documented here.
 - Cooperative background processing cancellation while preserving completed checkpoints.
 - SQLite, Excel, Parquet and machine-readable selection-recipe provenance for final and reserve sets.
 - CLI replay/save support and a deterministic large-library benchmark.
+- Windows portable bundle and per-user Setup installer containing the complete PyInstaller runtime payload.
+- Windows native dependency manifest covering every bundled EXE, DLL and PYD file.
 
 ### Changed
 
