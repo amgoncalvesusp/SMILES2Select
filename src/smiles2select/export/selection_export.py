@@ -91,7 +91,7 @@ def final_selected_sheet(artifacts: SessionArtifacts) -> pd.DataFrame:
         selection_reason(artifacts.outcome, int(record_id)) for record_id in frame.index
     ]
     frame["Pinned"] = [
-        "sim" if record_id in states and states[record_id].pinned else "não"
+        "yes" if record_id in states and states[record_id].pinned else "no"
         for record_id in frame.index
     ]
     frame["Manual_Note"] = [
@@ -119,14 +119,14 @@ def selection_summary_sheet(artifacts: SessionArtifacts) -> pd.DataFrame:
     """Counts, coverage, constraints and the alerts raised before export."""
     counters = artifacts.basket.counters()
     rows: list[dict[str, object]] = [
-        {"section": "cesta", "item": label, "value": value} for label, value in counters.as_rows()
+        {"section": "basket", "item": label, "value": value} for label, value in counters.as_rows()
     ]
     rows += [
-        {"section": "seleção", "item": label, "value": value}
+        {"section": "selection", "item": label, "value": value}
         for label, value in summary_rows(artifacts.outcome, artifacts.constraints)
     ]
     rows += [
-        {"section": "restrições", "item": label, "value": value}
+        {"section": "constraints", "item": label, "value": value}
         for label, value in artifacts.constraints.summary_rows()
     ]
 
@@ -138,7 +138,7 @@ def selection_summary_sheet(artifacts: SessionArtifacts) -> pd.DataFrame:
         list(artifacts.borderline["record_id"]) if artifacts.borderline is not None else None,
     )
     rows += [
-        {"section": "alertas", "item": f"alerta {number}", "value": text}
+        {"section": "alerts", "item": f"alert {number}", "value": text}
         for number, text in enumerate(alerts, start=1)
     ]
     return pd.DataFrame(rows)

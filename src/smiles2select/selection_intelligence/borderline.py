@@ -50,11 +50,11 @@ _BORDERLINE_STATUSES = frozenset(
 class BorderlineSort(str, Enum):
     """Orderings the panel offers."""
 
-    TIGHTEST_MARGIN = "menor margem"
-    MOST_BORDERLINE_RULES = "mais critérios limítrofes"
-    BEST_PARETO = "melhor Pareto rank"
-    HIGHEST_QED = "maior QED"
-    LOWEST_SA = "menor SA Score"
+    TIGHTEST_MARGIN = "tightest margin"
+    MOST_BORDERLINE_RULES = "most borderline rules"
+    BEST_PARETO = "best Pareto rank"
+    HIGHEST_QED = "highest QED"
+    LOWEST_SA = "lowest SA Score"
 
 
 _SORT_KEYS: dict[BorderlineSort, tuple[str, bool]] = {

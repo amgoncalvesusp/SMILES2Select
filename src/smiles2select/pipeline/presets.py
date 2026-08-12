@@ -65,12 +65,12 @@ class RunPreset:
         """Problems that prevent this preset from being applied."""
         problems: list[str] = []
         if not self.roles:
-            problems.append("o preset não seleciona nenhum perfil")
+            problems.append("the preset does not select any profile")
         unknown = [pid for pid in self.roles if pid not in available_profiles]
         if unknown:
-            problems.append(f"perfis desconhecidos: {', '.join(sorted(unknown))}")
+            problems.append(f"unknown profiles: {', '.join(sorted(unknown))}")
         if self.qed.excludes and not self.compute_qed:
-            problems.append("a política de QED exclui moléculas, mas o QED está desativado")
+            problems.append("the QED policy excludes molecules, but QED is disabled")
         try:
             self.build_policy()
         except ValueError as exc:
@@ -98,6 +98,35 @@ class RunPreset:
             "drop_duplicates": self.drop_duplicates,
             "detailed_export": self.detailed_export,
         }
+
+
+def natural_product_exploration_preset() -> RunPreset:
+    """Built-in policy for natural-product exploration.
+
+    Dockability is the only hard eligibility layer. Classical profiles remain
+    classifications/informative outputs unless a caller deliberately changes
+    their roles.
+    """
+
+    profile_ids = (
+        "dockability_envelope",
+        "lipinski",
+        "veber",
+        "ghose",
+        "egan",
+        "muegge",
+        "beyond_ro5",
+    )
+    roles: dict[str, ProfileRole] = dict.fromkeys(profile_ids, "informative")
+    roles["dockability_envelope"] = "mandatory"
+    return RunPreset(
+        name="Natural Product Exploration",
+        roles=roles,
+        active_catalogs=("pains", "brenk"),
+        alert_actions={"pains": "warn", "brenk": "warn"},
+        compute_qed=True,
+        drop_duplicates=True,
+    )
 
 
 def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> RunPreset:

@@ -20,7 +20,8 @@ from typing import Any
 from smiles2select.app_metadata import APP_VERSION, rdkit_version
 from smiles2select.selection_intelligence.action_log import utc_timestamp
 
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "3.0"
+LEGACY_SCHEMA_VERSIONS = frozenset({"2.0"})
 RECIPE_SUFFIX = ".selection.json"
 
 
@@ -61,6 +62,17 @@ class SelectionRecipe:
     manual_overrides: tuple[ManualOverride, ...] = ()
     pinned_ids: tuple[int, ...] = ()
     excluded_ids: tuple[int, ...] = ()
+    # Optional Chemical Space Hub provenance. Traditional 2.1 runs can leave
+    # these fields empty and remain fully representable.
+    candidate_library: str = ""
+    reference_libraries: tuple[dict[str, Any], ...] = ()
+    background_libraries: tuple[dict[str, Any], ...] = ()
+    standardization: dict[str, Any] = field(default_factory=dict)
+    fingerprint: dict[str, Any] = field(default_factory=dict)
+    zones: tuple[dict[str, Any], ...] = ()
+    projection: dict[str, Any] = field(default_factory=dict)
+    reserve_count: int | None = None
+    seed: int | None = None
     created_at: str = field(default_factory=utc_timestamp)
     updated_at: str = field(default_factory=utc_timestamp)
 
@@ -95,10 +107,22 @@ class SelectionRecipe:
             },
             "final_selection": {
                 "target_count": self.target_count,
+                "reserve_count": self.reserve_count,
                 "strategy": self.strategy,
+                "selection_strategy": self.strategy,
                 "max_per_scaffold": self.max_per_scaffold,
                 "max_per_cluster": self.max_per_cluster,
             },
+            "libraries": {
+                "candidate": self.candidate_library,
+                "references": [dict(item) for item in self.reference_libraries],
+                "background": [dict(item) for item in self.background_libraries],
+            },
+            "standardization": dict(self.standardization),
+            "fingerprint": dict(self.fingerprint),
+            "zones": [dict(zone) for zone in self.zones],
+            "projection": dict(self.projection),
+            "seed": self.seed,
             "manual_overrides": [asdict(override) for override in self.manual_overrides],
             "pinned_ids": list(self.pinned_ids),
             "excluded_ids": list(self.excluded_ids),
@@ -118,13 +142,19 @@ class SelectionRecipe:
             ("robustness_method", self.robustness_method),
             ("borderline_fraction", self.borderline_fraction),
             ("target_count", self.target_count or "-"),
+            ("reserve_count", self.reserve_count or "-"),
             ("strategy", self.strategy),
             ("max_per_scaffold", self.max_per_scaffold or "-"),
             ("max_per_cluster", self.max_per_cluster or "-"),
-            ("thresholds alterados", len(self.changed_thresholds)),
+            ("changed thresholds", len(self.changed_thresholds)),
             ("manual_overrides", len(self.manual_overrides)),
             ("pinned", len(self.pinned_ids)),
             ("excluded", len(self.excluded_ids)),
+            ("candidate_library", self.candidate_library or "-"),
+            ("reference_libraries", len(self.reference_libraries)),
+            ("zones", len(self.zones)),
+            ("projection", self.projection.get("method", "-") if self.projection else "-"),
+            ("seed", self.seed if self.seed is not None else "-"),
             ("created_at", self.created_at),
             ("updated_at", self.updated_at),
         ]
@@ -133,7 +163,7 @@ class SelectionRecipe:
 def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRecipe:
     """Rebuild a recipe, refusing a schema this version does not understand."""
     schema = payload.get("schema_version", SCHEMA_VERSION)
-    if schema != SCHEMA_VERSION:
+    if schema != SCHEMA_VERSION and schema not in LEGACY_SCHEMA_VERSIONS:
         raise RecipeError(
             f"{source}: schema '{schema}' is not supported (this version reads '{SCHEMA_VERSION}')"
         )
@@ -142,6 +172,7 @@ def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRe
     sensitivity = payload.get("sensitivity") or {}
     robustness = payload.get("robustness") or {}
     final = payload.get("final_selection") or {}
+    libraries = payload.get("libraries") or {}
 
     return SelectionRecipe(
         name=payload.get("name", "selection"),
@@ -155,6 +186,7 @@ def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRe
         robustness_method=robustness.get("method", "iqr_normalized"),
         borderline_fraction=robustness.get("borderline_fraction", 0.10),
         target_count=final.get("target_count"),
+        reserve_count=final.get("reserve_count"),
         strategy=final.get("strategy", "balanced"),
         max_per_scaffold=final.get("max_per_scaffold"),
         max_per_cluster=final.get("max_per_cluster"),
@@ -163,6 +195,16 @@ def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRe
         ),
         pinned_ids=tuple(payload.get("pinned_ids", ())),
         excluded_ids=tuple(payload.get("excluded_ids", ())),
+        candidate_library=libraries.get("candidate", payload.get("candidate_library", "")),
+        reference_libraries=tuple(
+            libraries.get("references", payload.get("reference_libraries", ()))
+        ),
+        background_libraries=tuple(libraries.get("background", ())),
+        standardization=dict(payload.get("standardization") or {}),
+        fingerprint=dict(payload.get("fingerprint") or {}),
+        zones=tuple(payload.get("zones", ())),
+        projection=dict(payload.get("projection") or {}),
+        seed=payload.get("seed"),
         created_at=payload.get("created_at", utc_timestamp()),
         updated_at=payload.get("updated_at", utc_timestamp()),
     )
@@ -196,22 +238,30 @@ def compare(first: SelectionRecipe, second: SelectionRecipe) -> list[str]:
     """Human-readable differences between two recipes."""
     differences: list[str] = []
     if first.input_hash != second.input_hash:
-        differences.append("bibliotecas de entrada diferentes (input_hash)")
+        differences.append("input libraries differ (input_hash)")
     if first.descriptor_version != second.descriptor_version:
         differences.append(
-            f"versão de descritores: {first.descriptor_version} -> {second.descriptor_version}"
+            f"descriptor version: {first.descriptor_version} -> {second.descriptor_version}"
         )
     if first.objectives != second.objectives:
         differences.append(
-            f"objetivos de Pareto: {len(first.objectives)} -> {len(second.objectives)}"
+            f"Pareto objectives: {len(first.objectives)} -> {len(second.objectives)}"
         )
     for rule_id in sorted(set(first.applied_thresholds) | set(second.applied_thresholds)):
         before = first.applied_thresholds.get(rule_id)
         after = second.applied_thresholds.get(rule_id)
         if before != after:
-            differences.append(f"limite {rule_id}: {before} -> {after}")
+            differences.append(f"limit {rule_id}: {before} -> {after}")
     if first.target_count != second.target_count:
-        differences.append(f"quantidade final: {first.target_count} -> {second.target_count}")
+        differences.append(f"final count: {first.target_count} -> {second.target_count}")
     if first.strategy != second.strategy:
-        differences.append(f"estratégia: {first.strategy} -> {second.strategy}")
+        differences.append(f"strategy: {first.strategy} -> {second.strategy}")
+    if first.reserve_count != second.reserve_count:
+        differences.append(f"reserve count: {first.reserve_count} -> {second.reserve_count}")
+    if first.reference_libraries != second.reference_libraries:
+        differences.append("reference libraries changed")
+    if first.fingerprint != second.fingerprint:
+        differences.append("fingerprint settings changed")
+    if first.zones != second.zones:
+        differences.append("selection zones changed")
     return differences

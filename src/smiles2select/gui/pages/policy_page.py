@@ -34,25 +34,25 @@ from smiles2select.profiles.loader import builtin_registry
 from smiles2select.scores.qed import QedSelection
 
 QED_MODES = {
-    "Calcular apenas": "compute",
-    "Ranquear": "rank",
-    "Percentil superior": "top_percentile",
-    "Limite mínimo": "threshold",
+    "Compute only": "compute",
+    "Rank": "rank",
+    "Top percentile": "top_percentile",
+    "Minimum threshold": "threshold",
 }
 MODE_LABELS = {value: label for label, value in QED_MODES.items()}
 ACTION_ORDER = ("inform", "warn", "penalize", "exclude")
 
 
 class PolicyPage(WizardPage):
-    title = "5. Política de seleção"
-    subtitle = "Defina como os perfis, o QED e os alertas se combinam na decisão final."
+    title = "5. Selection policy"
+    subtitle = "Define how profiles, QED and alerts combine in the final decision."
 
     def __init__(self, state) -> None:
         super().__init__(state)
 
         self.consensus_spin = QSpinBox()
         self.consensus_spin.setRange(0, 20)
-        self.consensus_spin.setSpecialValueText("(sem consenso)")
+        self.consensus_spin.setSpecialValueText("(no consensus)")
         self.consensus_spin.valueChanged.connect(self._apply)
 
         self.expression_edit = QLineEdit()
@@ -63,7 +63,7 @@ class PolicyPage(WizardPage):
 
         self.qed_mode = QComboBox()
         self.qed_mode.addItems(QED_MODES.keys())
-        self.qed_mode.setCurrentText(MODE_LABELS.get(state.qed.mode, "Ranquear"))
+        self.qed_mode.setCurrentText(MODE_LABELS.get(state.qed.mode, "Rank"))
         self.qed_mode.currentTextChanged.connect(self._apply)
 
         self.qed_value = QDoubleSpinBox()
@@ -72,35 +72,35 @@ class PolicyPage(WizardPage):
         self.qed_value.setValue(0.5)
         self.qed_value.valueChanged.connect(self._apply)
 
-        decision_group = QGroupBox("Decisão")
+        decision_group = QGroupBox("Decision")
         decision_form = QFormLayout(decision_group)
-        decision_form.addRow("Aprovar em pelo menos N perfis de consenso:", self.consensus_spin)
-        decision_form.addRow("Expressão personalizada:", self.expression_edit)
+        decision_form.addRow("Approve in at least N consensus profiles:", self.consensus_spin)
+        decision_form.addRow("Custom expression:", self.expression_edit)
         decision_form.addRow("QED:", self.qed_mode)
-        decision_form.addRow("Valor (limite ou percentil):", self.qed_value)
+        decision_form.addRow("Value (threshold or percentile):", self.qed_value)
 
         self.alert_table = QTableWidget(0, 3)
-        self.alert_table.setHorizontalHeaderLabels(["Catálogo", "Usar", "Ação"])
+        self.alert_table.setHorizontalHeaderLabels(["Catalog", "Use", "Action"])
         self.alert_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.alert_table.horizontalHeader().setStretchLastSection(True)
         self._catalog_boxes: dict[str, QCheckBox] = {}
         self._action_combos: dict[str, QComboBox] = {}
         self._build_alert_rows()
 
-        alert_group = QGroupBox("Alertas estruturais")
+        alert_group = QGroupBox("Structural alerts")
         alert_layout = QVBoxLayout(alert_group)
         alert_layout.addWidget(self.alert_table)
 
         self.database_edit = QLineEdit()
         self.excel_edit = QLineEdit()
-        self.detailed_box = QCheckBox("Exportação detalhada (uma aba por regra quebrada)")
+        self.detailed_box = QCheckBox("Detailed export (one sheet per broken rule)")
         self.detailed_box.setChecked(True)
         self.detailed_box.stateChanged.connect(self._apply)
 
-        output_group = QGroupBox("Saídas")
+        output_group = QGroupBox("Outputs")
         output_form = QFormLayout(output_group)
-        output_form.addRow("Banco SQLite:", _with_browse(self.database_edit, self._pick_database))
-        output_form.addRow("Relatório Excel:", _with_browse(self.excel_edit, self._pick_excel))
+        output_form.addRow("SQLite database:", _with_browse(self.database_edit, self._pick_database))
+        output_form.addRow("Excel report:", _with_browse(self.excel_edit, self._pick_excel))
         output_form.addRow(self.detailed_box)
 
         self.explanation = QLabel("")
@@ -111,8 +111,8 @@ class PolicyPage(WizardPage):
         self.warning.setWordWrap(True)
         self.warning.setStyleSheet("color: #a33;")
 
-        save_button = QPushButton("Salvar preset...")
-        load_button = QPushButton("Carregar preset...")
+        save_button = QPushButton("Save preset...")
+        load_button = QPushButton("Load preset...")
         save_button.clicked.connect(self._save_preset)
         load_button.clicked.connect(self._load_preset)
         preset_buttons = QHBoxLayout()
@@ -129,35 +129,35 @@ class PolicyPage(WizardPage):
 
     def _save_preset(self) -> None:
         """Store the current choices; files and output paths are not included."""
-        path, _ = QFileDialog.getSaveFileName(self, "Salvar preset", "", "Preset (*.json)")
+        path, _ = QFileDialog.getSaveFileName(self, "Save preset", "", "Preset (*.json)")
         if not path:
             return
         self._apply()
         try:
             presets.save(self.state.to_preset(name=Path(path).stem), path)
         except OSError as exc:
-            QMessageBox.critical(self, "Falha ao salvar", str(exc))
+            QMessageBox.critical(self, "Save failed", str(exc))
 
     def _load_preset(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Carregar preset", "", "Preset (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "Load preset", "", "Preset (*.json)")
         if not path:
             return
         try:
             preset = presets.load(path)
             self.state.apply_preset(preset, builtin_registry().ids())
         except (presets.PresetError, ValueError) as exc:
-            QMessageBox.critical(self, "Preset inválido", str(exc))
+            QMessageBox.critical(self, "Invalid preset", str(exc))
             return
         self._refresh_widgets_from_state()
         QMessageBox.information(
             self,
-            "Preset carregado",
-            f"'{preset.name}' aplicado. Os arquivos escolhidos foram mantidos.",
+            "Preset loaded",
+            f"'{preset.name}' applied. The selected files were kept.",
         )
 
     def _refresh_widgets_from_state(self) -> None:
         """Push a loaded preset back into the widgets."""
-        self.qed_mode.setCurrentText(MODE_LABELS.get(self.state.qed.mode, "Ranquear"))
+        self.qed_mode.setCurrentText(MODE_LABELS.get(self.state.qed.mode, "Rank"))
         value = self.state.qed.threshold or self.state.qed.percentile
         if value is not None:
             self.qed_value.setValue(float(value))
@@ -191,13 +191,13 @@ class PolicyPage(WizardPage):
             self.alert_table.setCellWidget(row, 2, combo)
 
     def _pick_database(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Banco da execução", "", "SQLite (*.sqlite)")
+        path, _ = QFileDialog.getSaveFileName(self, "Run database", "", "SQLite (*.sqlite)")
         if path:
             self.database_edit.setText(path)
             self._apply()
 
     def _pick_excel(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Relatório Excel", "", "Excel (*.xlsx)")
+        path, _ = QFileDialog.getSaveFileName(self, "Excel report", "", "Excel (*.xlsx)")
         if path:
             self.excel_edit.setText(path)
             self._apply()
@@ -250,7 +250,7 @@ class PolicyPage(WizardPage):
             try:
                 compile_expression(self.state.expression)
             except ExpressionError as exc:
-                return f"Expressão inválida: {exc}"
+                return f"Invalid expression: {exc}"
         problems = self.state.validation_errors()
         return "\n".join(problems) if problems else None
 
@@ -259,7 +259,7 @@ def _with_browse(edit: QLineEdit, handler) -> QWidget:
     container = QWidget()
     layout = QHBoxLayout(container)
     layout.setContentsMargins(0, 0, 0, 0)
-    button = QPushButton("Procurar...")
+    button = QPushButton("Browse...")
     button.clicked.connect(handler)
     layout.addWidget(edit, stretch=1)
     layout.addWidget(button)

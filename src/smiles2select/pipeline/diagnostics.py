@@ -117,7 +117,7 @@ def default_diagnostics_config() -> ParallelDiagnosticsConfig:
 
 
 def safe_mode_config(log_directory: Path | str | None = None) -> ParallelDiagnosticsConfig:
-    """The "Modo seguro de diagnóstico" preset: n_jobs=1, small chunks, everything logged."""
+    """The diagnostic-safe preset: n_jobs=1, small chunks, everything logged."""
     return ParallelDiagnosticsConfig(
         enabled=True,
         force_sequential=True,

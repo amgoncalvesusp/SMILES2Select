@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from smiles2select.alerts.custom_smarts import SmartsAlert
 from smiles2select.alerts.policies import AlertPolicy
 from smiles2select.app_metadata import APP_NAME, APP_VERSION, DISCLAIMER
+from smiles2select.chemistry.fingerprints import FingerprintConfig
+from smiles2select.chemistry.standardization import StandardizationConfig
 from smiles2select.decision.explanations import policy_sentence, restrictiveness_warning
 from smiles2select.decision.policies import DecisionPolicy, ProfileRole
 from smiles2select.export import docking, excel, parquet
@@ -26,6 +29,7 @@ from smiles2select.pipeline.diagnostics import ParallelDiagnosticsConfig, safe_m
 from smiles2select.pipeline.runner import RunResult, run
 from smiles2select.profiles.loader import builtin_registry
 from smiles2select.scores.qed import QedSelection
+from smiles2select.selection_intelligence import recipes
 
 DEFAULT_PROFILES = ("lipinski", "veber", "ghose", "egan", "muegge")
 
@@ -42,6 +46,65 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sheet", default=None, help="spreadsheet sheet name")
     parser.add_argument("--smiles-column", default=None, help="column holding the SMILES")
     parser.add_argument("--id-column", default=None, help="column holding the molecule id")
+    parser.add_argument(
+        "--reference",
+        action="append",
+        type=Path,
+        default=[],
+        metavar="FILE",
+        help="reference library file (repeatable; references are never selected)",
+    )
+    parser.add_argument(
+        "--background",
+        action="append",
+        type=Path,
+        default=[],
+        metavar="FILE",
+        help="context/background library file (repeatable; never selected)",
+    )
+    parser.add_argument(
+        "--reference-smiles-column",
+        default=None,
+        help="SMILES column in reference libraries",
+    )
+    parser.add_argument(
+        "--reference-id-column",
+        default=None,
+        help="identifier column in reference libraries",
+    )
+    parser.add_argument("--background-smiles-column", default=None)
+    parser.add_argument("--background-id-column", default=None)
+    parser.add_argument(
+        "--reference-search",
+        choices=("exact", "fast"),
+        default="exact",
+        help="reference nearest-neighbor discovery mode",
+    )
+    parser.add_argument(
+        "--exclude-reference-duplicates",
+        action="store_true",
+        help="exclude exact candidate/reference duplicates from the final selection",
+    )
+    parser.add_argument(
+        "--reference-min-similarity", type=float, default=0.0,
+        help="lower bound for reference-neighborhood selection",
+    )
+    parser.add_argument(
+        "--reference-max-similarity", type=float, default=1.0,
+        help="upper bound for reference-neighborhood selection",
+    )
+    parser.add_argument(
+        "--selection-strategy",
+        choices=(
+            "traditional", "balanced", "diversity_first", "reference_novelty",
+            "reference_neighborhood", "reference_aware_diversity", "stratified", "manual_assisted",
+        ),
+        default="traditional",
+        help="optional strategy layer applied after chemical eligibility",
+    )
+    parser.add_argument("--final-count", type=int, default=None)
+    parser.add_argument("--reserve-count", type=int, default=None)
+    parser.add_argument("--selection-seed", type=int, default=0xF00D)
     parser.add_argument(
         "--profiles",
         default=",".join(DEFAULT_PROFILES),
@@ -154,6 +217,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--save-preset", type=Path, default=None, help="write the resolved settings as a preset"
     )
     parser.add_argument(
+        "--selection-plan",
+        type=Path,
+        default=None,
+        help="replay strategy, fingerprint, final/reserve counts and seed from a selection recipe",
+    )
+    parser.add_argument(
+        "--save-selection-plan",
+        type=Path,
+        default=None,
+        help="save the resolved run as a machine-readable selection recipe",
+    )
+    parser.add_argument(
         "--profile-dir",
         action="append",
         type=Path,
@@ -189,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
         print(policy_sentence(config.policy))
         warning = restrictiveness_warning(config.policy)
         if warning:
-            print(f"AVISO: {warning}")
+            print(f"WARNING: {warning}")
 
     progress = None if args.quiet else _print_progress
     try:
@@ -197,6 +272,9 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"run failed: {exc}", file=sys.stderr)
         return 1
+
+    if args.save_selection_plan is not None:
+        recipes.save(_recipe_from_result(result), args.save_selection_plan)
 
     if config.excel_path is not None:
         excel.export(result, config.excel_path, excel.ExportOptions(detailed=not args.compact))
@@ -229,6 +307,9 @@ def _build_config(args: argparse.Namespace) -> RunConfig:
     An explicit flag always wins over the preset: the preset supplies the
     settings the user did not state on this command line.
     """
+    if args.selection_plan is not None:
+        return _config_from_selection_plan(args, recipes.load(args.selection_plan))
+
     preset = presets.load(args.preset) if args.preset else None
     if preset is not None:
         available = builtin_registry(tuple(args.profile_dir)).ids()
@@ -260,6 +341,110 @@ def _build_config(args: argparse.Namespace) -> RunConfig:
         detailed_export=not args.compact,
         checkpoint_path=args.checkpoint,
         diagnostics=_build_diagnostics(args),
+        reference_sources=tuple(_build_reference_sources(args)),
+        background_sources=tuple(_build_background_sources(args)),
+        reference_search=args.reference_search,
+        exclude_reference_duplicates=args.exclude_reference_duplicates,
+        reference_min_similarity=args.reference_min_similarity,
+        reference_max_similarity=args.reference_max_similarity,
+        selection_strategy=args.selection_strategy,
+        final_count=args.final_count,
+        reserve_count=args.reserve_count,
+        selection_seed=args.selection_seed,
+    )
+
+
+def _config_from_selection_plan(args: argparse.Namespace, recipe: recipes.SelectionRecipe) -> RunConfig:
+    """Replay the deterministic Hub layer while letting the caller choose new inputs."""
+    profile_ids = tuple(_split(args.profiles))
+    standardization_fields = set(StandardizationConfig.__dataclass_fields__)
+    standardization_payload = {
+        key: value for key, value in recipe.standardization.items() if key in standardization_fields
+    }
+    fingerprint_payload = recipe.fingerprint
+    fingerprint = FingerprintConfig(
+        radius=int(fingerprint_payload.get("radius", 2)),
+        size=int(fingerprint_payload.get("bits", fingerprint_payload.get("size", 2048))),
+        use_chirality=bool(fingerprint_payload.get("use_chirality", False)),
+    )
+    reference_paths = list(_build_reference_sources(args))
+    if not reference_paths:
+        for item in recipe.reference_libraries:
+            source = Path(str(item.get("source", "")))
+            if source.exists():
+                reference_paths.append(
+                SourceFile(path=source, mapping=guess_mapping(preview_columns(source)))
+                )
+    background_paths = list(_build_background_sources(args))
+    if not background_paths:
+        for item in recipe.background_libraries:
+            source = Path(str(item.get("source", "")))
+            if source.exists():
+                background_paths.append(
+                    SourceFile(path=source, mapping=guess_mapping(preview_columns(source)))
+                )
+    return RunConfig(
+        sources=tuple(_build_sources(args)),
+        profile_ids=profile_ids,
+        policy=_build_policy(args, profile_ids),
+        standardization=StandardizationConfig(**standardization_payload),
+        alert_catalogs=tuple(_split(args.alerts)) if args.alerts != "none" else (),
+        custom_alerts=tuple(_build_custom_alerts(args.custom_smarts)),
+        compute_qed=not args.no_qed,
+        compute_sa=args.sa_score,
+        compute_np=args.np_score,
+        diversity_pick=args.diverse,
+        per_scaffold_limit=args.per_scaffold,
+        fingerprint_config=fingerprint,
+        drop_duplicates=not args.keep_duplicates,
+        profile_directories=tuple(args.profile_dir),
+        n_jobs=args.jobs,
+        chunk_size=args.chunk_size,
+        database_path=args.database,
+        excel_path=args.excel,
+        parquet_path=args.parquet,
+        cache_path=args.cache,
+        detailed_export=not args.compact,
+        checkpoint_path=args.checkpoint,
+        diagnostics=_build_diagnostics(args),
+        reference_sources=tuple(reference_paths),
+        background_sources=tuple(background_paths),
+        reference_search=("fast" if "HNSW" in str(fingerprint_payload.get("search", "")) else args.reference_search),
+        exclude_reference_duplicates=args.exclude_reference_duplicates,
+        reference_min_similarity=args.reference_min_similarity,
+        reference_max_similarity=args.reference_max_similarity,
+        selection_strategy=recipe.strategy,
+        final_count=recipe.target_count,
+        reserve_count=recipe.reserve_count,
+        selection_seed=recipe.seed if recipe.seed is not None else args.selection_seed,
+        zones=tuple(recipe.zones),
+    )
+
+
+def _recipe_from_result(result: RunResult) -> recipes.SelectionRecipe:
+    """Capture the run-level settings needed to replay its Hub decision."""
+    return recipes.SelectionRecipe(
+        name="cli-selection",
+        input_hash=result.config.fingerprint(),
+        required_filters=tuple(result.config.profile_ids),
+        target_count=result.config.final_count,
+        strategy=result.config.selection_strategy,
+        reference_libraries=tuple(
+            library.spec.as_dict() for library in result.reference_libraries
+        ),
+        background_libraries=tuple(
+            library.spec.as_dict() for library in result.background_libraries
+        ),
+        standardization=asdict(result.config.standardization),
+        fingerprint={
+            "radius": result.config.fingerprint_config.radius,
+            "bits": result.config.fingerprint_config.size,
+            "use_chirality": result.config.fingerprint_config.use_chirality,
+            "search": result.config.reference_search,
+        },
+        reserve_count=result.config.reserve_count,
+        seed=result.config.selection_seed,
+        zones=tuple(result.config.zones),
     )
 
 
@@ -292,6 +477,16 @@ def _config_from_preset(args: argparse.Namespace, preset: presets.RunPreset) -> 
         detailed_export=preset.detailed_export and not args.compact,
         checkpoint_path=args.checkpoint,
         diagnostics=_build_diagnostics(args),
+        reference_sources=tuple(_build_reference_sources(args)),
+        background_sources=tuple(_build_background_sources(args)),
+        reference_search=args.reference_search,
+        exclude_reference_duplicates=args.exclude_reference_duplicates,
+        reference_min_similarity=args.reference_min_similarity,
+        reference_max_similarity=args.reference_max_similarity,
+        selection_strategy=args.selection_strategy,
+        final_count=args.final_count,
+        reserve_count=args.reserve_count,
+        selection_seed=args.selection_seed,
     )
 
 
@@ -304,6 +499,41 @@ def _build_sources(args: argparse.Namespace) -> list[SourceFile]:
             mapping = guess_mapping(preview_columns(path, args.sheet))
             if args.id_column:
                 mapping = ColumnMapping(smiles=mapping.smiles, molecule_id=args.id_column)
+        sources.append(SourceFile(path=Path(path), mapping=mapping, sheet=args.sheet))
+    return sources
+
+
+def _build_reference_sources(args: argparse.Namespace) -> list[SourceFile]:
+    sources: list[SourceFile] = []
+    for path in args.reference:
+        if args.reference_smiles_column:
+            mapping = ColumnMapping(
+                smiles=args.reference_smiles_column,
+                molecule_id=args.reference_id_column,
+            )
+        else:
+            mapping = guess_mapping(preview_columns(path, args.sheet))
+            if args.reference_id_column:
+                mapping = ColumnMapping(smiles=mapping.smiles, molecule_id=args.reference_id_column)
+        sources.append(SourceFile(path=Path(path), mapping=mapping, sheet=args.sheet))
+    return sources
+
+
+def _build_background_sources(args: argparse.Namespace) -> list[SourceFile]:
+    sources: list[SourceFile] = []
+    for path in args.background:
+        if args.background_smiles_column:
+            mapping = ColumnMapping(
+                smiles=args.background_smiles_column,
+                molecule_id=args.background_id_column,
+            )
+        else:
+            mapping = guess_mapping(preview_columns(path, args.sheet))
+            if args.background_id_column:
+                mapping = ColumnMapping(
+                    smiles=mapping.smiles,
+                    molecule_id=args.background_id_column,
+                )
         sources.append(SourceFile(path=Path(path), mapping=mapping, sheet=args.sheet))
     return sources
 
@@ -399,13 +629,13 @@ def _print_report(result: RunResult, *, quiet: bool) -> None:
         print(result.decision.selected_count)
         return
     print()
-    print(f"Política:            {result.config.policy.id}")
-    print(f"Total processado:    {result.total_records}")
-    print(f"Inválidos:           {result.invalid_count}")
-    print(f"Duplicatas:          {result.duplicate_count}")
-    print(f"Avaliados:           {result.evaluated_count}")
-    print(f"Selecionados finais: {result.decision.selected_count}")
-    print(f"Excluídos finais:    {result.decision.excluded_count}")
+    print(f"Policy:              {result.config.policy.id}")
+    print(f"Records processed:   {result.total_records}")
+    print(f"Invalid:             {result.invalid_count}")
+    print(f"Duplicates:          {result.duplicate_count}")
+    print(f"Evaluated:           {result.evaluated_count}")
+    print(f"Final selected:      {result.decision.selected_count}")
+    print(f"Final excluded:      {result.decision.excluded_count}")
     print()
     print(result.profile_summary().to_string(index=False))
     if result.diversity is not None:
@@ -414,9 +644,9 @@ def _print_report(result: RunResult, *, quiet: bool) -> None:
             print(f"  {label}: {value}")
     if result.cache_stats is not None:
         hits, misses = result.cache_stats
-        print(f"\nCache: {hits} reaproveitadas, {misses} calculadas")
+        print(f"\nCache: {hits} reused, {misses} computed")
     if result.database_path:
-        print(f"\nBanco: {result.database_path}")
+        print(f"\nDatabase: {result.database_path}")
     if result.config.excel_path:
         print(f"Excel: {result.config.excel_path}")
     if result.config.parquet_path:

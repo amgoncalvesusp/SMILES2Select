@@ -56,21 +56,21 @@ def choose_method(molecule_count: int) -> MethodChoice:
     if molecule_count <= SMALL_LIBRARY:
         return MethodChoice(
             "pca",
-            f"{molecule_count} moléculas: PCA é determinístico e imediato nesta escala",
+            f"{molecule_count} molecules: PCA is deterministic and immediate at this scale",
             tuple(method for method in methods if method != "pca"),
         )
 
     if "tmap" in methods:
         band = "50 mil a 250 mil" if molecule_count <= LARGE_LIBRARY else "acima de 250 mil"
         return MethodChoice(
-            "tmap", f"{band} moléculas: TMAP foi projetado para esta escala", methods
+            "tmap", f"{band} molecules: TMAP was designed for this scale", methods
         )
 
     return MethodChoice(
         "pca",
         (
-            f"{molecule_count} moléculas: TMAP seria o padrão nesta escala, mas não está "
-            "instalado; usando PCA, que permanece determinístico"
+            f"{molecule_count} molecules: TMAP would be the default at this scale, but it is "
+            "not installed; using deterministic PCA"
         ),
         methods,
     )

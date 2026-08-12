@@ -36,6 +36,7 @@ class BasketCounters:
     candidates: int
     shortlisted: int
     final_selected: int
+    reserve: int
     pinned: int
     manually_excluded: int
     target: int | None = None
@@ -48,14 +49,15 @@ class BasketCounters:
 
     def as_rows(self) -> list[tuple[str, object]]:
         return [
-            ("Candidatos", self.candidates),
+            ("Candidates", self.candidates),
             ("Shortlist", self.shortlisted),
             (
-                "Selecionados finais",
+                "Final selected",
                 f"{self.final_selected} / {self.target}" if self.target else self.final_selected,
             ),
-            ("Fixados", self.pinned),
-            ("Excluídos manualmente", self.manually_excluded),
+            ("Pinned", self.pinned),
+            ("Reserve", self.reserve),
+            ("Manually excluded", self.manually_excluded),
         ]
 
 
@@ -113,6 +115,7 @@ class SelectionBasket:
             candidates=len(self._states),
             shortlisted=len(self.ids_with_status(SelectionStatus.SHORTLISTED)),
             final_selected=len(self.final_ids()),
+            reserve=len(self.ids_with_status(SelectionStatus.RESERVE)),
             pinned=len(self.pinned_ids()),
             manually_excluded=len(self.excluded_ids()),
             target=self.target_count,
@@ -122,15 +125,15 @@ class SelectionBasket:
         """What a bulk action would do, shown before it is confirmed."""
         known = [key for key in record_ids if key in self._states]
         return {
-            "solicitadas": len(record_ids),
-            "desconhecidas": len(record_ids) - len(known),
-            "já selecionadas": sum(1 for key in known if self._states[key].is_selected),
-            "excluídas manualmente": sum(
+            "requested": len(record_ids),
+            "unknown": len(record_ids) - len(known),
+            "already selected": sum(1 for key in known if self._states[key].is_selected),
+            "manually excluded": sum(
                 1
                 for key in known
                 if self._states[key].selection_status is SelectionStatus.MANUALLY_EXCLUDED
             ),
-            "fixadas": sum(1 for key in known if self._states[key].pinned),
+            "pinned": sum(1 for key in known if self._states[key].pinned),
         }
 
     # -- writing ------------------------------------------------------------
@@ -246,8 +249,8 @@ class SelectionBasket:
         if state.chemical_status.passed or reason.strip():
             return
         raise JustificationRequired(
-            f"molécula {state.record_id} está como {state.chemical_status.value}; "
-            f"selecioná-la ({origin.value}) exige uma justificativa"
+            f"molecule {state.record_id} is {state.chemical_status.value}; "
+            f"selecting it ({origin.value}) requires a justification"
         )
 
 

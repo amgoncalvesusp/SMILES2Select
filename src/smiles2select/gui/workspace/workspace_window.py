@@ -11,6 +11,7 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -26,11 +27,19 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from rdkit import Chem
 
 from smiles2select.app_metadata import APP_NAME
-from smiles2select.chemical_space import pca_projection
-from smiles2select.chemical_space.clustering import cluster
+from smiles2select.chemical_space.clustering import ClusteringTooLargeError, cluster
+from smiles2select.chemical_space.projection_manager import (
+    ProjectionConfig,
+    ProjectionResult,
+    project,
+)
+from smiles2select.chemistry.descriptor_registry import default_registry
 from smiles2select.chemistry.scaffolds import scaffolds_from_smiles
+from smiles2select.explainability.consequences import explain_change
+from smiles2select.explainability.method_cards import get_method_card
 from smiles2select.export import selection_export
 from smiles2select.gui.workspace.panels import BasketPanel, InspectorPanel
 from smiles2select.gui.workspace.views import ChemicalSpaceView, ParetoView
@@ -51,7 +60,7 @@ from smiles2select.selection_intelligence.states import (
     chemical_status_from_run,
 )
 
-VIEW_MAP = "Espaço químico"
+VIEW_MAP = "Chemical space"
 VIEW_PARETO = "Pareto"
 OBJECTIVE_CANDIDATES = ("qed", "mol_wt", "rdkit_wlogp", "tpsa", "sa_score", "np_score")
 
@@ -61,7 +70,7 @@ class WorkspaceWindow(QMainWindow):
 
     def __init__(self, result: RunResult, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f"{APP_NAME} — Selection Intelligence")
+        self.setWindowTitle(f"{APP_NAME} - Chemical Space Hub")
         self.resize(1440, 900)
 
         self.result = result
@@ -70,6 +79,7 @@ class WorkspaceWindow(QMainWindow):
         self.ranker = ParetoRanker()
         self.pareto = None
         self._outcome: SelectionOutcome | None = None
+        self._projection_results: dict[tuple[str, bool], tuple[ProjectionResult, pd.DataFrame]] = {}
 
         self.map_view = ChemicalSpaceView()
         self.pareto_view = ParetoView()
@@ -96,8 +106,13 @@ class WorkspaceWindow(QMainWindow):
             evaluable["murcko_scaffold"] = scaffolds_from_smiles(
                 evaluable["canonical_smiles"].fillna("").tolist()
             )
-        clusters = cluster(evaluable["canonical_smiles"].fillna("").tolist(), evaluable.index)
-        evaluable["cluster_id"] = clusters.labels
+        try:
+            clusters = cluster(evaluable["canonical_smiles"].fillna("").tolist(), evaluable.index)
+            evaluable["cluster_id"] = clusters.labels
+        except ClusteringTooLargeError:
+            # The map remains usable; a large library needs a scalable cluster
+            # backend rather than a hidden quadratic allocation.
+            evaluable["cluster_id"] = pd.Series(pd.NA, index=evaluable.index, dtype="Int64")
         for column in ("qed", "sa_score"):
             if column not in evaluable.columns:
                 evaluable[column] = pd.NA
@@ -119,7 +134,7 @@ class WorkspaceWindow(QMainWindow):
         return SelectionBasket(states)
 
     def _build_layout(self) -> QWidget:
-        controls = QGroupBox("Controles")
+        controls = QGroupBox("Chemical Space Hub")
         form = QFormLayout(controls)
 
         self.view_selector = QComboBox()
@@ -138,20 +153,45 @@ class WorkspaceWindow(QMainWindow):
         self.target_count.setValue(min(50, max(1, len(self.candidates))))
         self.per_scaffold = QSpinBox()
         self.per_scaffold.setRange(0, 100)
-        self.per_scaffold.setSpecialValueText("sem cota")
+        self.per_scaffold.setSpecialValueText("no quota")
         self.per_cluster = QSpinBox()
         self.per_cluster.setRange(0, 100)
-        self.per_cluster.setSpecialValueText("sem cota")
+        self.per_cluster.setSpecialValueText("no quota")
         self.strategy = QComboBox()
         self.strategy.addItems([item.value for item in Strategy])
+        self.method_card = QLabel()
+        self.method_card.setWordWrap(True)
+        self.method_card.setStyleSheet("background: #eef3f8; padding: 6px;")
+        self.consequence = QLabel()
+        self.consequence.setWordWrap(True)
+        self.projection_selector = QComboBox()
+        self.projection_selector.addItem("Property PCA", "property_pca")
+        self.projection_selector.addItem("Structural UMAP", "structural_umap")
+        self.projection_selector.addItem("TMAP", "tmap")
+        self.color_selector = QComboBox()
+        self.color_selector.addItems(["Selection status", "Pareto rank", "Reference similarity"])
+        self.reference_overlay = QCheckBox("Show reference overlay")
+        self.reference_overlay.setChecked(bool(self.result.reference_libraries))
+        reference_info = QLabel(
+            f"Reference libraries: {len(self.result.reference_libraries)}\n"
+            "Map distances are for visualization only. Molecular similarity and "
+            "novelty use fingerprints."
+        )
+        reference_info.setWordWrap(True)
 
-        form.addRow("Visualização:", self.view_selector)
-        form.addRow("Objetivo 1 (maximizar):", self.first_objective)
-        form.addRow("Objetivo 2 (minimizar):", self.second_objective)
-        form.addRow("Número final:", self.target_count)
-        form.addRow("Máx. por scaffold:", self.per_scaffold)
-        form.addRow("Máx. por cluster:", self.per_cluster)
-        form.addRow("Estratégia:", self.strategy)
+        form.addRow("View:", self.view_selector)
+        form.addRow("Objective 1 (maximize):", self.first_objective)
+        form.addRow("Objective 2 (minimize):", self.second_objective)
+        form.addRow("Final count:", self.target_count)
+        form.addRow("Max per scaffold:", self.per_scaffold)
+        form.addRow("Max per cluster:", self.per_cluster)
+        form.addRow("Strategy:", self.strategy)
+        form.addRow("Method card:", self.method_card)
+        form.addRow("Consequence:", self.consequence)
+        form.addRow("Projection:", self.projection_selector)
+        form.addRow("Color by:", self.color_selector)
+        form.addRow(self.reference_overlay)
+        form.addRow(reference_info)
         form.addRow(self.warnings)
 
         top = QSplitter(Qt.Horizontal)
@@ -178,6 +218,11 @@ class WorkspaceWindow(QMainWindow):
         self.view_selector.currentTextChanged.connect(self._switch_view)
         self.first_objective.currentTextChanged.connect(self._recompute_pareto)
         self.second_objective.currentTextChanged.connect(self._recompute_pareto)
+        self.projection_selector.currentIndexChanged.connect(lambda _index: self.refresh())
+        self.color_selector.currentIndexChanged.connect(lambda _index: self.refresh())
+        self.reference_overlay.stateChanged.connect(lambda _state: self.refresh())
+        self.strategy.currentTextChanged.connect(self._update_method_card)
+        self._update_method_card(self.strategy.currentText())
 
         for view in (self.map_view, self.pareto_view):
             view.point_clicked.connect(self._show_molecule)
@@ -199,6 +244,21 @@ class WorkspaceWindow(QMainWindow):
         self.views.setCurrentIndex(0 if name == VIEW_MAP else 1)
         self.refresh()
 
+    def _update_method_card(self, strategy: str) -> None:
+        """Keep method bias and consequence visible while changing controls."""
+        try:
+            card = get_method_card(strategy)
+        except KeyError:
+            card = get_method_card("balanced")
+        self.method_card.setText(
+            f"<b>{card.title}</b><br>{card.what_it_does}<br>"
+            f"<i>Favors:</i> {card.what_it_favors}<br>"
+            f"<i>May underrepresent:</i> {card.may_underrepresent}"
+        )
+        self.consequence.setText(
+            explain_change("selection_strategy", "previous", strategy).message
+        )
+
     def objectives(self) -> ObjectiveSet:
         return ObjectiveSet(
             [
@@ -212,7 +272,7 @@ class WorkspaceWindow(QMainWindow):
         second = self.second_objective.currentText()
         if not first or not second or first == second:
             self.pareto = None
-            self.warnings.setText("Escolha dois objetivos diferentes.")
+            self.warnings.setText("Choose two different objectives.")
             self.refresh()
             return
         try:
@@ -231,8 +291,8 @@ class WorkspaceWindow(QMainWindow):
             extras["Pareto rank"] = int(self.pareto.table.loc[record_id, "pareto_rank"])
         if record_id in self.basket:
             state = self.basket.state(record_id)
-            extras["Status químico"] = state.chemical_status.value
-            extras["Status de seleção"] = state.selection_status.value
+            extras["Chemical status"] = state.chemical_status.value
+            extras["Selection status"] = state.selection_status.value
         self.inspector.show_molecule(record_id, self.candidates, extras)
 
     def _shortlist_region(self, record_ids: list[int]) -> None:
@@ -242,8 +302,8 @@ class WorkspaceWindow(QMainWindow):
         summary = "\n".join(f"{label}: {value}" for label, value in preview.items())
         answer = QMessageBox.question(
             self,
-            "Adicionar à shortlist",
-            f"{summary}\n\nConfirmar?",
+            "Add to shortlist",
+            f"{summary}\n\nConfirm?",
             QMessageBox.Yes | QMessageBox.No,
         )
         if answer == QMessageBox.Yes:
@@ -264,7 +324,7 @@ class WorkspaceWindow(QMainWindow):
                 pinned = self.basket.state(record_id).pinned
                 (self.basket.unpin if pinned else self.basket.pin)([record_id])
         except JustificationRequired as exc:
-            QMessageBox.warning(self, "Justificativa necessária", str(exc))
+            QMessageBox.warning(self, "Justification required", str(exc))
             return
         self.refresh()
 
@@ -275,11 +335,11 @@ class WorkspaceWindow(QMainWindow):
         if not state.chemical_status.passed:
             reason, accepted = QInputDialog.getText(
                 self,
-                "Justificativa",
-                f"A molécula está como {state.chemical_status.value}. Justifique a seleção:",
+                "Justification",
+                f"The molecule is {state.chemical_status.value}. Explain the selection:",
             )
             if not accepted or not reason.strip():
-                raise JustificationRequired("seleção cancelada: nenhuma justificativa fornecida")
+                raise JustificationRequired("selection cancelled: no justification supplied")
         self.basket.add_to_final([record_id], reason=reason)
 
     def constraints(self) -> SelectionConstraints:
@@ -306,7 +366,7 @@ class WorkspaceWindow(QMainWindow):
             list(outcome.selected_ids),
             origin=SelectionOrigin.AUTOMATIC,
             source=outcome.strategy.value,
-            reason="seleção automática",
+            reason="automatic selection",
         )
         self._outcome = outcome
         self.warnings.setText("\n".join(outcome.warnings(constraints)))
@@ -321,12 +381,12 @@ class WorkspaceWindow(QMainWindow):
         self.refresh()
 
     def _export(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Exportar seleção", "", "Excel (*.xlsx)")
+        path, _ = QFileDialog.getSaveFileName(self, "Export selection", "", "Excel (*.xlsx)")
         if not path:
             return
         workbook, recipe = selection_export.export(self.build_artifacts(), path)
         QMessageBox.information(
-            self, "Exportado", f"Planilha: {workbook.name}\nReceita: {recipe.name}"
+            self, "Exported", f"Workbook: {workbook.name}\nRecipe: {recipe.name}"
         )
 
     def build_artifacts(self) -> selection_export.SessionArtifacts:
@@ -347,6 +407,28 @@ class WorkspaceWindow(QMainWindow):
                 max_per_cluster=self.per_cluster.value() or None,
                 pinned_ids=self.basket.pinned_ids(),
                 excluded_ids=self.basket.excluded_ids(),
+                candidate_library="candidate",
+                reference_libraries=tuple(
+                    library.spec.as_dict() for library in self.result.reference_libraries
+                ),
+                background_libraries=tuple(
+                    library.spec.as_dict() for library in self.result.background_libraries
+                ),
+                standardization={
+                    "config_hash": self.result.config.standardization.fingerprint(),
+                },
+                fingerprint=(
+                    {
+                        "radius": self.result.reference_similarity.fingerprint.radius,
+                        "bits": self.result.reference_similarity.fingerprint.size,
+                        "use_chirality": self.result.reference_similarity.fingerprint.use_chirality,
+                        "search": self.result.reference_similarity.search_mode,
+                    }
+                    if self.result.reference_similarity is not None
+                    else {}
+                ),
+                reserve_count=len(self.result.reserve_ids),
+                seed=self.result.config.selection_seed,
             ),
             pareto=self.pareto,
             clusters=self.candidates.get("cluster_id"),
@@ -359,8 +441,21 @@ class WorkspaceWindow(QMainWindow):
         ranks = self.pareto.table["pareto_rank"] if self.pareto is not None else None
 
         if self.views.currentIndex() == 0:
-            projection = pca_projection.project(self.candidates)
-            self.map_view.set_points(projection.coordinates, selected, ranks)
+            try:
+                projection, reference_coordinates = self._map_projection()
+            except Exception as exc:
+                self.warnings.setText(str(exc))
+                self.map_view.set_points(pd.DataFrame(columns=["x", "y"]))
+                self.map_view.set_reference_points(None)
+            else:
+                self.map_view.set_points(
+                    projection.projection.coordinates,
+                    selected,
+                    self._colour_values(projection.projection.coordinates, ranks),
+                )
+                self.map_view.set_reference_points(
+                    reference_coordinates if self.reference_overlay.isChecked() else None
+                )
         elif self.pareto is not None:
             self.pareto_view.show_objectives(
                 self.candidates,
@@ -370,3 +465,69 @@ class WorkspaceWindow(QMainWindow):
                 selected,
             )
         self.basket_panel.refresh(self.basket, self.candidates.get("molecule_id"))
+
+    def _map_projection(self) -> tuple[ProjectionResult, pd.DataFrame]:
+        """Build/cache the selected map and, for structural methods, references."""
+        method = str(self.projection_selector.currentData())
+        overlay = bool(self.reference_overlay.isChecked() and self.result.reference_libraries)
+        key = (method, overlay)
+        if key in self._projection_results:
+            return self._projection_results[key]
+        config = ProjectionConfig(method=method, fingerprint=self.result.config.fingerprint_config)
+        if overlay and method == "property_pca":
+            features = tuple(ProjectionConfig().features)
+            combined = self.candidates[[column for column in features if column in self.candidates]].copy()
+            combined.index = [f"candidate::{record_id}" for record_id in combined.index]
+            reference_frames = []
+            registry = default_registry()
+            for library in self.result.reference_libraries:
+                rows = []
+                for row_id, row in library.valid.iterrows():
+                    mol = Chem.MolFromSmiles(str(row["canonical_smiles"]))
+                    values = registry.compute(mol, features) if mol is not None else {}
+                    rows.append(values)
+                frame = pd.DataFrame(rows, index=library.valid.index)
+                frame.index = [
+                    f"reference::{library.library_id}::{row_id}" for row_id in frame.index
+                ]
+                reference_frames.append(frame)
+            combined = pd.concat([combined, *reference_frames], axis=0)
+            result = project(combined, config)
+            coordinates = result.projection.coordinates
+            candidate_coordinates = coordinates.loc[coordinates.index.str.startswith("candidate::")]
+            candidate_coordinates.index = pd.Index(
+                [int(value.split("::", 1)[1]) for value in candidate_coordinates.index]
+            )
+            reference_coordinates = coordinates.loc[coordinates.index.str.startswith("reference::")]
+            self._projection_results[key] = (
+                ProjectionResult(
+                    projection=type(result.projection)(
+                        coordinates=candidate_coordinates,
+                        method=result.projection.method,
+                        features=result.projection.features,
+                        explained_variance=result.projection.explained_variance,
+                        parameters=result.projection.parameters,
+                    ),
+                    config=result.config,
+                    input_hash=result.input_hash,
+                    software_versions=result.software_versions,
+                ),
+                reference_coordinates,
+            )
+        else:
+            result = project(self.candidates, config)
+            self._projection_results[key] = (result, pd.DataFrame(columns=["x", "y"]))
+        return self._projection_results[key]
+
+    def _colour_values(self, coordinates: pd.DataFrame, ranks: pd.Series | None) -> pd.Series:
+        mode = self.color_selector.currentText()
+        if mode == "Pareto rank" and ranks is not None:
+            return ranks.reindex(coordinates.index)
+        if mode == "Selection status":
+            values = pd.Series(float("nan"), index=coordinates.index)
+            values.loc[values.index.intersection(self.basket.final_ids())] = 1
+            return values
+        if "max_reference_similarity" in self.candidates.columns:
+            values = self.candidates["max_reference_similarity"].reindex(coordinates.index)
+            return (1 + (values.fillna(0).clip(0, 1) * 4).round()).astype(int)
+        return pd.Series(float("nan"), index=coordinates.index)

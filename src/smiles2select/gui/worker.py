@@ -12,6 +12,7 @@ import traceback
 from PySide6.QtCore import QThread, Signal
 
 from smiles2select.export import excel
+from smiles2select.pipeline.cancellation import CancellationToken, RunCancelled
 from smiles2select.pipeline.config import RunConfig
 from smiles2select.pipeline.runner import (
     RunResult,
@@ -27,14 +28,20 @@ class RunWorker(QThread):
     progress = Signal(int, int, str)
     completed = Signal(object)
     failed = Signal(str)
+    canceled = Signal()
 
     def __init__(self, config: RunConfig, parent=None) -> None:
         super().__init__(parent)
         self._config = config
+        self._cancellation = CancellationToken()
+
+    def cancel(self) -> None:
+        """Request a cooperative stop; the current chunk is allowed to finish."""
+        self._cancellation.cancel()
 
     def run(self) -> None:  # QThread entry point
         try:
-            result: RunResult = run(self._config, self._report)
+            result: RunResult = run(self._config, self._report, self._cancellation)
             if self._config.excel_path is not None:
                 self.progress.emit(0, 1, "Gerando Excel")
                 excel.export(
@@ -43,6 +50,8 @@ class RunWorker(QThread):
                     excel.ExportOptions(detailed=self._config.detailed_export),
                 )
             self.completed.emit(result)
+        except RunCancelled:
+            self.canceled.emit()
         except Exception as exc:  # surfaced in the interface, never swallowed
             self.failed.emit(self._failure_message(exc))
 
@@ -58,14 +67,14 @@ class RunWorker(QThread):
         checkpoint_path = resolve_checkpoint_path(self._config)
         log_directory = resolve_log_directory(self._config)
         preserved = (
-            "sim, no checkpoint" if checkpoint_path.exists() else "nenhum bloco concluído ainda"
+            "yes, in checkpoint" if checkpoint_path.exists() else "no completed block yet"
         )
         return (
-            f"O processamento foi interrompido: {exc}\n\n"
-            f"Resultados já concluídos preservados: {preserved}\n"
+            f"Processing was interrupted: {exc}\n\n"
+            f"Completed results preserved: {preserved}\n"
             f"Checkpoint: {checkpoint_path}\n"
-            f"Logs por worker (falhas nativas e memória): {log_directory}\n\n"
-            "Execute novamente com a mesma configuração para retomar a partir "
-            "do último bloco concluído, em vez de recomeçar do zero.\n\n"
-            f"Detalhe técnico:\n{traceback.format_exc()}"
+            f"Per-worker logs (native faults and memory): {log_directory}\n\n"
+            "Run again with the same configuration to resume from the last "
+            "completed block instead of starting over.\n\n"
+            f"Technical detail:\n{traceback.format_exc()}"
         )

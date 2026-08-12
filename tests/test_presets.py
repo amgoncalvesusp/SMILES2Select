@@ -55,11 +55,11 @@ def test_preset_builds_the_expected_policy():
 
 def test_preset_naming_an_unknown_profile_is_rejected():
     preset = presets.RunPreset(roles={"not_a_profile": "mandatory"})
-    assert any("desconhecidos" in problem for problem in preset.validate(AVAILABLE))
+    assert any("unknown profiles" in problem for problem in preset.validate(AVAILABLE))
 
 
 def test_empty_preset_is_rejected():
-    assert any("nenhum perfil" in problem for problem in presets.RunPreset().validate(AVAILABLE))
+    assert any("does not select any profile" in problem for problem in presets.RunPreset().validate(AVAILABLE))
 
 
 def test_preset_with_qed_exclusion_but_no_qed_is_rejected():
@@ -112,7 +112,7 @@ def test_applying_an_invalid_preset_leaves_the_state_untouched():
 
     state = WizardState()
     before = dict(state.roles)
-    with pytest.raises(ValueError, match="desconhecidos"):
+    with pytest.raises(ValueError, match="unknown profiles"):
         state.apply_preset(presets.RunPreset(roles={"nope": "mandatory"}), AVAILABLE)
     assert state.roles == before
 
@@ -165,4 +165,4 @@ def test_cli_rejects_a_preset_with_unknown_profiles(tmp_path, capsys):
     presets.save(presets.RunPreset(roles={"ghost": "mandatory"}), preset_path)
 
     assert main([str(library), "--smiles-column", "SMILES", "--preset", str(preset_path)]) == 2
-    assert "desconhecidos" in capsys.readouterr().err
+    assert "unknown profiles" in capsys.readouterr().err

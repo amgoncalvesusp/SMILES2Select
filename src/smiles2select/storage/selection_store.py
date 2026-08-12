@@ -78,6 +78,57 @@ CREATE TABLE IF NOT EXISTS selection_recipes (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS hub_libraries (
+    library_id TEXT PRIMARY KEY,
+    role TEXT NOT NULL,
+    source TEXT,
+    description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS hub_reference_overlap (
+    candidate_index TEXT,
+    candidate_id TEXT,
+    reference_library TEXT,
+    reference_index TEXT,
+    reference_id TEXT,
+    match_type TEXT
+);
+
+CREATE TABLE IF NOT EXISTS hub_reference_similarity (
+    record_id TEXT,
+    candidate_id TEXT,
+    reference_library TEXT,
+    reference_index TEXT,
+    reference_id TEXT,
+    similarity REAL
+);
+
+CREATE TABLE IF NOT EXISTS hub_zones (
+    zone_id TEXT PRIMARY KEY,
+    label TEXT,
+    expression TEXT,
+    quota INTEGER,
+    priority INTEGER,
+    color TEXT
+);
+
+CREATE TABLE IF NOT EXISTS hub_projections (
+    projection_id TEXT PRIMARY KEY,
+    method TEXT NOT NULL,
+    input_hash TEXT,
+    parameters_json TEXT NOT NULL,
+    recipe_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS hub_projection_coordinates (
+    record_id TEXT NOT NULL,
+    projection_id TEXT NOT NULL,
+    x REAL NOT NULL,
+    y REAL NOT NULL,
+    cluster_id TEXT,
+    PRIMARY KEY (record_id, projection_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_pareto_rank ON pareto_results (recipe_id, pareto_rank);
 CREATE INDEX IF NOT EXISTS idx_margin_status ON rule_margins (margin_status);
 CREATE INDEX IF NOT EXISTS idx_selection_status ON selection_state (selection_status);
@@ -200,6 +251,98 @@ class SelectionStore:
                 "SELECT recipe_id FROM selection_recipes ORDER BY updated_at DESC"
             )
         ]
+
+    # -- Chemical Space Hub -----------------------------------------------
+
+    def save_hub_libraries(self, libraries: Iterable[dict[str, Any]]) -> int:
+        rows = [
+            (
+                str(row["library_id"]),
+                str(row.get("role", "reference")),
+                row.get("source", ""),
+                row.get("description", ""),
+            )
+            for row in libraries
+        ]
+        self._connection.executemany(
+            "INSERT OR REPLACE INTO hub_libraries "
+            "(library_id, role, source, description) VALUES (?, ?, ?, ?)",
+            rows,
+        )
+        self._connection.commit()
+        return len(rows)
+
+    def save_hub_analysis(
+        self,
+        overlaps: Iterable[dict[str, Any]] = (),
+        similarities: Iterable[dict[str, Any]] = (),
+    ) -> tuple[int, int]:
+        overlap_rows = [
+            tuple(row.get(key) for key in (
+                "candidate_index", "candidate_id", "reference_library",
+                "reference_index", "reference_id", "match_type",
+            ))
+            for row in overlaps
+        ]
+        similarity_rows = [
+            tuple(row.get(key) for key in (
+                "record_id", "candidate_id", "reference_library",
+                "reference_index", "reference_id", "similarity",
+            ))
+            for row in similarities
+        ]
+        self._connection.executemany(
+            "INSERT INTO hub_reference_overlap VALUES (?, ?, ?, ?, ?, ?)", overlap_rows
+        )
+        self._connection.executemany(
+            "INSERT INTO hub_reference_similarity VALUES (?, ?, ?, ?, ?, ?)", similarity_rows
+        )
+        self._connection.commit()
+        return len(overlap_rows), len(similarity_rows)
+
+    def save_hub_zones(self, zones: Iterable[dict[str, Any]]) -> int:
+        rows = [
+            (
+                str(row["zone_id"]), row.get("label", ""), row.get("expression", ""),
+                row.get("quota"), row.get("priority", 0), row.get("color", ""),
+            )
+            for row in zones
+        ]
+        self._connection.executemany(
+            "INSERT OR REPLACE INTO hub_zones "
+            "(zone_id, label, expression, quota, priority, color) VALUES (?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        self._connection.commit()
+        return len(rows)
+
+    def save_hub_projection(self, projection: Any) -> str:
+        block = projection.recipe_block()
+        projection_id = str(projection.projection.projection_id)
+        self._connection.execute(
+            "INSERT OR REPLACE INTO hub_projections "
+            "(projection_id, method, input_hash, parameters_json, recipe_json) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                projection_id,
+                str(block.get("method", projection.projection.method)),
+                block.get("input_hash", ""),
+                json.dumps(block.get("parameters", {}), ensure_ascii=False),
+                json.dumps(block, ensure_ascii=False),
+            ),
+        )
+        coordinates = projection.projection.coordinates
+        rows = [
+            (str(record_id), projection_id, float(row["x"]), float(row["y"]), None)
+            for record_id, row in coordinates.iterrows()
+        ]
+        self._connection.executemany(
+            "INSERT OR REPLACE INTO hub_projection_coordinates "
+            "(record_id, projection_id, x, y, cluster_id) VALUES (?, ?, ?, ?, ?)",
+            rows,
+        )
+        self._connection.commit()
+        return projection_id
 
     # -- analysis tables ----------------------------------------------------
 

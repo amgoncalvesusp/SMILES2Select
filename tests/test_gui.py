@@ -60,7 +60,7 @@ def test_navigation_is_blocked_until_a_file_is_chosen(window, monkeypatch):
     assert window.pages.currentIndex() == 0
     window._go(1)
     assert window.pages.currentIndex() == 0  # blocked: no file selected
-    assert warnings and "arquivo" in warnings[0]
+    assert warnings and "file" in warnings[0]
 
 
 def test_state_defaults_follow_the_recommended_policy():
@@ -73,7 +73,7 @@ def test_state_defaults_follow_the_recommended_policy():
 
 def test_state_reports_missing_inputs():
     problems = WizardState().validation_errors()
-    assert any("arquivo" in problem for problem in problems)
+    assert any("file" in problem for problem in problems)
 
 
 def test_state_builds_a_config_once_complete(library_csv):
@@ -89,7 +89,7 @@ def test_removing_every_profile_is_reported(library_csv):
     state.files.append(FileSelection(path=library_csv, smiles_column="SMILES"))
     for profile_id in list(state.roles):
         state.set_role(profile_id, None)
-    assert any("perfil" in problem for problem in state.validation_errors())
+    assert any("profile" in problem for problem in state.validation_errors())
 
 
 def test_qed_exclusion_without_qed_computation_is_reported(library_csv):
@@ -141,5 +141,5 @@ def test_results_page_populates_from_a_run(window, library_csv):
 
     results_page = window.pages.widget(6)
     results_page.show_result(result)
-    assert "selecionadas" in results_page.headline.text()
+    assert "selected" in results_page.headline.text()
     assert results_page.table.rowCount() > 0

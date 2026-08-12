@@ -28,24 +28,24 @@ from smiles2select.profiles.loader import builtin_registry
 from smiles2select.profiles.registry import Profile
 
 ROLE_VALUES = {
-    "Obrigatório": "mandatory",
-    "Consenso": "consensus",
-    "Informativo": "informative",
-    "Ranqueamento": "ranking",
-    "Advertência": "warning",
-    "Exclusão": "exclusion",
+    "Mandatory": "mandatory",
+    "Consensus": "consensus",
+    "Informative": "informative",
+    "Ranking": "ranking",
+    "Warning": "warning",
+    "Exclusion": "exclusion",
 }
 VALUE_ROLES = {value: label for label, value in ROLE_VALUES.items()}
 
-STRICT = "Nenhuma violação"
-ONE_VIOLATION = "Até 1 violação"
+STRICT = "No violations"
+ONE_VIOLATION = "Up to 1 violation"
 
 
 class ProfilesPage(WizardPage):
-    title = "4. Perfis"
+    title = "4. Profiles"
     subtitle = (
-        "Escolha os perfis e o papel de cada um. Perfis informativos são calculados e "
-        "aparecem no relatório, mas não excluem moléculas."
+        "Choose profiles and assign each a role. Informative profiles are calculated "
+        "and reported but do not exclude molecules."
     )
 
     def __init__(self, state) -> None:
@@ -55,7 +55,7 @@ class ProfilesPage(WizardPage):
 
         self.table = QTableWidget(len(self.profiles), 5)
         self.table.setHorizontalHeaderLabels(
-            ["Perfil", "Usar", "Papel", "Configuração", "Espaço químico"]
+            ["Profile", "Use", "Role", "Configuration", "Chemical space"]
         )
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -68,11 +68,11 @@ class ProfilesPage(WizardPage):
         self.sample_size.setRange(50, 100000)
         self.sample_size.setValue(1000)
         self.sample_size.setSingleStep(50)
-        analyse_button = QPushButton("Analisar amostra")
+        analyse_button = QPushButton("Analyze sample")
         analyse_button.clicked.connect(self._analyse_sample)
 
         controls = QHBoxLayout()
-        controls.addWidget(QLabel("Moléculas na amostra:"))
+        controls.addWidget(QLabel("Molecules in sample:"))
         controls.addWidget(self.sample_size)
         controls.addWidget(analyse_button)
         controls.addStretch(1)
@@ -81,8 +81,8 @@ class ProfilesPage(WizardPage):
         self.report.setReadOnly(True)
         self.report.setMaximumHeight(220)
         self.report.setPlaceholderText(
-            "A análise de amostra mostra o impacto de cada perfil sobre os seus próprios dados. "
-            "Ela não escolhe regras por você."
+            "Sample analysis shows the impact of each profile on your data. "
+            "It does not choose rules for you."
         )
 
         self.body.addWidget(self.table, stretch=1)
@@ -104,7 +104,7 @@ class ProfilesPage(WizardPage):
             role_combo = QComboBox()
             role_combo.addItems(ROLE_VALUES.keys())
             role_combo.setCurrentText(
-                VALUE_ROLES.get(self.state.roles.get(profile.id, "informative"), "Informativo")
+                VALUE_ROLES.get(self.state.roles.get(profile.id, "informative"), "Informative")
             )
             role_combo.currentTextChanged.connect(lambda _text, pid=profile.id: self._sync(pid))
             self._role_combos[profile.id] = role_combo
@@ -153,12 +153,12 @@ class ProfilesPage(WizardPage):
         """Run the selected profiles over a sample and report their impact."""
         problem = self.validate()
         if problem:
-            QMessageBox.warning(self, "Configuração incompleta", problem)
+            QMessageBox.warning(self, "Incomplete configuration", problem)
             return
         try:
             config = self.state.build_config()
         except ValueError as exc:
-            QMessageBox.warning(self, "Configuração incompleta", str(exc))
+            QMessageBox.warning(self, "Incomplete configuration", str(exc))
             return
 
         sample_config = replace(
@@ -174,7 +174,7 @@ class ProfilesPage(WizardPage):
             result = run_pipeline(sample_config)
             report = analyse(result.evaluation, list(self.state.selected_profiles()))
         except Exception as exc:
-            QMessageBox.critical(self, "Falha na análise", str(exc))
+            QMessageBox.critical(self, "Analysis failed", str(exc))
             return
         finally:
             QApplication.restoreOverrideCursor()
@@ -186,7 +186,7 @@ class ProfilesPage(WizardPage):
 
     def validate(self) -> str | None:
         if not self.state.roles:
-            return "Selecione pelo menos um perfil."
+            return "Select at least one profile."
         return None
 
 
@@ -200,34 +200,34 @@ def _centered(widget: QWidget) -> QWidget:
 
 
 def _format_report(report, result) -> str:
-    lines = [f"Amostra analisada: {report.sample_size} moléculas válidas.", ""]
-    lines.append("Impacto isolado (aprovação de cada perfil sozinho):")
+    lines = [f"Sample analyzed: {report.sample_size} valid molecules.", ""]
+    lines.append("Individual impact (approval by each profile alone):")
     for row in report.per_profile.itertuples():
         lines.append(f"  {row.profile_id:<16} {row.passed:>6}  ({row.pass_rate * 100:.1f}%)")
 
     lines.append("")
-    lines.append("Impacto acumulado (interseção na ordem listada):")
+    lines.append("Cumulative impact (intersection in listed order):")
     for row in report.cumulative.itertuples():
         lines.append(f"  + {row.profile_id:<14} {row.surviving:>6}  ({row.pass_rate * 100:.1f}%)")
 
     lines.append("")
-    lines.append(f"Perfis mais restritivos: {', '.join(report.most_restrictive())}")
+    lines.append(f"Most restrictive profiles: {', '.join(report.most_restrictive())}")
 
     if not report.only_one_rule.empty:
         lines.append("")
-        lines.append("Moléculas reprovadas por uma única regra:")
+        lines.append("Molecules rejected by a single rule:")
         for row in report.only_one_rule.head(8).itertuples():
             lines.append(f"  {row.failure_code:<18} {row.sole_failures}")
 
     if not report.recovered_with_one_violation.empty:
         lines.append("")
-        lines.append("Recuperadas se o perfil tolerar uma violação:")
+        lines.append("Recovered if the profile tolerates one violation:")
         for row in report.recovered_with_one_violation.itertuples():
             lines.append(f"  {row.profile_id:<16} {row.recovered}")
 
     lines.append("")
     lines.append(
-        f"Na amostra, {result.decision.selected_count} de {result.evaluated_count} moléculas "
-        "seriam selecionadas com a política atual."
+        f"Under the current policy, {result.decision.selected_count} of {result.evaluated_count} "
+        "molecules would be selected in this sample."
     )
     return "\n".join(lines)

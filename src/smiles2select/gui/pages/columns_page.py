@@ -7,20 +7,20 @@ from PySide6.QtWidgets import QAbstractItemView, QComboBox, QLabel, QTableWidget
 from smiles2select.gui.pages.base import WizardPage
 from smiles2select.io.importer import SourceReadError, guess_mapping, preview_columns
 
-NO_ID = "(gerar automaticamente)"
+NO_ID = "(generate automatically)"
 
 
 class ColumnsPage(WizardPage):
-    title = "2. Colunas"
+    title = "2. Columns"
     subtitle = (
-        "Indique qual coluna contém o SMILES e, se houver, qual contém o identificador. "
-        "Sem identificador, um código sequencial é gerado."
+        "Choose the SMILES column and, when available, the identifier column. "
+        "A sequential identifier is generated when none is supplied."
     )
 
     def __init__(self, state) -> None:
         super().__init__(state)
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Arquivo", "Aba", "Coluna SMILES", "Coluna ID"])
+        self.table.setHorizontalHeaderLabels(["File", "Sheet", "SMILES column", "ID column"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.message = QLabel("")
@@ -80,5 +80,5 @@ class ColumnsPage(WizardPage):
             selection.path.name for selection in self.state.files if not selection.smiles_column
         ]
         if missing:
-            return f"Defina a coluna de SMILES para: {', '.join(missing)}"
+            return f"Define the SMILES column for: {', '.join(missing)}"
         return None

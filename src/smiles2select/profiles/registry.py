@@ -22,6 +22,7 @@ CATEGORIES = (
     "lead_space",
     "cns_space",
     "beyond_ro5",
+    "operational_filter",
     "custom",
 )
 
@@ -37,7 +38,7 @@ class Profile:
     rules: tuple[Rule, ...]
     pass_policy: Mapping[str, Any]
     #: Compact label for report columns ("Egan"), as opposed to the full
-    #: qualified name ("Egan — implementação compatível com SwissADME").
+    #: qualified name ("Egan — SwissADME-compatible implementation").
     short_name: str = ""
     logp_method: str = ""
     atom_count_definition: str = ""
@@ -71,8 +72,8 @@ class Profile:
     def policy_label(self) -> str:
         if self.pass_policy.get("type") == "max_violations":
             allowed = int(self.pass_policy.get("value", 0))
-            return f"até {allowed} violação(ões)" if allowed else "nenhuma violação"
-        return "todos os critérios"
+            return f"up to {allowed} violation(s)" if allowed else "no violations"
+        return "all criteria"
 
     def as_dict(self) -> dict[str, Any]:
         return {

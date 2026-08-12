@@ -110,7 +110,7 @@ def test_projection_rows_carry_optional_clusters(descriptors):
 def test_method_choice_explains_itself():
     small = projection_cache.choose_method(1000)
     assert small.method == "pca"
-    assert "determinístico" in small.reason
+    assert "deterministic" in small.reason
 
     large = projection_cache.choose_method(400_000)
     assert large.method in projection_cache.available_methods()
@@ -150,8 +150,8 @@ def test_cluster_coverage_and_gaps(descriptors):
     result = clustering.cluster(FAMILY, descriptors.index, cutoff=0.5)
     first_member = int(result.labels.index[0])
     coverage = clustering.coverage(result.labels, [first_member])
-    assert coverage["clusters_representados"] == 1
-    assert coverage["cobertura"] < 1.0
+    assert coverage["represented_clusters"] == 1
+    assert coverage["coverage"] < 1.0
     assert clustering.unrepresented(result.labels, [first_member])
 
 
@@ -209,8 +209,8 @@ def test_similarity_index_ranks_by_exact_tanimoto(descriptors):
 
 def test_similarity_index_reports_its_settings(descriptors):
     settings = dict(SimilarityIndex(FAMILY, descriptors.index).settings())
-    assert settings["métrica final"] == "Tanimoto exato"
-    assert settings["moléculas indexadas"] == len(FAMILY)
+    assert settings["final metric"] == "Exact Tanimoto"
+    assert settings["indexed molecules"] == len(FAMILY)
 
 
 def test_analogues_only_come_from_the_approved_set(descriptors):
@@ -253,7 +253,7 @@ def test_common_substructure_is_computed_for_one_pair():
 def test_selection_stops_at_the_requested_count(candidates):
     outcome = select(candidates, SelectionConstraints(target_count=3))
     assert outcome.count == 3
-    assert all("limite final atingido" in reason for reason in outcome.rejections.values())
+    assert all("final count reached" in reason for reason in outcome.rejections.values())
 
 
 def test_scaffold_quota_is_respected(candidates):
@@ -274,7 +274,7 @@ def test_pinned_molecules_survive_the_quotas(candidates):
         candidates, SelectionConstraints(target_count=2, max_per_scaffold=1), pinned_ids=[6]
     )
     assert 6 in outcome.selected_ids
-    assert outcome.reasons[6] == ["molécula fixada"]
+    assert outcome.reasons[6] == ["pinned molecule"]
 
 
 def test_excluded_molecules_never_return(candidates):
@@ -287,7 +287,7 @@ def test_shortfall_is_reported_not_hidden(candidates):
     constraints = SelectionConstraints(target_count=10, max_per_scaffold=1)
     outcome = select(candidates, constraints)
     assert outcome.shortfall(constraints) == 10 - outcome.count
-    assert any("Faltam" in warning for warning in outcome.warnings(constraints))
+    assert any("Missing" in warning for warning in outcome.warnings(constraints))
 
 
 def test_minimum_scaffolds_produces_a_warning(candidates):
@@ -317,14 +317,14 @@ def test_every_selected_molecule_carries_a_reason(candidates):
 def test_summary_counts_scaffolds_and_clusters(candidates):
     constraints = SelectionConstraints(target_count=3)
     rows = dict(summary_rows(select(candidates, constraints), constraints))
-    assert rows["selecionados finais"] == 3
-    assert rows["scaffolds cobertos"] >= 1
+    assert rows["final selected"] == 3
+    assert rows["scaffolds covered"] >= 1
 
 
 def test_final_alerts_flag_a_dominant_scaffold():
     outcome = SelectionOutcome(selected_ids=(1, 2, 3), scaffold_usage={"A": 3})
     alerts = final_alerts(outcome, SelectionConstraints(target_count=3))
-    assert any("mesmo scaffold" in alert for alert in alerts)
+    assert any("one scaffold" in alert for alert in alerts)
 
 
 def test_final_alerts_flag_manual_overrides():
@@ -333,7 +333,7 @@ def test_final_alerts_flag_manual_overrides():
     alerts = final_alerts(
         SelectionOutcome(selected_ids=(1,)), SelectionConstraints(), basket=basket
     )
-    assert any("apesar de" in alert for alert in alerts)
+    assert any("despite" in alert for alert in alerts)
 
 
 def test_manual_decisions_come_from_the_history():

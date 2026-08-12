@@ -90,14 +90,14 @@ class WizardState:
         """Problems that must be fixed before the run can start."""
         problems: list[str] = []
         if not self.files:
-            problems.append("Nenhum arquivo selecionado.")
+            problems.append("No file selected.")
         for selection in self.files:
             if not selection.smiles_column:
-                problems.append(f"{selection.path.name}: coluna de SMILES não definida.")
+                problems.append(f"{selection.path.name}: SMILES column is not defined.")
         if not self.roles:
-            problems.append("Nenhum perfil selecionado.")
+            problems.append("No profile selected.")
         if self.qed.excludes and not self.compute_qed:
-            problems.append("A política de QED exclui moléculas, mas o QED está desativado.")
+            problems.append("The QED policy excludes molecules, but QED is disabled.")
         try:
             self.build_policy()
         except ValueError as exc:

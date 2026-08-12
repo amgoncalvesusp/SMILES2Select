@@ -22,8 +22,8 @@ from smiles2select.rules.engine import Rule
 MAX_SIMULTANEOUS_CHANGES = 3
 
 NO_SIMPLE_COUNTERFACTUAL = (
-    "Esta classificação depende de múltiplas regras. Nenhuma alteração única "
-    "dentro dos limites configurados muda o resultado."
+    "This classification depends on multiple rules. No single change within "
+    "the configured limits changes the result."
 )
 
 TABLE_COLUMNS = [
@@ -55,11 +55,11 @@ class Counterfactual:
 
     def describe(self) -> str:
         if self.policy_change:
-            return f"A molécula seria {self.classification_after_change} se {self.policy_change}."
+            return f"The molecule would be {self.classification_after_change} if {self.policy_change}."
         return (
-            f"A molécula seria {self.classification_after_change} se o limite de "
-            f"{self.affected_rule} fosse alterado de {self.current_threshold:g} "
-            f"para {self.counterfactual_threshold:g}."
+            f"The molecule would be {self.classification_after_change} if the "
+            f"{self.affected_rule} limit changed from {self.current_threshold:g} "
+            f"to {self.counterfactual_threshold:g}."
         )
 
     def as_row(self) -> dict[str, object]:
@@ -116,7 +116,7 @@ def for_failed_rules(
                 record_id=record_id,
                 affected_rule=rule.id,
                 current_status="AUTO_FAIL",
-                classification_after_change="aprovada",
+                classification_after_change="approved",
                 current_threshold=current,
                 counterfactual_threshold=proposed,
                 absolute_delta=round(proposed - current, 6),
@@ -154,7 +154,7 @@ def for_passing_molecule(
         record_id=record_id,
         affected_rule=rule.id,
         current_status="AUTO_PASS",
-        classification_after_change="reprovada",
+        classification_after_change="rejected",
         current_threshold=float(current),
         counterfactual_threshold=observed,
         absolute_delta=round(observed - float(current), 6),
@@ -174,10 +174,10 @@ def violation_policy_change(
         record_id=record_id,
         affected_rule=profile_id,
         current_status="AUTO_FAIL",
-        classification_after_change="aprovada",
+        classification_after_change="approved",
         policy_change=(
-            f"fosse permitida uma {needed}ª violação em {profile_id} "
-            f"(hoje são permitidas {allowed_violations})"
+            f"{needed} violation(s) were allowed for {profile_id} "
+            f"({allowed_violations} currently allowed)"
         ),
     )
 

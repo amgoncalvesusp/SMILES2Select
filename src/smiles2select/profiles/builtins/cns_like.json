@@ -1,6 +1,6 @@
 {
   "id": "cns_like",
-  "name": "CNS-like — heurística físico-química",
+  "name": "CNS-like — physicochemical heuristic",
   "short_name": "CNSLike",
   "category": "cns_space",
   "version": "1.0.0",

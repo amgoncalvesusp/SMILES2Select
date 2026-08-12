@@ -51,9 +51,9 @@ _STRATEGY_KEYS: dict[Strategy, tuple[tuple[str, bool], ...]] = {
     Strategy.MANUAL_ASSISTED: (("pareto_rank", True), ("qed", False)),
 }
 
-LIMIT_REACHED = "limite final atingido"
-SCAFFOLD_QUOTA = "cota de scaffold excedida"
-CLUSTER_QUOTA = "cota de cluster excedida"
+LIMIT_REACHED = "final count reached"
+SCAFFOLD_QUOTA = "scaffold quota exceeded"
+CLUSTER_QUOTA = "cluster quota exceeded"
 
 
 @dataclass(frozen=True)
@@ -74,11 +74,11 @@ class SelectionConstraints:
 
     def summary_rows(self) -> list[tuple[str, object]]:
         return [
-            ("número final de moléculas", self.target_count or "sem limite"),
-            ("máximo por scaffold", self.max_per_scaffold or "-"),
-            ("mínimo de scaffolds", self.min_scaffolds or "-"),
-            ("máximo por cluster", self.max_per_cluster or "-"),
-            ("preservar moléculas fixadas", "sim" if self.preserve_pinned else "não"),
+            ("final molecule count", self.target_count or "unlimited"),
+            ("maximum per scaffold", self.max_per_scaffold or "-"),
+            ("minimum scaffolds", self.min_scaffolds or "-"),
+            ("maximum per cluster", self.max_per_cluster or "-"),
+            ("preserve pinned molecules", "yes" if self.preserve_pinned else "no"),
         ]
 
 
@@ -116,12 +116,12 @@ class SelectionOutcome:
         missing = self.shortfall(constraints)
         if missing:
             messages.append(
-                f"Foram solicitadas {constraints.target_count} moléculas, mas as restrições "
-                f"permitiram apenas {self.count}. Faltam {missing}."
+                f"{constraints.target_count} molecules were requested, but the constraints "
+                f"allowed only {self.count}. Missing: {missing}."
             )
         if constraints.min_scaffolds and self.scaffolds_covered < constraints.min_scaffolds:
             messages.append(
-                f"A seleção cobre {self.scaffolds_covered} scaffolds; o mínimo pedido era "
+                f"The selection covers {self.scaffolds_covered} scaffolds; the requested minimum was "
                 f"{constraints.min_scaffolds}."
             )
         return messages
@@ -190,13 +190,13 @@ def _selection_reasons(
     if rank is not None and not pd.isna(rank):
         reasons.append(f"Pareto Front {int(rank)}")
     if cluster is not None and cluster_usage.get(cluster, 0) == 0:
-        reasons.append(f"representante do cluster {cluster}")
+        reasons.append(f"cluster {cluster} representative")
     if scaffold is not None and scaffold_usage.get(scaffold, 0) == 0:
-        reasons.append("primeiro membro do seu scaffold")
+        reasons.append("first member of its scaffold")
     robustness = row.get("robustness_score")
     if robustness is not None and not pd.isna(robustness) and float(robustness) >= 0.5:
-        reasons.append("aprovação robusta")
-    return reasons or ["ordenação da estratégia"]
+        reasons.append("robust approval")
+    return reasons or ["strategy ordering"]
 
 
 def _consume(
@@ -240,7 +240,7 @@ def select(
                 continue
             row = pool.loc[record_id]
             selected.append(record_id)
-            reasons[record_id] = ["molécula fixada"]
+            reasons[record_id] = ["pinned molecule"]
             _consume(_scaffold_of(row), _cluster_of(row), scaffold_usage, cluster_usage)
 
     for raw_id, row in order_candidates(pool, strategy).iterrows():

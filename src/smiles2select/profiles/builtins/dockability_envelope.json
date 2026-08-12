@@ -1,0 +1,68 @@
+{
+  "id": "dockability_envelope",
+  "name": "Dockability Envelope",
+  "short_name": "Dockability",
+  "category": "operational_filter",
+  "version": "1.0.0",
+  "reference": "SMILES2Select operational preset; not a universal biological threshold",
+  "notes": "Editable operational defaults for docking preparation. This profile describes workflow manageability and is not a new drug-likeness rule.",
+  "pass_policy": {
+    "type": "all_rules"
+  },
+  "rules": [
+    {
+      "id": "dock_mw",
+      "descriptor": "mol_wt",
+      "operator": "between_inclusive",
+      "threshold": [120, 700],
+      "severity": "hard",
+      "failure_code": "DOCK_MW_OUTSIDE",
+      "label": "Molecular weight (Da)"
+    },
+    {
+      "id": "dock_tpsa",
+      "descriptor": "tpsa",
+      "operator": "<=",
+      "threshold": 200,
+      "severity": "hard",
+      "failure_code": "DOCK_TPSA_HIGH",
+      "label": "TPSA (A^2)"
+    },
+    {
+      "id": "dock_hbd",
+      "descriptor": "hbd_lipinski",
+      "operator": "<=",
+      "threshold": 10,
+      "severity": "hard",
+      "failure_code": "DOCK_HBD_HIGH",
+      "label": "H-bond donors"
+    },
+    {
+      "id": "dock_hba",
+      "descriptor": "hba_lipinski",
+      "operator": "<=",
+      "threshold": 16,
+      "severity": "hard",
+      "failure_code": "DOCK_HBA_HIGH",
+      "label": "H-bond acceptors"
+    },
+    {
+      "id": "dock_rotb",
+      "descriptor": "rotatable_bonds",
+      "operator": "<=",
+      "threshold": 18,
+      "severity": "hard",
+      "failure_code": "DOCK_ROTB_HIGH",
+      "label": "Rotatable bonds"
+    },
+    {
+      "id": "dock_logp",
+      "descriptor": "rdkit_wlogp",
+      "operator": "between_inclusive",
+      "threshold": [-3, 8],
+      "severity": "hard",
+      "failure_code": "DOCK_LOGP_OUTSIDE",
+      "label": "LogP (WLOGP)"
+    }
+  ]
+}

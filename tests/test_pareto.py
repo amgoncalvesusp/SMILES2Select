@@ -93,7 +93,7 @@ def test_disabled_objectives_are_ignored():
 def test_too_many_objectives_is_reported():
     fields = [f"field_{index}" for index in range(MAX_USEFUL_OBJECTIVES + 1)]
     objectives = ObjectiveSet(Objective(name) for name in fields)
-    assert any("máximo suportado" in problem for problem in objectives.validate(fields))
+    assert any("maximum supported" in problem for problem in objectives.validate(fields))
 
 
 def test_objectives_round_trip_through_dicts():
@@ -108,13 +108,13 @@ def test_objectives_round_trip_through_dicts():
 
 def test_constant_objective_is_flagged():
     warnings = ObjectiveSet([Objective("qed")]).diagnostics(frame(qed=[0.5, 0.5, 0.5]))
-    assert any("constante" in warning for warning in warnings)
+    assert any("nearly constant" in warning for warning in warnings)
 
 
 def test_redundant_objectives_are_flagged():
     objectives = ObjectiveSet([Objective("a"), Objective("b")])
     warnings = objectives.diagnostics(frame(a=[1.0, 2.0, 3.0, 4.0], b=[2.0, 4.0, 6.0, 8.0]))
-    assert any("redundantes" in warning for warning in warnings)
+    assert any("are redundant" in warning for warning in warnings)
 
 
 # --- dominance ---------------------------------------------------------------
@@ -214,7 +214,7 @@ def test_crowded_first_front_produces_a_warning():
     candidates = frame(qed=[0.9, 0.5, 0.1], mol_wt=[300.0, 400.0, 500.0])
     objectives = ObjectiveSet([Objective("qed"), Objective("mol_wt", Direction.MINIMIZE)])
     result = rank_candidates(candidates, objectives)
-    assert any("primeira fronteira" in warning for warning in result.warnings)
+    assert any("first front" in warning for warning in result.warnings)
 
 
 def test_rows_for_storage_match_the_pareto_table():
@@ -231,7 +231,7 @@ def test_rows_for_storage_match_the_pareto_table():
 
 
 def test_missing_objective_column_is_rejected():
-    with pytest.raises(ObjectiveError, match="coluna ausente"):
+    with pytest.raises(ObjectiveError, match="missing column"):
         rank_candidates(frame(qed=[0.5]), ObjectiveSet([Objective("not_there")]))
 
 

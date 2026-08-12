@@ -1,7 +1,7 @@
 """Main window: the seven-step wizard.
 
-Arquivos -> Colunas -> Padronização -> Perfis -> Política -> Processamento ->
-Resultados. The step list stays visible so the user always knows where they are
+Files -> Columns -> Standardization -> Profiles -> Policy -> Processing ->
+Results. The step list stays visible so the user always knows where they are
 and can go back without losing what they have chosen.
 """
 
@@ -32,13 +32,13 @@ from smiles2select.gui.pages.standardization_page import StandardizationPage
 from smiles2select.gui.state import WizardState
 
 STEPS = (
-    "1. Arquivos",
-    "2. Colunas",
-    "3. Padronização",
-    "4. Perfis",
-    "5. Política de seleção",
-    "6. Processamento",
-    "7. Resultados",
+    "1. Files",
+    "2. Columns",
+    "3. Standardization",
+    "4. Profiles",
+    "5. Selection policy",
+    "6. Processing",
+    "7. Results",
 )
 
 
@@ -72,8 +72,8 @@ class MainWindow(QMainWindow):
 
         self._page_widgets[5].run_finished.connect(self._on_run_finished)
 
-        self.back_button = QPushButton("Voltar")
-        self.next_button = QPushButton("Avançar")
+        self.back_button = QPushButton("Back")
+        self.next_button = QPushButton("Next")
         self.back_button.clicked.connect(lambda: self._go(self.pages.currentIndex() - 1))
         self.next_button.clicked.connect(lambda: self._go(self.pages.currentIndex() + 1))
 
@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
         if index > self.pages.currentIndex():
             problem = self.pages.currentWidget().validate()
             if problem:
-                QMessageBox.warning(self, "Verifique esta etapa", problem)
+                QMessageBox.warning(self, "Check this step", problem)
                 return
         self.pages.setCurrentIndex(index)
         self.pages.currentWidget().on_enter()

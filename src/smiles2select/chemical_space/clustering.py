@@ -22,6 +22,11 @@ from smiles2select.chemistry.fingerprints import FingerprintConfig, fingerprints
 
 #: Tanimoto distance below which two molecules join the same cluster.
 DEFAULT_CUTOFF = 0.35
+DEFAULT_MAX_EXACT_SIZE = 10_000
+
+
+class ClusteringTooLargeError(RuntimeError):
+    """Raised instead of silently allocating a quadratic distance list."""
 
 
 @dataclass(frozen=True)
@@ -47,10 +52,10 @@ class ClusterResult:
 
     def summary_rows(self) -> list[tuple[str, object]]:
         return [
-            ("moléculas agrupadas", int(self.labels.notna().sum())),
+            ("molecules clustered", int(self.labels.notna().sum())),
             ("clusters", self.cluster_count),
-            ("clusters unitários", self.singleton_count),
-            ("corte de distância", self.cutoff),
+            ("singleton clusters", self.singleton_count),
+            ("distance cutoff", self.cutoff),
             ("fingerprint", self.fingerprint_label),
         ]
 
@@ -60,6 +65,7 @@ def cluster(
     index: pd.Index,
     cutoff: float = DEFAULT_CUTOFF,
     fingerprint: FingerprintConfig = FingerprintConfig(),
+    max_exact_size: int = DEFAULT_MAX_EXACT_SIZE,
 ) -> ClusterResult:
     """Butina clustering; unparseable molecules get no cluster.
 
@@ -69,11 +75,19 @@ def cluster(
     """
     if not 0 < cutoff < 1:
         raise ValueError("cutoff must lie in (0, 1)")
+    if max_exact_size < 1:
+        raise ValueError("max_exact_size must be positive")
 
     vectors, positions = fingerprints_from_smiles(smiles, fingerprint)
     labels = pd.Series(pd.NA, index=index, dtype="Int64")
     if not vectors:
         return ClusterResult(labels, cutoff, fingerprint.label())
+    if len(vectors) > max_exact_size:
+        raise ClusteringTooLargeError(
+            f"exact Butina clustering is disabled above {max_exact_size:,} valid molecules; "
+            "the quadratic distance list is not allocated; use scaffold statistics, "
+            "a sample or an approximate neighbor graph"
+        )
 
     distances: list[float] = []
     for position in range(1, len(vectors)):
@@ -92,12 +106,12 @@ def coverage(labels: pd.Series, selected_ids: Sequence[int]) -> dict[str, float]
     known = labels.dropna()
     total = int(known.nunique())
     if total == 0:
-        return {"clusters": 0, "clusters_representados": 0, "cobertura": 0.0}
+        return {"clusters": 0, "represented_clusters": 0, "coverage": 0.0}
     represented = int(known.reindex(pd.Index(selected_ids)).dropna().nunique())
     return {
         "clusters": total,
-        "clusters_representados": represented,
-        "cobertura": round(represented / total, 4),
+        "represented_clusters": represented,
+        "coverage": round(represented / total, 4),
     }
 
 

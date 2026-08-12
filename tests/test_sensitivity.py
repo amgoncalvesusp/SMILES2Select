@@ -184,8 +184,8 @@ def test_most_restrictive_ranks_by_retention(indexes, descriptors):
 
 def test_summary_rows_are_readable(indexes, descriptors):
     rows = dict(simulate(indexes, descriptors.index, {"lip_mw_max": 550}).summary_rows())
-    assert "candidatos mantidos" in rows
-    assert rows["entraram"] == 1
+    assert "retained candidates" in rows
+    assert rows["entered"] == 1
 
 
 # --- margins -----------------------------------------------------------------
@@ -394,7 +394,7 @@ def test_simple_counterfactual_names_the_threshold_move():
     assert change.current_threshold == 500.0
     assert change.counterfactual_threshold == 505.0
     assert change.absolute_delta == 5.0
-    assert "seria aprovada" in change.describe()
+    assert "would be approved" in change.describe()
 
 
 def test_counterfactuals_are_ordered_by_how_small_the_change_is():
@@ -427,14 +427,14 @@ def test_passing_molecule_gets_the_fragility_counterfactual(descriptors):
     change = cf.for_passing_molecule(3, margin_table([MW_RULE, TPSA_RULE], descriptors), RULES)
     assert change is not None
     assert change.current_status == "AUTO_PASS"
-    assert change.classification_after_change == "reprovada"
-    assert "seria reprovada" in change.describe()
+    assert change.classification_after_change == "rejected"
+    assert "would be rejected" in change.describe()
 
 
 def test_violation_policy_counterfactual():
     change = cf.violation_policy_change(5, failures_frame(), "lipinski", allowed_violations=0)
     assert change is not None
-    assert "violação" in change.describe()
+    assert "violation" in change.describe()
 
 
 def test_violation_policy_is_none_when_the_gap_is_too_large():

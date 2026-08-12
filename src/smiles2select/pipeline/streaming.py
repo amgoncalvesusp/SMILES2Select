@@ -55,7 +55,7 @@ def run_streaming(
     done_count = already_done + len(results)
     isolated_chunks = 0
     crashed_records = 0
-    report(done_count, total, "Calculando descritores")
+    report(done_count, total, "Computing descriptors")
 
     while planner.has_more():
         window: list[MoleculeChunk] = []
@@ -67,7 +67,7 @@ def run_streaming(
             checkpoint.commit_chunk(outcome.chunk_id, outcome.results)
             results.extend(outcome.results)
             done_count += len(outcome.results)
-            report(done_count, total, "Calculando descritores")
+            report(done_count, total, "Computing descriptors")
 
             if outcome.isolated:
                 checkpoint.mark_isolating(outcome.chunk_id)

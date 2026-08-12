@@ -22,8 +22,8 @@ from smiles2select.gui.worker import RunWorker
 
 
 class RunPage(WizardPage):
-    title = "6. Processamento"
-    subtitle = "Confira o resumo e execute. O cálculo roda em segundo plano."
+    title = "6. Processing"
+    subtitle = "Review the summary and run. Calculation happens in the background."
 
     run_finished = Signal(object)
 
@@ -37,7 +37,7 @@ class RunPage(WizardPage):
         # -1 no longer means "every core": it is resolved from available
         # memory and CPU count at run time (see pipeline.resource_estimation),
         # specifically to avoid the OOM risk of always maxing out n_jobs.
-        self.jobs_spin.setSpecialValueText("automático (memória + CPU)")
+        self.jobs_spin.setSpecialValueText("automatic (memory + CPU)")
 
         self.chunk_spin = QSpinBox()
         self.chunk_spin.setRange(100, 100000)
@@ -46,8 +46,8 @@ class RunPage(WizardPage):
 
         settings = QGroupBox("Paralelismo")
         form = QFormLayout(settings)
-        form.addRow("Processos:", self.jobs_spin)
-        form.addRow("Moléculas por lote:", self.chunk_spin)
+        form.addRow("Processes:", self.jobs_spin)
+        form.addRow("Molecules per batch:", self.chunk_spin)
 
         self.summary = QTextEdit()
         self.summary.setReadOnly(True)
@@ -55,13 +55,17 @@ class RunPage(WizardPage):
 
         self.progress = QProgressBar()
         self.progress.setFormat("%v / %m")
-        self.stage_label = QLabel("Pronto para executar.")
+        self.stage_label = QLabel("Ready to run.")
 
-        self.start_button = QPushButton("Executar")
+        self.start_button = QPushButton("Run")
         self.start_button.clicked.connect(self._start)
+        self.cancel_button = QPushButton("Cancelar")
+        self.cancel_button.setEnabled(False)
+        self.cancel_button.clicked.connect(self._cancel)
 
         buttons = QHBoxLayout()
         buttons.addWidget(self.start_button)
+        buttons.addWidget(self.cancel_button)
         buttons.addStretch(1)
 
         self.body.addWidget(settings)
@@ -75,31 +79,33 @@ class RunPage(WizardPage):
         problems = self.state.validation_errors()
         if problems:
             self.summary.setPlainText(
-                "Pendências:\n" + "\n".join(f"  - {problem}" for problem in problems)
+                "Pending issues:\n" + "\n".join(f"  - {problem}" for problem in problems)
             )
             self.start_button.setEnabled(False)
             return
         self.start_button.setEnabled(True)
         config = self.state.build_config()
         lines = [f"{key}: {value}" for key, value in config.summary_rows()]
-        lines.append(f"arquivos: {len(config.sources)}")
+        lines.append(f"files: {len(config.sources)}")
         self.summary.setPlainText("\n".join(lines))
 
     def _start(self) -> None:
         try:
             config = self.state.build_config()
         except ValueError as exc:
-            QMessageBox.warning(self, "Configuração incompleta", str(exc))
+            QMessageBox.warning(self, "Incomplete configuration", str(exc))
             return
 
         config = replace(config, n_jobs=self.jobs_spin.value(), chunk_size=self.chunk_spin.value())
 
         self.start_button.setEnabled(False)
+        self.cancel_button.setEnabled(True)
         self.progress.setRange(0, 0)
         self._worker = RunWorker(config, self)
         self._worker.progress.connect(self._on_progress)
         self._worker.completed.connect(self._on_completed)
         self._worker.failed.connect(self._on_failed)
+        self._worker.canceled.connect(self._on_canceled)
         self._worker.start()
 
     def _on_progress(self, done: int, total: int, stage: str) -> None:
@@ -112,15 +118,30 @@ class RunPage(WizardPage):
 
     def _on_completed(self, result: object) -> None:
         self.start_button.setEnabled(True)
-        self.stage_label.setText("Concluído.")
+        self.cancel_button.setEnabled(False)
+        self.stage_label.setText("Completed.")
         self.run_finished.emit(result)
 
     def _on_failed(self, message: str) -> None:
         self.start_button.setEnabled(True)
+        self.cancel_button.setEnabled(False)
         self.progress.setRange(0, 1)
         self.progress.setValue(0)
-        self.stage_label.setText("Falhou.")
-        QMessageBox.critical(self, "Falha na execução", message)
+        self.stage_label.setText("Failed.")
+        QMessageBox.critical(self, "Execution failed", message)
+
+    def _cancel(self) -> None:
+        if self._worker is not None and self._worker.isRunning():
+            self.cancel_button.setEnabled(False)
+            self.stage_label.setText("Cancellation requested; finishing the current batch...")
+            self._worker.cancel()
+
+    def _on_canceled(self) -> None:
+        self.start_button.setEnabled(True)
+        self.cancel_button.setEnabled(False)
+        self.progress.setRange(0, 1)
+        self.progress.setValue(0)
+        self.stage_label.setText("Cancelled. The checkpoint can be resumed.")
 
     def validate(self) -> str | None:
         problems = self.state.validation_errors()

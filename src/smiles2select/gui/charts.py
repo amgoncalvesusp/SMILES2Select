@@ -41,9 +41,9 @@ def profile_bars(canvas: Canvas, summary: pd.DataFrame) -> None:
         canvas.draw_idle()
         return
     axes.barh(summary["profile_id"], summary["percentage"], color="#3b6ea5")
-    axes.set_xlabel("Aprovação (%)")
+    axes.set_xlabel("Approval (%)")
     axes.set_xlim(0, 100)
-    axes.set_title("Aprovação por perfil")
+    axes.set_title("Approval by profile")
     for index, value in enumerate(summary["percentage"]):
         axes.text(min(value + 1, 96), index, f"{value:.1f}%", va="center", fontsize=8)
     canvas.draw_idle()
@@ -67,15 +67,15 @@ def descriptor_histogram(
             [values[mask], values[~mask]],
             bins=25,
             stacked=True,
-            label=["Selecionados", "Excluídos"],
+            label=["Selected", "Excluded"],
             color=["#3b6ea5", "#c9772f"],
         )
         axes.legend(fontsize=8)
     else:
         axes.hist(values, bins=25, color="#3b6ea5")
     axes.set_xlabel(label)
-    axes.set_ylabel("Moléculas")
-    axes.set_title(f"Distribuição de {label}")
+    axes.set_ylabel("Molecules")
+    axes.set_title(f"Distribution of {label}")
     canvas.draw_idle()
 
 
@@ -83,13 +83,13 @@ def violation_counts(canvas: Canvas, failures: pd.DataFrame, top: int = 15) -> N
     """How often each rule is broken."""
     axes = canvas.clear()
     if failures.empty:
-        axes.set_title("Nenhuma violação registrada")
+        axes.set_title("No violations recorded")
         canvas.draw_idle()
         return
     counted = failures.groupby("failure_code").size().sort_values(ascending=True).tail(top)
     axes.barh(counted.index, counted.to_numpy(), color="#c9772f")
-    axes.set_xlabel("Moléculas")
-    axes.set_title("Violações por regra")
+    axes.set_xlabel("Molecules")
+    axes.set_title("Violations by rule")
     canvas.draw_idle()
 
 
@@ -130,6 +130,6 @@ def intersection_matrix(canvas: Canvas, status: pd.DataFrame, profile_ids: list[
                 fontsize=7,
                 color="black" if matrix[row][column] < 60 else "white",
             )
-    axes.set_title("Interseção entre perfis (% da linha)")
+    axes.set_title("Intersection between profiles (% of row)")
     canvas.figure.colorbar(image, ax=axes, shrink=0.8)
     canvas.draw_idle()

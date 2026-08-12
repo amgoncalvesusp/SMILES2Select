@@ -69,11 +69,11 @@ class SelectionAction:
         }
 
     def describe(self) -> str:
-        parts = [self.timestamp, self.action_type.value, f"{len(self.record_ids)} molécula(s)"]
+        parts = [self.timestamp, self.action_type.value, f"{len(self.record_ids)} molecule(s)"]
         if self.source:
-            parts.append(f"origem: {self.source}")
+            parts.append(f"source: {self.source}")
         if self.reason:
-            parts.append(f"motivo: {self.reason}")
+            parts.append(f"reason: {self.reason}")
         return " | ".join(parts)
 
 

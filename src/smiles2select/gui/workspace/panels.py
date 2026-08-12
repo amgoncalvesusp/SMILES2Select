@@ -32,6 +32,9 @@ INSPECTOR_FIELDS = (
     ("qed", "QED"),
     ("sa_score", "SA"),
     ("murcko_scaffold", "Scaffold"),
+    ("nearest_reference_id", "Nearest reference"),
+    ("max_reference_similarity", "Reference similarity"),
+    ("reference_novelty", "Reference novelty"),
 )
 
 
@@ -47,7 +50,7 @@ class InspectorPanel(QWidget):
         super().__init__(parent)
         self.record_id: int | None = None
 
-        self.title = QLabel("Nenhuma molécula selecionada")
+        self.title = QLabel("No molecule selected")
         self.title.setStyleSheet("font-weight: 600;")
         self.details = QTextEdit()
         self.details.setReadOnly(True)
@@ -55,9 +58,9 @@ class InspectorPanel(QWidget):
         buttons = QHBoxLayout()
         for label, signal in (
             ("Shortlist", self.shortlist_requested),
-            ("Selecionar", self.select_requested),
-            ("Excluir", self.exclude_requested),
-            ("Fixar", self.pin_requested),
+            ("Select", self.select_requested),
+            ("Exclude", self.exclude_requested),
+            ("Pin", self.pin_requested),
         ):
             button = QPushButton(label)
             button.clicked.connect(lambda _checked=False, emitter=signal: self._emit(emitter))
@@ -81,7 +84,7 @@ class InspectorPanel(QWidget):
         """Fill the panel; missing properties are simply omitted."""
         self.record_id = record_id
         if record_id not in descriptors.index:
-            self.title.setText(f"Registro {record_id} não encontrado")
+            self.title.setText(f"Record {record_id} not found")
             self.details.setPlainText("")
             return
 
@@ -114,14 +117,14 @@ class BasketPanel(QWidget):
         self.counters = QLabel("")
         self.counters.setStyleSheet("font-weight: 600;")
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["ID", "Status", "Origem", "Nota"])
+        self.table.setHorizontalHeaderLabels(["ID", "Status", "Origin", "Note"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
 
-        self.undo_button = QPushButton("Desfazer")
-        self.redo_button = QPushButton("Refazer")
-        auto_button = QPushButton("Completar automaticamente")
-        export_button = QPushButton("Exportar seleção...")
+        self.undo_button = QPushButton("Undo")
+        self.redo_button = QPushButton("Redo")
+        auto_button = QPushButton("Auto-select")
+        export_button = QPushButton("Export selection...")
         self.undo_button.clicked.connect(self.undo_requested)
         self.redo_button.clicked.connect(self.redo_requested)
         auto_button.clicked.connect(self.auto_select_requested)

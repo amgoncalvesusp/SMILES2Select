@@ -93,7 +93,7 @@ def test_basket_counters():
 
 def test_selecting_a_failed_molecule_requires_a_reason():
     basket = build_basket()
-    with pytest.raises(JustificationRequired, match="justificativa"):
+    with pytest.raises(JustificationRequired, match="justification"):
         basket.add_to_final([3], origin=SelectionOrigin.MANUAL)
 
     basket.add_to_final([3], origin=SelectionOrigin.RESCUED, reason="análogo aprovado MOL001")
@@ -120,10 +120,10 @@ def test_preview_reports_what_a_bulk_action_would_do():
     basket.add_to_final([1])
     basket.exclude([4])
     preview = basket.preview([1, 2, 4, 999])
-    assert preview["solicitadas"] == 4
-    assert preview["desconhecidas"] == 1
-    assert preview["já selecionadas"] == 1
-    assert preview["excluídas manualmente"] == 1
+    assert preview["requested"] == 4
+    assert preview["unknown"] == 1
+    assert preview["already selected"] == 1
+    assert preview["manually excluded"] == 1
 
 
 # --- history -----------------------------------------------------------------
@@ -215,7 +215,7 @@ def test_recipe_comparison_lists_differences():
     second = recipes.SelectionRecipe(applied_thresholds={"lip_mw_max": 450.0}, target_count=200)
     differences = recipes.compare(first, second)
     assert any("lip_mw_max" in text for text in differences)
-    assert any("quantidade final" in text for text in differences)
+    assert any("final count" in text for text in differences)
 
 
 def test_recipe_default_path():

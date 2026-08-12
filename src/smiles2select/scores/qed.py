@@ -39,11 +39,11 @@ class QedSelection:
 
     def describe(self) -> str:
         if self.mode == "compute":
-            return "QED calculado e reportado (sem limite)"
+            return "QED computed and reported (no cutoff)"
         if self.mode == "rank":
-            return "QED usado para ranqueamento"
+            return "QED used for ranking"
         if self.mode == "top_percentile":
-            return f"QED: percentil superior {self.percentile:g}%"
+            return f"QED: top {self.percentile:g} percentile"
         return f"QED >= {self.threshold:g}"
 
 

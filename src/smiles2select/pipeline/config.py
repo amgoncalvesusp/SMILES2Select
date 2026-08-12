@@ -65,12 +65,46 @@ class RunConfig:
     #: next to database_path (or a temp file) and discards it on success;
     #: set explicitly to keep it around for a later --resume.
     checkpoint_path: Path | None = None
+    #: Optional libraries used to characterize candidate/reference overlap.
+    #: They are never selected as candidates.
+    reference_sources: tuple[SourceFile, ...] = ()
+    background_sources: tuple[SourceFile, ...] = ()
+    reference_search: str = "exact"
+    exclude_reference_duplicates: bool = False
+    reference_min_similarity: float = 0.0
+    reference_max_similarity: float = 1.0
+    #: Optional Hub strategy layer applied after chemical eligibility.
+    selection_strategy: str = "traditional"
+    final_count: int | None = None
+    reserve_count: int | None = None
+    selection_seed: int = 0xF00D
+    #: Optional overlapping chemical-space zones with explicit quotas.
+    zones: tuple[dict[str, object], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.profile_ids:
             raise ValueError("at least one profile must be selected")
         if self.chunk_size < 1:
             raise ValueError("chunk_size must be positive")
+        if self.reference_search not in {"exact", "fast"}:
+            raise ValueError("reference_search must be 'exact' or 'fast'")
+        if not 0.0 <= self.reference_min_similarity <= self.reference_max_similarity <= 1.0:
+            raise ValueError("reference similarity window must satisfy 0 <= minimum <= maximum <= 1")
+        if self.selection_strategy not in {
+            "traditional",
+            "balanced",
+            "diversity_first",
+            "reference_novelty",
+            "reference_neighborhood",
+            "reference_aware_diversity",
+            "stratified",
+            "manual_assisted",
+        }:
+            raise ValueError(f"unknown selection_strategy '{self.selection_strategy}'")
+        if self.final_count is not None and self.final_count < 0:
+            raise ValueError("final_count must not be negative")
+        if self.reserve_count is not None and self.reserve_count < 0:
+            raise ValueError("reserve_count must not be negative")
         if self.policy is None:
             object.__setattr__(self, "policy", recommended_policy(self.profile_ids))
         missing_roles = [
@@ -115,6 +149,17 @@ class RunConfig:
                 "custom_alerts": sorted(alert.smarts for alert in self.custom_alerts),
                 "compute_qed": self.compute_qed,
                 "drop_duplicates": self.drop_duplicates,
+                "reference_sources": [source.label for source in self.reference_sources],
+                "background_sources": [source.label for source in self.background_sources],
+                "reference_search": self.reference_search,
+                "exclude_reference_duplicates": self.exclude_reference_duplicates,
+                "reference_min_similarity": self.reference_min_similarity,
+                "reference_max_similarity": self.reference_max_similarity,
+                "selection_strategy": self.selection_strategy,
+                "final_count": self.final_count,
+                "reserve_count": self.reserve_count,
+                "selection_seed": self.selection_seed,
+                "zones": [dict(zone) for zone in self.zones],
             }
         )
 
@@ -134,16 +179,26 @@ class RunConfig:
             ("custom_alerts", str(len(self.custom_alerts))),
             ("standardization", str(self.standardization)),
             ("drop_duplicates", str(self.drop_duplicates)),
-            ("sa_score", "calculado" if self.compute_sa else "desativado"),
-            ("np_score", "calculado" if self.compute_np else "desativado"),
+            ("sa_score", "computed" if self.compute_sa else "disabled"),
+            ("np_score", "computed" if self.compute_np else "disabled"),
             ("diversity_pick", str(self.diversity_pick or "-")),
             ("per_scaffold_limit", str(self.per_scaffold_limit or "-")),
             ("fingerprint", self.fingerprint_config.label()),
-            ("cache", str(self.cache_path) if self.cache_path else "desativado"),
-            ("n_jobs", str(self.n_jobs) if self.n_jobs and self.n_jobs > 0 else "automático"),
+            ("cache", str(self.cache_path) if self.cache_path else "disabled"),
+            ("n_jobs", str(self.n_jobs) if self.n_jobs and self.n_jobs > 0 else "automatic"),
             ("chunk_size_inicial", str(self.chunk_size)),
-            ("modo_diagnostico", "seguro" if self.diagnostics.enabled else "padrão"),
+            ("diagnostics_mode", "safe" if self.diagnostics.enabled else "standard"),
             ("config_hash", self.fingerprint()),
+            ("reference_libraries", ", ".join(source.label for source in self.reference_sources) or "-"),
+            ("background_libraries", ", ".join(source.label for source in self.background_sources) or "-"),
+            ("reference_search", self.reference_search),
+            ("exclude_reference_duplicates", str(self.exclude_reference_duplicates)),
+            ("reference_similarity_window", f"{self.reference_min_similarity:g}-{self.reference_max_similarity:g}"),
+            ("selection_strategy", self.selection_strategy),
+            ("final_count", str(self.final_count or "-")),
+            ("reserve_count", str(self.reserve_count or "-")),
+            ("selection_seed", str(self.selection_seed)),
+            ("zones", str(len(self.zones))),
         ]
 
 

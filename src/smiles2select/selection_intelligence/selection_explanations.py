@@ -86,19 +86,19 @@ def final_alerts(
     messages = list(outcome.warnings(constraints))
 
     if unrepresented_clusters:
-        messages.append(f"{len(unrepresented_clusters)} clusters não possuem representantes.")
+        messages.append(f"{len(unrepresented_clusters)} clusters have no representatives.")
 
     if outcome.scaffold_usage and outcome.count:
         share = max(outcome.scaffold_usage.values()) / outcome.count
         if share >= SCAFFOLD_DOMINANCE:
-            messages.append(f"{share * 100:.0f}% da seleção pertence ao mesmo scaffold.")
+            messages.append(f"{share * 100:.0f}% of the selection belongs to one scaffold.")
 
     if borderline_ids:
         selected = set(outcome.selected_ids)
         overlap = [record_id for record_id in borderline_ids if record_id in selected]
         if overlap:
             messages.append(
-                f"{len(overlap)} moléculas selecionadas estão próximas de pelo menos um limite."
+                f"{len(overlap)} selected molecules are close to at least one threshold."
             )
 
     if basket is not None:
@@ -111,8 +111,7 @@ def final_alerts(
         ]
         if overrides:
             messages.append(
-                f"{len(overrides)} moléculas foram selecionadas manualmente apesar de "
-                "reprovação química."
+                f"{len(overrides)} molecules were selected manually despite a chemical failure."
             )
 
     return messages
@@ -123,11 +122,11 @@ def summary_rows(
 ) -> list[tuple[str, object]]:
     """Counts for the SELECTION_SUMMARY sheet."""
     return [
-        ("estratégia", outcome.strategy.value),
-        ("selecionados finais", outcome.count),
-        ("solicitados", constraints.target_count or "sem limite"),
-        ("faltando", outcome.shortfall(constraints)),
-        ("scaffolds cobertos", outcome.scaffolds_covered),
-        ("clusters cobertos", outcome.clusters_covered),
-        ("rejeitados por cota ou limite", len(outcome.rejections)),
+        ("strategy", outcome.strategy.value),
+        ("final selected", outcome.count),
+        ("requested", constraints.target_count or "unlimited"),
+        ("shortfall", outcome.shortfall(constraints)),
+        ("scaffolds covered", outcome.scaffolds_covered),
+        ("clusters covered", outcome.clusters_covered),
+        ("rejected by quota or limit", len(outcome.rejections)),
     ]

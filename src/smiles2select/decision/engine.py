@@ -93,7 +93,7 @@ class DecisionEngine:
                 raise KeyError(f"mandatory profile '{profile_id}' was not evaluated")
             failed = ~status[column].astype(bool)
             selected = selected & ~failed
-            reasons = _add_reason(reasons, failed, f"reprovado no perfil obrigatório {profile_id}")
+            reasons = _add_reason(reasons, failed, f"failed mandatory profile {profile_id}")
         return selected, reasons
 
     def _apply_consensus(
@@ -112,7 +112,7 @@ class DecisionEngine:
         reasons = _add_reason(
             reasons,
             failed,
-            f"consenso insuficiente (< {self.policy.consensus_min_pass} de {len(columns)})",
+            f"insufficient consensus (< {self.policy.consensus_min_pass} of {len(columns)})",
         )
         return selected, reasons
 
@@ -142,7 +142,7 @@ class DecisionEngine:
             return selected, reasons
         catalogs = ", ".join(self.policy.alert_policy.excluding_catalogs())
         selected = selected & ~excluded
-        reasons = _add_reason(reasons, excluded, f"alerta estrutural excludente ({catalogs})")
+        reasons = _add_reason(reasons, excluded, f"excluding structural alert ({catalogs})")
         return selected, reasons
 
     def _apply_expression(
@@ -159,7 +159,7 @@ class DecisionEngine:
         variables = expression_variables(status, scores, alerts, index)
         satisfied = expression_parser.evaluate(self.policy.expression, variables)
         selected = selected & satisfied
-        reasons = _add_reason(reasons, ~satisfied, "expressão personalizada não satisfeita")
+        reasons = _add_reason(reasons, ~satisfied, "custom expression not satisfied")
         return selected, reasons
 
 

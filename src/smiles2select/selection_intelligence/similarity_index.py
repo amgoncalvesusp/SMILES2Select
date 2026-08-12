@@ -121,7 +121,7 @@ class SimilarityIndex:
         """What the search used, for the report."""
         return [
             ("fingerprint", self.config.label()),
-            ("métrica final", "Tanimoto exato"),
-            ("busca aproximada", "HNSW" if self.uses_approximate_stage else "exaustiva"),
-            ("moléculas indexadas", len(self._vectors)),
+            ("final metric", "Exact Tanimoto"),
+            ("approximate search", "HNSW" if self.uses_approximate_stage else "exhaustive"),
+            ("indexed molecules", len(self._vectors)),
         ]

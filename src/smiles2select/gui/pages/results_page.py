@@ -20,20 +20,20 @@ from smiles2select.export.excel import export_frame
 from smiles2select.gui import charts
 from smiles2select.gui.pages.base import WizardPage
 
-VIEWS = ("Selecionados", "Excluídos", "Todos")
+VIEWS = ("Selected", "Excluded", "All")
 MAX_TABLE_ROWS = 5000
 
 
 class ResultsPage(WizardPage):
-    title = "7. Resultados"
-    subtitle = "Comparação entre perfis, distribuições e a tabela final."
+    title = "7. Results"
+    subtitle = "Compare profiles, distributions and the final table."
 
     def __init__(self, state) -> None:
         super().__init__(state)
         self._result = None
         self._frame = pd.DataFrame()
 
-        self.headline = QLabel("Nenhuma execução concluída.")
+        self.headline = QLabel("No completed run.")
         self.headline.setStyleSheet("font-size: 14px; font-weight: 600;")
 
         self.tabs = QTabWidget()
@@ -41,20 +41,20 @@ class ResultsPage(WizardPage):
         self.violation_canvas = charts.Canvas()
         self.intersection_canvas = charts.Canvas()
         self.distribution_canvas = charts.Canvas()
-        self.tabs.addTab(self.profile_canvas, "Aprovação por perfil")
-        self.tabs.addTab(self.violation_canvas, "Violações")
-        self.tabs.addTab(self.intersection_canvas, "Interseção")
-        self.tabs.addTab(self._distribution_tab(), "Distribuições")
+        self.tabs.addTab(self.profile_canvas, "Approval by profile")
+        self.tabs.addTab(self.violation_canvas, "Violations")
+        self.tabs.addTab(self.intersection_canvas, "Intersection")
+        self.tabs.addTab(self._distribution_tab(), "Distributions")
 
         self.view_combo = QComboBox()
         self.view_combo.addItems(VIEWS)
         self.view_combo.currentTextChanged.connect(self._refresh_table)
         self.filter_edit = QLineEdit()
-        self.filter_edit.setPlaceholderText("Filtrar por ID ou SMILES...")
+        self.filter_edit.setPlaceholderText("Filter by ID or SMILES...")
         self.filter_edit.textChanged.connect(self._refresh_table)
 
         filters = QHBoxLayout()
-        filters.addWidget(QLabel("Exibir:"))
+        filters.addWidget(QLabel("Show:"))
         filters.addWidget(self.view_combo)
         filters.addWidget(self.filter_edit, stretch=1)
 
@@ -84,9 +84,9 @@ class ResultsPage(WizardPage):
         """Populate the page after a run finishes."""
         self._result = result
         self.headline.setText(
-            f"{result.decision.selected_count} selecionadas de {result.total_records} registros "
-            f"({result.invalid_count} inválidos, {result.duplicate_count} duplicatas, "
-            f"{result.evaluated_count} avaliados)."
+            f"{result.decision.selected_count} selected of {result.total_records} records "
+            f"({result.invalid_count} invalid, {result.duplicate_count} duplicates, "
+            f"{result.evaluated_count} evaluated)."
         )
 
         charts.profile_bars(self.profile_canvas, result.profile_summary())
@@ -118,9 +118,9 @@ class ResultsPage(WizardPage):
             return
         view = self.view_combo.currentText()
         frame = self._frame
-        if view == "Selecionados":
+        if view == "Selected":
             frame = frame[frame["Final_Status"] == "SELECTED"]
-        elif view == "Excluídos":
+        elif view == "Excluded":
             frame = frame[frame["Final_Status"] != "SELECTED"]
 
         text = self.filter_edit.text().strip().lower()
@@ -145,7 +145,7 @@ class ResultsPage(WizardPage):
         if len(frame) > MAX_TABLE_ROWS:
             self.table_note.setText(
                 f"Exibindo {MAX_TABLE_ROWS} de {len(frame)} linhas. "
-                "O arquivo Excel contém o conjunto completo."
+                "The Excel file contains the complete set."
             )
         else:
             self.table_note.setText(f"{len(frame)} linhas.")

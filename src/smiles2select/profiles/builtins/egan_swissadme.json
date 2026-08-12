@@ -1,6 +1,6 @@
 {
   "id": "egan",
-  "name": "Egan — implementação compatível com SwissADME",
+  "name": "Egan — SwissADME-compatible implementation",
   "short_name": "Egan",
   "category": "oral_druglikeness",
   "version": "1.0.0",

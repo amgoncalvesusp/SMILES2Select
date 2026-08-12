@@ -149,9 +149,9 @@ def _warnings(objectives: ObjectiveSet, frame: pd.DataFrame, table: pd.DataFrame
         share = int((table["pareto_rank"] == 1).sum()) / total
         if share > CROWDED_FRONT_FRACTION:
             messages.append(
-                f"A primeira fronteira contém {share * 100:.0f}% das moléculas. "
-                "Considere reduzir ou agrupar os objetivos para tornar a priorização "
-                "mais informativa."
+                f"The first front contains {share * 100:.0f}% of molecules. "
+                "Consider reducing or grouping objectives to make prioritization "
+                "more informative."
             )
     return messages
 

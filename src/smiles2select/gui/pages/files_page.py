@@ -18,27 +18,26 @@ from smiles2select.gui.pages.base import WizardPage
 from smiles2select.gui.state import FileSelection
 from smiles2select.io.importer import SourceReadError, sheet_names
 
-FILE_FILTER = "Bibliotecas (*.csv *.tsv *.txt *.smi *.smiles *.xlsx *.xlsm *.xls);;Todos (*)"
+FILE_FILTER = "Libraries (*.csv *.tsv *.txt *.smi *.smiles *.xlsx *.xlsm *.xls);;All (*)"
 
 
 class FilesPage(WizardPage):
-    title = "1. Arquivos"
+    title = "1. Files"
     subtitle = (
-        "Selecione uma ou mais bibliotecas de SMILES. Planilhas com várias abas são "
-        "adicionadas uma linha por aba."
+        "Select one or more SMILES libraries. Workbooks with multiple sheets add one row per sheet."
     )
 
     def __init__(self, state) -> None:
         super().__init__(state)
 
         self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Arquivo", "Aba", "Caminho"])
+        self.table.setHorizontalHeaderLabels(["File", "Sheet", "Path"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
 
-        add_button = QPushButton("Adicionar arquivos...")
-        remove_button = QPushButton("Remover selecionado")
+        add_button = QPushButton("Add files...")
+        remove_button = QPushButton("Remove selected")
         add_button.clicked.connect(self._add_files)
         remove_button.clicked.connect(self._remove_selected)
 
@@ -51,13 +50,13 @@ class FilesPage(WizardPage):
         self.body.addLayout(buttons)
 
     def _add_files(self) -> None:
-        paths, _ = QFileDialog.getOpenFileNames(self, "Selecionar bibliotecas", "", FILE_FILTER)
+        paths, _ = QFileDialog.getOpenFileNames(self, "Select libraries", "", FILE_FILTER)
         for raw_path in paths:
             path = Path(raw_path)
             try:
                 sheets = sheet_names(path)
             except SourceReadError as exc:
-                QMessageBox.warning(self, "Arquivo ilegível", str(exc))
+                QMessageBox.warning(self, "Unreadable file", str(exc))
                 continue
             if sheets:
                 for sheet in sheets:
@@ -82,5 +81,5 @@ class FilesPage(WizardPage):
 
     def validate(self) -> str | None:
         if not self.state.files:
-            return "Selecione pelo menos um arquivo."
+            return "Select at least one file."
         return None

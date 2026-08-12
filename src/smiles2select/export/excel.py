@@ -18,6 +18,7 @@ import pandas as pd
 
 from smiles2select.alerts import engine as alert_engine
 from smiles2select.app_metadata import APP_NAME, APP_VERSION, AUTHORSHIP, DISCLAIMER
+from smiles2select.chemical_space.coverage import coverage
 from smiles2select.decision.explanations import policy_sentence
 from smiles2select.pipeline.runner import RunResult
 from smiles2select.rules import explanations
@@ -38,6 +39,8 @@ DESCRIPTOR_EXPORT_COLUMNS = {
     "qed": "QED",
     "sa_score": "SA",
     "np_score": "NP",
+    "max_reference_similarity": "Max_Reference_Similarity",
+    "reference_novelty": "Reference_Novelty",
 }
 
 
@@ -59,7 +62,16 @@ def export(result: RunResult, path: str | Path, options: ExportOptions | None = 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         _write(writer, summary_sheet(result), "00_SUMMARY")
         _write(writer, selected_sheet(result), "01_SELECTED_FINAL")
+        if result.reserve_ids:
+            _write(writer, reserve_sheet(result), "02_RESERVE")
         _write(writer, excluded_sheet(result), "02_EXCLUDED_FINAL")
+        if result.reference_duplicates is not None:
+            _write(writer, reference_overlap_sheet(result), "05_REFERENCE_OVERLAP")
+        if result.reference_similarity is not None:
+            _write(writer, reference_similarity_sheet(result), "06_REFERENCE_SIMILARITY")
+        if result.zone_allocation is not None:
+            _write(writer, result.zone_allocation.memberships, "07_ZONE_MEMBERSHIPS")
+            _write(writer, result.zone_allocation.allocation_table, "08_ZONE_ALLOCATION")
         if settings.include_profile_matrix:
             _write(writer, profile_matrix(result), "03_PROFILE_MATRIX")
         for profile in result.profiles:
@@ -91,20 +103,20 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
     blocks: list[pd.DataFrame] = [
         pd.DataFrame(
             [
-                {"section": "Totais", "item": "Total processado", "value": result.total_records},
+                {"section": "Totals", "item": "Records processed", "value": result.total_records},
                 {
-                    "section": "Totais",
-                    "item": "Selecionados finais",
+                    "section": "Totals",
+                    "item": "Final selected",
                     "value": result.decision.selected_count,
                 },
                 {
-                    "section": "Totais",
-                    "item": "Excluídos finais",
+                    "section": "Totals",
+                    "item": "Final excluded",
                     "value": result.decision.excluded_count,
                 },
-                {"section": "Totais", "item": "Inválidos", "value": result.invalid_count},
-                {"section": "Totais", "item": "Duplicatas", "value": result.duplicate_count},
-                {"section": "Totais", "item": "Avaliados", "value": result.evaluated_count},
+                {"section": "Totals", "item": "Invalid", "value": result.invalid_count},
+                {"section": "Totals", "item": "Duplicates", "value": result.duplicate_count},
+                {"section": "Totals", "item": "Evaluated", "value": result.evaluated_count},
             ]
         )
     ]
@@ -113,11 +125,23 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
     blocks.append(
         pd.DataFrame(
             {
-                "section": "Aprovação por perfil",
+                "section": "Approval by profile",
                 "item": profile_rows["profile"],
                 "value": profile_rows["approved"],
                 "extra": profile_rows["percentage"].map(lambda pct: f"{pct:.2f}%"),
             }
+        )
+    )
+
+    coverage_report = coverage(result.descriptors, result.decision.selected_ids())
+    blocks.append(
+        pd.DataFrame(
+            [
+                {"section": "Coverage", "item": "Selected molecules", "value": coverage_report.selected_count},
+                {"section": "Coverage", "item": "Unique scaffolds", "value": coverage_report.unique_scaffolds},
+                {"section": "Coverage", "item": "Selected unique scaffolds", "value": coverage_report.selected_unique_scaffolds},
+                {"section": "Coverage", "item": "Novel candidates", "value": coverage_report.novel_candidate_count},
+            ]
         )
     )
 
@@ -127,7 +151,7 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
         blocks.append(
             pd.DataFrame(
                 {
-                    "section": "Violações por regra",
+                    "section": "Violations by rule",
                     "item": counted.index,
                     "value": counted.to_numpy(),
                 }
@@ -139,7 +163,7 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
         blocks.append(
             pd.DataFrame(
                 {
-                    "section": "Alertas estruturais",
+                    "section": "Structural alerts",
                     "item": alerts.index,
                     "value": alerts.to_numpy(),
                 }
@@ -151,7 +175,7 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
         blocks.append(
             pd.DataFrame(
                 {
-                    "section": "Distribuição de QED",
+                    "section": "QED distribution",
                     "item": [
                         f"{row.bin_lower:.1f}-{row.bin_upper:.1f}" for row in histogram.itertuples()
                     ],
@@ -160,16 +184,54 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
             )
         )
 
+    if result.reference_similarity is not None:
+        similarity = result.reference_similarity.annotations
+        blocks.append(
+            pd.DataFrame(
+                [
+                    {
+                        "section": "Reference comparison",
+                        "item": "Reference libraries",
+                        "value": len(result.reference_libraries),
+                    },
+                    {
+                        "section": "Reference comparison",
+                        "item": "Background libraries",
+                        "value": len(result.background_libraries),
+                    },
+                    {
+                        "section": "Reference comparison",
+                        "item": "Exact search method",
+                        "value": result.reference_similarity.method_description,
+                    },
+                    {
+                        "section": "Reference comparison",
+                        "item": "Exact reference duplicates",
+                        "value": int(
+                            result.reference_duplicates.duplicate_count
+                            if result.reference_duplicates is not None
+                            else 0
+                        ),
+                    },
+                    {
+                        "section": "Reference comparison",
+                        "item": "Candidates with a nearest reference",
+                        "value": int(similarity["nearest_reference_id"].notna().sum()),
+                    },
+                ]
+            )
+        )
+
     blocks.append(
         pd.DataFrame(
             [
-                {"section": "Política", "item": "Política final", "value": result.config.policy.id},
+                {"section": "Policy", "item": "Final policy", "value": result.config.policy.id},
                 {
-                    "section": "Política",
-                    "item": "Descrição",
+                    "section": "Policy",
+                    "item": "Description",
                     "value": policy_sentence(result.config.policy),
                 },
-                {"section": "Aviso", "item": "Interpretação", "value": DISCLAIMER},
+                {"section": "Warning", "item": "Interpretation", "value": DISCLAIMER},
             ]
         )
     )
@@ -208,19 +270,52 @@ def export_frame(result: RunResult) -> pd.DataFrame:
         if catalog_id in result.config.alert_catalogs:
             frame[label] = alert_engine.counts_by_catalog(result.alerts, frame.index, catalog_id)
 
-    status = decisions["selected"].reindex(frame.index)
-    frame["Final_Status"] = status.map({True: "SELECTED", False: "EXCLUDED"}).fillna(
-        "NOT_EVALUATED"
-    )
+    if "selection_status" in decisions:
+        status = decisions["selection_status"].reindex(frame.index)
+        frame["Final_Status"] = status.map(
+            {"FINAL_SELECTED": "SELECTED", "RESERVE": "RESERVE", "EXCLUDED": "EXCLUDED"}
+        ).fillna("NOT_EVALUATED")
+    else:
+        status = decisions["selected"].reindex(frame.index)
+        frame["Final_Status"] = status.map({True: "SELECTED", False: "EXCLUDED"}).fillna(
+            "NOT_EVALUATED"
+        )
     frame["Source_File"] = descriptors["source_file"]
     frame["Source_Sheet"] = descriptors["source_sheet"]
     frame["Source_Row"] = descriptors["source_row"]
     return frame
 
 
+def reference_overlap_sheet(result: RunResult) -> pd.DataFrame:
+    """One row per exact candidate/reference overlap."""
+
+    if result.reference_duplicates is None:
+        return pd.DataFrame()
+    return result.reference_duplicates.overlaps.copy()
+
+
+def reference_similarity_sheet(result: RunResult) -> pd.DataFrame:
+    """Nearest-reference results with the exact search metadata."""
+
+    if result.reference_similarity is None:
+        return pd.DataFrame()
+    return result.reference_similarity.annotations.reset_index()
+
+
 def selected_sheet(result: RunResult) -> pd.DataFrame:
     frame = export_frame(result)
     return frame[frame["Final_Status"] == "SELECTED"].reset_index(drop=True)
+
+
+def reserve_sheet(result: RunResult) -> pd.DataFrame:
+    """Reserve molecules are exported separately and never counted as final."""
+
+    frame = export_frame(result)
+    if not result.reserve_ids:
+        return frame.iloc[0:0].reset_index(drop=True)
+    return frame.loc[frame.index.isin(result.reserve_ids)].assign(
+        Final_Status="RESERVE"
+    ).reset_index(drop=True)
 
 
 def excluded_sheet(result: RunResult) -> pd.DataFrame:
@@ -246,7 +341,7 @@ def excluded_sheet(result: RunResult) -> pd.DataFrame:
     excluded["Final_Exclusion_Reasons"] = excluded["Final_Exclusion_Reasons"].fillna(invalid)
     duplicate_of = result.descriptors["duplicate_of"].reindex(excluded.index)
     is_duplicate = duplicate_of.notna()
-    excluded.loc[is_duplicate, "Final_Exclusion_Reasons"] = "duplicata do registro " + duplicate_of[
+    excluded.loc[is_duplicate, "Final_Exclusion_Reasons"] = "duplicate of record " + duplicate_of[
         is_duplicate
     ].astype(str)
     return excluded.reset_index(drop=True)
@@ -323,16 +418,16 @@ def alert_sheets(result: RunResult) -> dict[str, pd.DataFrame]:
 def config_sheet(result: RunResult) -> pd.DataFrame:
     """Profiles, versions, thresholds, methods and hashes used in this run."""
     rows: list[dict[str, object]] = [
-        {"section": "aplicação", "key": "name", "value": APP_NAME},
-        {"section": "aplicação", "key": "version", "value": APP_VERSION},
-        {"section": "aplicação", "key": "autoria", "value": AUTHORSHIP},
+        {"section": "application", "key": "name", "value": APP_NAME},
+        {"section": "application", "key": "version", "value": APP_VERSION},
+        {"section": "application", "key": "authorship", "value": AUTHORSHIP},
     ]
     rows.extend(
-        {"section": "execução", "key": key, "value": value}
+        {"section": "run", "key": key, "value": value}
         for key, value in result.config.summary_rows()
     )
     for profile in result.profiles:
-        section = f"perfil:{profile.id}"
+        section = f"profile:{profile.id}"
         rows.append(
             {"section": section, "key": "version", "value": f"{profile.version} ({profile.name})"}
         )
@@ -350,9 +445,9 @@ def config_sheet(result: RunResult) -> pd.DataFrame:
     for descriptor_id in result.plan.descriptor_ids:
         rows.append(
             {
-                "section": "descritores",
+                "section": "descriptors",
                 "key": descriptor_id,
-                "value": "calculado uma vez por estrutura canônica",
+                "value": "computed once per canonical structure",
             }
         )
     return pd.DataFrame(rows)

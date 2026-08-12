@@ -59,8 +59,8 @@ def test_run_writes_database_and_excel(library, tmp_path, capsys):
     assert workbook.exists()
 
     output = capsys.readouterr().out
-    assert "Total processado:    3" in output
-    assert "Selecionados finais: 2" in output
+    assert "Records processed:   3" in output
+    assert "Final selected:      2" in output
 
 
 def test_consensus_option(library, capsys):
@@ -186,3 +186,32 @@ def test_parser_defaults_match_the_recommended_configuration():
     assert args.mandatory == "lipinski,veber"
     assert args.alerts == "pains,brenk"
     assert args.qed_mode == "rank"
+
+
+def test_cli_saves_and_replays_a_selection_plan(library, tmp_path, capsys):
+    plan = tmp_path / "selection.selection.json"
+    common = [
+        str(library),
+        "--smiles-column",
+        "SMILES",
+        "--id-column",
+        "ID",
+        "--profiles",
+        "lipinski",
+        "--mandatory",
+        "lipinski",
+        "--selection-strategy",
+        "diversity_first",
+        "--final-count",
+        "1",
+        "--reserve-count",
+        "1",
+        "--jobs",
+        "1",
+        "--quiet",
+    ]
+    assert main([*common, "--save-selection-plan", str(plan)]) == 0
+    assert plan.exists()
+    capsys.readouterr()
+    assert main([str(library), "--smiles-column", "SMILES", "--id-column", "ID",
+                 "--selection-plan", str(plan), "--jobs", "1", "--quiet"]) == 0

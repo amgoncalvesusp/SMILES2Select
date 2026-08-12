@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 APP_NAME = "SMILES2Select"
-APP_VERSION = "2.1.0"
+APP_VERSION = "3.0.0"
 
 AUTHOR = "Adriano Marques Gonçalves"
 AFFILIATION = "Universidade de Araraquara (UNIARA)"
@@ -20,9 +20,9 @@ DISCLAIMER = (
 )
 
 SELECTION_SENTENCE = (
-    "Uma molécula será selecionada quando passar nos perfis obrigatórios. "
-    "Os perfis informativos serão calculados e incluídos no relatório, mas não "
-    "serão usados para exclusão. Alertas PAINS e Brenk não excluirão moléculas."
+    "A molecule is selected when it passes the mandatory profiles. Informative "
+    "profiles are calculated and included in the report but do not exclude "
+    "molecules. PAINS and Brenk alerts do not exclude molecules by default."
 )
 
 

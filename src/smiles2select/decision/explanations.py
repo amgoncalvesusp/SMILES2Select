@@ -16,12 +16,12 @@ def policy_sentence(policy: DecisionPolicy) -> str:
     informative = policy.informative_profiles()
     parts = [SELECTION_SENTENCE]
     if mandatory:
-        parts.append(f"Perfis obrigatórios: {', '.join(mandatory)}.")
+        parts.append(f"Mandatory profiles: {', '.join(mandatory)}.")
     if informative:
-        parts.append(f"Perfis informativos: {', '.join(informative)}.")
+        parts.append(f"Informative profiles: {', '.join(informative)}.")
     if policy.excludes_on_alert():
         catalogs = ", ".join(policy.alert_policy.excluding_catalogs())
-        parts.append(f"ATENÇÃO: os catálogos {catalogs} estão configurados para EXCLUIR.")
+        parts.append(f"WARNING: catalogs {catalogs} are configured to EXCLUDE.")
     return " ".join(parts)
 
 
@@ -31,7 +31,7 @@ def policy_rows(policy: DecisionPolicy) -> list[dict[str, str]]:
         {
             "profile_id": profile_id,
             "role": ROLE_LABELS[policy.roles[profile_id]],
-            "excludes": "sim" if policy.roles[profile_id] in {"mandatory", "exclusion"} else "não",
+            "excludes": "yes" if policy.roles[profile_id] in {"mandatory", "exclusion"} else "no",
         }
         for profile_id in sorted(policy.roles)
     ]
@@ -43,8 +43,7 @@ def restrictiveness_warning(policy: DecisionPolicy) -> str | None:
     if len(mandatory) < 4:
         return None
     return (
-        f"{len(mandatory)} perfis estão marcados como obrigatórios "
-        f"({', '.join(mandatory)}). Eles foram desenvolvidos com objetivos, conjuntos de "
-        "dados e descritores diferentes; exigir aprovação simultânea em todos tende a "
-        "produzir uma interseção excessivamente restritiva."
+        f"{len(mandatory)} profiles are mandatory ({', '.join(mandatory)}). They were "
+        "developed with different objectives, datasets and descriptors; requiring all "
+        "of them simultaneously tends to produce an overly restrictive intersection."
     )

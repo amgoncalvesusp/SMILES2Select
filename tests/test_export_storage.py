@@ -94,12 +94,12 @@ def test_config_sheet_records_methods_and_versions(result):
     assert "rdkit_version" in keys
     assert "config_hash" in keys
     assert "logp_method" in keys
-    assert any(section.startswith("perfil:") for section in config["section"])
+    assert any(section.startswith("profile:") for section in config["section"])
 
 
 def test_summary_sheet_carries_the_disclaimer(result):
     summary = excel.summary_sheet(result)
-    assert (summary["section"] == "Aviso").any()
+    assert (summary["section"] == "Warning").any()
 
 
 def test_sheet_name_sanitisation():

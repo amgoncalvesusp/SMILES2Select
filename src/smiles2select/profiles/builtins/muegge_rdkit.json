@@ -1,6 +1,6 @@
 {
   "id": "muegge",
-  "name": "Muegge — adaptação RDKit",
+  "name": "Muegge — RDKit adaptation",
   "short_name": "Muegge",
   "category": "oral_druglikeness",
   "version": "1.0.0",

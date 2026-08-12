@@ -21,6 +21,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from smiles2select.chemical_space.density_tiles import lasso_contains
+from smiles2select.chemical_space.layers import progressive_layer
 
 #: Colour-blind safe ramp; never a rainbow scale, which encodes no order.
 RANK_COLOURS = ("#1b6ca8", "#4c9f70", "#d9a441", "#c9772f", "#a33a3a")
@@ -50,6 +51,14 @@ class ScatterView(QWidget):
         self.scatter = pg.ScatterPlotItem(size=7, pen=None, hoverable=True)
         self.scatter.sigClicked.connect(self._on_click)
         self.plot.addItem(self.scatter)
+        self.reference_scatter = pg.ScatterPlotItem(
+            size=10, symbol="t", brush=pg.mkBrush("#a33a3a"), pen=pg.mkPen("#6e2222", width=1)
+        )
+        self.reference_scatter.setZValue(2)
+        self.plot.addItem(self.reference_scatter)
+        self.density_scatter = pg.ScatterPlotItem(pen=None)
+        self.density_scatter.setZValue(-1)
+        self.plot.addItem(self.density_scatter)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -77,22 +86,45 @@ class ScatterView(QWidget):
         self._coordinates = coordinates
         if coordinates.empty:
             self.scatter.setData([])
+            self.density_scatter.setData([])
             return
 
+        layer = progressive_layer(coordinates, selected_ids=pd.Index(selected_ids))
+        display = layer.points
         selected = {int(value) for value in selected_ids}
         brushes, pens = [], []
-        for record_id in coordinates.index:
+        for record_id in display.index:
             brushes.append(pg.mkBrush(self._colour_for(record_id, colour_by)))
             pens.append(
                 pg.mkPen(SELECTED, width=2) if int(record_id) in selected else pg.mkPen(None)
             )
 
         self.scatter.setData(
-            x=coordinates["x"].to_numpy(dtype=float),
-            y=coordinates["y"].to_numpy(dtype=float),
+            x=display["x"].to_numpy(dtype=float),
+            y=display["y"].to_numpy(dtype=float),
             brush=brushes,
             pen=pens,
-            data=[int(record_id) for record_id in coordinates.index],
+            data=[int(record_id) for record_id in display.index],
+        )
+        if layer.aggregated:
+            self.density_scatter.setData(
+                x=layer.density["x"].to_numpy(dtype=float),
+                y=layer.density["y"].to_numpy(dtype=float),
+                size=(6 + 2 * layer.density["molecules"].clip(upper=100).pow(0.5)).to_numpy(),
+                brush=[pg.mkBrush("#d7e3ea") for _ in range(len(layer.density))],
+            )
+        else:
+            self.density_scatter.setData([])
+
+    def set_reference_points(self, coordinates: pd.DataFrame | None) -> None:
+        """Show reference compounds as a separate triangular overlay layer."""
+        if coordinates is None or coordinates.empty:
+            self.reference_scatter.setData([])
+            return
+        self.reference_scatter.setData(
+            x=coordinates["x"].to_numpy(dtype=float),
+            y=coordinates["y"].to_numpy(dtype=float),
+            data=[str(record_id) for record_id in coordinates.index],
         )
 
     def _colour_for(self, record_id, colour_by: pd.Series | None) -> QColor:
@@ -145,14 +177,14 @@ class ChemicalSpaceView(ScatterView):
     """The chemical space map."""
 
     def __init__(self, parent=None) -> None:
-        super().__init__("Componente 1", "Componente 2", parent)
+        super().__init__("Component 1", "Component 2", parent)
 
 
 class ParetoView(ScatterView):
     """Two objectives against each other, coloured by front."""
 
     def __init__(self, parent=None) -> None:
-        super().__init__("objetivo 1", "objetivo 2", parent)
+        super().__init__("Objective 1", "Objective 2", parent)
 
     def show_objectives(
         self,

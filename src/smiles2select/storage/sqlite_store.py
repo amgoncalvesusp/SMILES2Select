@@ -86,7 +86,57 @@ CREATE TABLE IF NOT EXISTS final_decisions (
     hard_failure_count INTEGER NOT NULL,
     alert_count INTEGER NOT NULL,
     consensus_score REAL,
-    exclusion_reasons TEXT
+    exclusion_reasons TEXT,
+    selection_status TEXT
+);
+
+CREATE TABLE IF NOT EXISTS reference_libraries (
+    library_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    source TEXT,
+    description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS reference_overlap (
+    candidate_index INTEGER,
+    candidate_id TEXT,
+    reference_library TEXT,
+    reference_index INTEGER,
+    reference_id TEXT,
+    match_type TEXT
+);
+
+CREATE TABLE IF NOT EXISTS reference_similarity (
+    record_id INTEGER,
+    candidate_id TEXT,
+    reference_library TEXT,
+    reference_index INTEGER,
+    reference_id TEXT,
+    similarity REAL
+);
+
+CREATE TABLE IF NOT EXISTS reserve_selection (
+    record_id INTEGER PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS zone_memberships (
+    record_id TEXT,
+    zone_id TEXT,
+    zone_name TEXT,
+    zone_kind TEXT,
+    zone_priority INTEGER,
+    zone_quota INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS zone_allocation (
+    zone_id TEXT,
+    zone_name TEXT,
+    available INTEGER,
+    requested_final INTEGER,
+    allocated_final INTEGER,
+    requested_reserve INTEGER,
+    allocated_reserve INTEGER,
+    shortfall INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS run_config (

@@ -130,7 +130,7 @@ def test_inspector_shows_what_exists_and_omits_the_rest(qapp):
 def test_inspector_reports_an_unknown_record(qapp):
     panel = InspectorPanel()
     panel.show_molecule(99, pd.DataFrame(index=pd.Index([1], name="record_id")))
-    assert "não encontrado" in panel.title.text()
+    assert "not found" in panel.title.text()
 
 
 def test_basket_panel_lists_only_decided_molecules(qapp):
@@ -160,14 +160,14 @@ def test_workspace_computes_pareto_on_open(window):
 def test_identical_objectives_are_refused(window):
     window.second_objective.setCurrentText(window.first_objective.currentText())
     assert window.pareto is None
-    assert "diferentes" in window.warnings.text()
+    assert "different" in window.warnings.text()
 
 
 def test_clicking_a_point_fills_the_inspector(window):
     record_id = int(window.candidates.index[0])
     window._show_molecule(record_id)
     assert window.inspector.record_id == record_id
-    assert "Status químico" in window.inspector.details.toPlainText()
+    assert "Chemical status" in window.inspector.details.toPlainText()
 
 
 def test_auto_selection_respects_the_target(window):
@@ -228,7 +228,7 @@ def test_summary_sheet_reports_counters_and_constraints(window):
     window.target_count.setValue(2)
     window._auto_select()
     summary = selection_export.selection_summary_sheet(window.build_artifacts())
-    assert set(summary["section"]) >= {"cesta", "seleção", "restrições"}
+    assert set(summary["section"]) >= {"basket", "selection", "constraints"}
 
 
 def test_recipe_records_the_objectives(window):

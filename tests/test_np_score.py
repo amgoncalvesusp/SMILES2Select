@@ -50,7 +50,7 @@ def test_config_lists_np_among_the_scores():
         compute_np=True,
     )
     assert "np_score" in config.score_ids()
-    assert ("np_score", "calculado") in config.summary_rows()
+    assert ("np_score", "computed") in config.summary_rows()
 
 
 @pytest.mark.integration

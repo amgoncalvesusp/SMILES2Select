@@ -160,12 +160,13 @@ class ObjectiveSet:
         return tuple(objective.field for objective in self.active)
 
     def validate(self, columns: Sequence[str]) -> list[str]:
-        problems = [f"coluna ausente: {field}" for field in self.fields() if field not in columns]
+        problems = [f"missing column: {field}" for field in self.fields() if field not in columns]
         if not self.active:
-            problems.append("nenhum objetivo ativo")
+            problems.append("no active objectives")
         if len(self.active) > MAX_USEFUL_OBJECTIVES:
             problems.append(
-                f"{len(self.active)} objetivos ativos; o máximo suportado é {MAX_USEFUL_OBJECTIVES}"
+                f"{len(self.active)} active objectives; the maximum supported is "
+                f"{MAX_USEFUL_OBJECTIVES}"
             )
         return problems
 
@@ -198,11 +199,11 @@ class ObjectiveSet:
         for objective in active:
             values = pd.to_numeric(frame[objective.field], errors="coerce").dropna()
             if values.empty:
-                warnings.append(f"objetivo '{objective.field}' não tem valores calculados")
+                warnings.append(f"objective '{objective.field}' has no computed values")
             elif float(values.std(ddof=0)) < 1e-9:
                 warnings.append(
-                    f"objetivo '{objective.field}' é praticamente constante "
-                    "e não diferencia moléculas"
+                    f"objective '{objective.field}' is nearly constant and does not "
+                    "differentiate molecules"
                 )
 
         for first in range(len(active)):
@@ -215,8 +216,8 @@ class ObjectiveSet:
                 correlation = pair.corr().iloc[0, 1]
                 if pd.notna(correlation) and abs(correlation) > 0.95:
                     warnings.append(
-                        f"objetivos '{active[first].field}' e '{active[second].field}' são "
-                        f"redundantes (correlação {correlation:.2f})"
+                        f"objectives '{active[first].field}' and '{active[second].field}' "
+                        f"are redundant (correlation {correlation:.2f})"
                     )
         return warnings
 

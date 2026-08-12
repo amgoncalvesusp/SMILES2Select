@@ -18,10 +18,10 @@ import pandas as pd
 from smiles2select.selection_intelligence.threshold_indexes import ThresholdIndexSet
 
 #: The four ways a molecule can move when thresholds change.
-STAYED_IN = "permaneceu selecionada"
-ENTERED = "entrou na seleção"
-LEFT = "saiu da seleção"
-STAYED_OUT = "permaneceu excluída"
+STAYED_IN = "remained selected"
+ENTERED = "entered the selection"
+LEFT = "left the selection"
+STAYED_OUT = "remained excluded"
 
 _RESTRICTIVE_COLUMNS = [
     "rule_id",
@@ -55,11 +55,11 @@ class RetentionSummary:
 
     def describe(self) -> str:
         if self.delta == 0:
-            return f"{self.rule_id}: {self.applied_threshold:g} não altera a retenção"
-        direction = "recupera" if self.delta > 0 else "perde"
+            return f"{self.rule_id}: {self.applied_threshold:g} does not change retention"
+        direction = "gains" if self.delta > 0 else "loses"
         return (
             f"{self.rule_id}: {self.original_threshold:g} -> {self.applied_threshold:g} "
-            f"{direction} {abs(self.delta)} molécula(s)"
+            f"{direction} {abs(self.delta)} molecule(s)"
         )
 
 
@@ -111,11 +111,11 @@ class SensitivityResult:
     def summary_rows(self) -> list[tuple[str, object]]:
         counts = self.counts
         return [
-            ("candidatos mantidos", self.retained),
-            ("percentual de retenção", f"{self.retention * 100:.1f}%"),
-            ("entraram", counts[ENTERED]),
-            ("saíram", counts[LEFT]),
-            ("permaneceram selecionadas", counts[STAYED_IN]),
+            ("retained candidates", self.retained),
+            ("retention percentage", f"{self.retention * 100:.1f}%"),
+            ("entered", counts[ENTERED]),
+            ("left", counts[LEFT]),
+            ("remained selected", counts[STAYED_IN]),
         ]
 
 

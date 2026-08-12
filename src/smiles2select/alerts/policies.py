@@ -14,10 +14,10 @@ from typing import Literal
 AlertAction = Literal["inform", "warn", "penalize", "exclude"]
 
 ACTION_LABELS: dict[str, str] = {
-    "inform": "Informar — apenas registra o alerta",
-    "warn": "Advertir — destaca a molécula na interface",
-    "penalize": "Penalizar — reduz o escore combinado",
-    "exclude": "Excluir — remove da seleção final",
+    "inform": "Inform — record the alert only",
+    "warn": "Warn — highlight the molecule in the interface",
+    "penalize": "Penalize — reduce the combined score",
+    "exclude": "Exclude — remove from the final selection",
 }
 
 DEFAULT_ACTIONS: dict[str, AlertAction] = {

@@ -64,12 +64,12 @@ class Projection:
 
     def describe(self) -> list[tuple[str, object]]:
         rows: list[tuple[str, object]] = [
-            ("método", self.method),
-            ("descritores", ", ".join(self.features)),
-            ("moléculas", len(self.coordinates)),
+            ("method", self.method),
+            ("descriptors", ", ".join(self.features)),
+            ("molecules", len(self.coordinates)),
         ]
         if self.explained_variance:
-            rows.append(("variância explicada", f"{sum(self.explained_variance) * 100:.1f}%"))
+            rows.append(("explained variance", f"{sum(self.explained_variance) * 100:.1f}%"))
         return rows
 
 

@@ -164,7 +164,7 @@ def test_expression_reports_unknown_names():
 
 def test_policy_sentence_states_that_alerts_do_not_exclude():
     sentence = policy_sentence(recommended_policy())
-    assert "não" in sentence
+    assert "do not exclude" in sentence
     assert "PAINS" in sentence
 
 
@@ -172,7 +172,7 @@ def test_stacking_many_mandatory_profiles_raises_a_warning():
     policy = all_profiles_policy(["lipinski", "veber", "ghose", "egan", "muegge"])
     warning = restrictiveness_warning(policy)
     assert warning is not None
-    assert "restritiva" in warning
+    assert "overly restrictive" in warning
 
 
 def test_two_mandatory_profiles_do_not_trigger_the_warning():

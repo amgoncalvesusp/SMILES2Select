@@ -27,12 +27,12 @@ ProfileRole = Literal[
 ]
 
 ROLE_LABELS: dict[str, str] = {
-    "mandatory": "Obrigatório",
-    "consensus": "Consenso",
-    "informative": "Informativo",
-    "ranking": "Ranqueamento",
-    "warning": "Advertência",
-    "exclusion": "Exclusão",
+    "mandatory": "Mandatory",
+    "consensus": "Consensus",
+    "informative": "Informative",
+    "ranking": "Ranking",
+    "warning": "Warning",
+    "exclusion": "Exclusion",
 }
 
 #: Roles that can remove a molecule from the final selection.
@@ -105,13 +105,13 @@ class DecisionPolicy:
         ]
         if self.consensus_min_pass is not None and self.consensus_profiles():
             lines.append(
-                f"Consenso: aprovar em pelo menos {self.consensus_min_pass} de "
-                f"{len(self.consensus_profiles())} perfis"
+                f"Consensus: approve in at least {self.consensus_min_pass} of "
+                f"{len(self.consensus_profiles())} profiles"
             )
         lines.append(self.qed.describe())
         lines.extend(self.alert_policy.describe())
         if self.expression:
-            lines.append(f"Expressão personalizada: {self.expression}")
+            lines.append(f"Custom expression: {self.expression}")
         return lines
 
 

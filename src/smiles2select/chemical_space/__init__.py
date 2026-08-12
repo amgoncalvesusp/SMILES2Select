@@ -10,6 +10,6 @@ a validated chemical cluster.
 """
 
 PROXIMITY_DISCLAIMER = (
-    "A proximidade no mapa é uma representação aproximada. Ilhas visuais não "
-    "constituem automaticamente clusters químicos validados."
+    "Map proximity is an approximate representation. Visual islands do not "
+    "automatically constitute validated chemical clusters."
 )

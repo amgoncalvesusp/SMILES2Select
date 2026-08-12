@@ -23,6 +23,7 @@ EXPECTED_PROFILES = {
     "lead_like",
     "cns_like",
     "beyond_ro5",
+    "dockability_envelope",
 }
 
 
@@ -80,7 +81,7 @@ def test_egan_is_declared_as_swissadme_compatible_not_original(profiles):
 
 def test_muegge_is_declared_as_an_rdkit_adaptation(profiles):
     muegge = profiles.get("muegge")
-    assert "adaptação RDKit" in muegge.name
+    assert "RDKit adaptation" in muegge.name
     assert "XLOGP3" in muegge.notes
 
 

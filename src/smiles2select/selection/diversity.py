@@ -39,13 +39,13 @@ class DiversityReport:
 
     def summary_rows(self) -> list[tuple[str, object]]:
         return [
-            ("moléculas disponíveis", self.available),
-            ("moléculas selecionadas", len(self.picked_index)),
+            ("molecules available", self.available),
+            ("molecules selected", len(self.picked_index)),
             ("fingerprint", self.fingerprint_label),
-            ("similaridade média antes", self.mean_similarity_before),
-            ("similaridade média depois", self.mean_similarity_after),
-            ("scaffolds antes", self.scaffolds_before.get("scaffold_count", 0)),
-            ("scaffolds depois", self.scaffolds_after.get("scaffold_count", 0)),
+            ("mean similarity before", self.mean_similarity_before),
+            ("mean similarity after", self.mean_similarity_after),
+            ("scaffolds before", self.scaffolds_before.get("scaffold_count", 0)),
+            ("scaffolds after", self.scaffolds_after.get("scaffold_count", 0)),
         ]
 
 

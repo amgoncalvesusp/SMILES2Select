@@ -51,7 +51,7 @@ def scaffold_table(scaffold_smiles: pd.Series) -> pd.DataFrame:
     counts = scaffold_smiles.fillna("").value_counts()
     return pd.DataFrame(
         {
-            "scaffold_smiles": [key if key else "(acíclico)" for key in counts.index],
+            "scaffold_smiles": [key if key else "(acyclic)" for key in counts.index],
             "molecules": counts.to_numpy(),
         }
     )
