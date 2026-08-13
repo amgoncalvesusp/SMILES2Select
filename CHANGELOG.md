@@ -2,6 +2,15 @@
 
 All notable changes to SMILES2Select are documented here.
 
+## 3.0.1 — 2026-08-13
+
+### Changed
+
+- Added explicit software authorship and Zenodo metadata for Adriano Marques
+  Gonçalves, Universidade de Araraquara (UNIARA).
+- Registered this patch release as the Zenodo DOI release record.
+- Synchronized the package and desktop-bundle version to 3.0.1.
+
 ## 3.0.0 — 2026-08-12
 
 ### Added

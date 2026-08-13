@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 APP_NAME = "SMILES2Select"
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.0.1"
 
 AUTHOR = "Adriano Marques Gonçalves"
 AFFILIATION = "Universidade de Araraquara (UNIARA)"

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Python = "python",
-    [string]$Version = "3.0.0"
+    [string]$Version = "3.0.1"
 )
 
 $ErrorActionPreference = "Stop"

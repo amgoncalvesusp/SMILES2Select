@@ -1,0 +1,20 @@
+{
+  "title": "SMILES2Select",
+  "upload_type": "software",
+  "description": "Multi-rule drug-likeness and chemical-space selection tool for large SMILES libraries.",
+  "version": "3.0.1",
+  "creators": [
+    {
+      "name": "Adriano Marques Gonçalves",
+      "affiliation": "Universidade de Araraquara (UNIARA)"
+    }
+  ],
+  "keywords": [
+    "cheminformatics",
+    "drug-likeness",
+    "virtual screening",
+    "RDKit",
+    "chemical space"
+  ],
+  "license": "MIT"
+}
