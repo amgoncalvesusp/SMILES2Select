@@ -2,6 +2,17 @@
 
 All notable changes to SMILES2Select are documented here.
 
+## 3.0.2 — 2026-08-13
+
+### Fixed
+
+- Fixed Windows PyInstaller workers failing with `ValueError: not enough values to unpack (expected 2, got 1)` when processing large libraries. Frozen builds now use the standard-library spawn executor instead of the incompatible loky command-line path.
+
+### Added
+
+- Added PNG and SVG export for the four result charts: approval by profile, violations, profile intersection and descriptor distributions.
+- Connected the Results page to the interactive Chemical Space Hub, including point inspection, Pareto view, lasso shortlisting, constrained auto-selection, undo/redo and selection export.
+
 ## 3.0.1 — 2026-08-13
 
 ### Changed

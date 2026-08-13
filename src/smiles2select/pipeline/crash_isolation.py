@@ -7,6 +7,13 @@ in flight in that batch are affected: everything already queued behind them
 still runs, and the batch that died gets bisected down to the one record that
 kills the worker, which is reported instead of silently dropped.
 
+Frozen Windows builds use the standard-library ``spawn`` executor for the
+main batch. Loky's frozen command line contains a bare pipe handle, while
+PyInstaller's multiprocessing runtime hook expects every worker argument to
+have the ``name=value`` form. That combination fails before application code
+runs, so the source build keeps loky and the frozen build uses the compatible
+standard-library path.
+
 This is what keeps one bad molecule (or one moment of memory pressure) from
 ending a run over hundreds of thousands of records.
 """
@@ -14,9 +21,10 @@ ending a run over hundreds of thousands of records.
 from __future__ import annotations
 
 import multiprocessing
+import sys
 import time
 from collections.abc import Callable, Iterator, Sequence
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 
@@ -28,8 +36,8 @@ from smiles2select.pipeline.workers import RecordResult
 
 #: What a dead worker looks like from the parent's side. loky's
 #: TerminatedWorkerError subclasses this for compatibility with stdlib
-#: ProcessPoolExecutor, so catching the base class covers both the streaming
-#: path (loky, via joblib) and the isolation path (ProcessPoolExecutor).
+#: ProcessPoolExecutor, so catching the base class covers both execution
+#: paths.
 _WORKER_DEATH_EXCEPTIONS = (BrokenProcessPool,)
 
 #: 2**12 single-record isolation attempts is far past any real chunk size;
@@ -70,21 +78,43 @@ def stream_chunks(
         done_ids: set[int] = set()
 
         try:
-            with parallel_config(
-                backend="loky",
-                n_jobs=effective_jobs,
-                inner_max_num_threads=1,
-                initializer=initialize_worker,
-                initargs=(log_directory,),
-            ):
-                stream = Parallel(
-                    return_as="generator_unordered", pre_dispatch=effective_jobs, batch_size=1
-                )(delayed(_timed_run)(run_chunk, chunk) for chunk in batch)
-                for chunk_id, results, duration in stream:
-                    done_ids.add(chunk_id)
-                    yield ChunkOutcome(
-                        chunk_id=chunk_id, results=tuple(results), duration_s=duration
-                    )
+            if getattr(sys, "frozen", False):
+                # joblib/loky emits a bare pipe-handle argument for frozen
+                # Windows workers. PyInstaller's runtime hook expects
+                # ``name=value`` arguments and fails before this module can
+                # run. The stdlib spawn command line uses the compatible form.
+                context = multiprocessing.get_context("spawn")
+                with ProcessPoolExecutor(
+                    max_workers=effective_jobs,
+                    mp_context=context,
+                    initializer=initialize_worker,
+                    initargs=(log_directory,),
+                ) as executor:
+                    futures = {
+                        executor.submit(_timed_run, run_chunk, chunk): chunk for chunk in batch
+                    }
+                    for future in as_completed(futures):
+                        chunk_id, results, duration = future.result()
+                        done_ids.add(chunk_id)
+                        yield ChunkOutcome(
+                            chunk_id=chunk_id, results=tuple(results), duration_s=duration
+                        )
+            else:
+                with parallel_config(
+                    backend="loky",
+                    n_jobs=effective_jobs,
+                    inner_max_num_threads=1,
+                    initializer=initialize_worker,
+                    initargs=(log_directory,),
+                ):
+                    stream = Parallel(
+                        return_as="generator_unordered", pre_dispatch=effective_jobs, batch_size=1
+                    )(delayed(_timed_run)(run_chunk, chunk) for chunk in batch)
+                    for chunk_id, results, duration in stream:
+                        done_ids.add(chunk_id)
+                        yield ChunkOutcome(
+                            chunk_id=chunk_id, results=tuple(results), duration_s=duration
+                        )
         except _WORKER_DEATH_EXCEPTIONS:
             pass  # whichever chunks in `batch` never reached done_ids get isolated below
 

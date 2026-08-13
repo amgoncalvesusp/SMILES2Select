@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -28,6 +34,8 @@ class ResultsPage(WizardPage):
     title = "7. Results"
     subtitle = "Compare profiles, distributions and the final table."
 
+    workspace_requested = Signal(object)
+
     def __init__(self, state) -> None:
         super().__init__(state)
         self._result = None
@@ -45,6 +53,18 @@ class ResultsPage(WizardPage):
         self.tabs.addTab(self.violation_canvas, "Violations")
         self.tabs.addTab(self.intersection_canvas, "Intersection")
         self.tabs.addTab(self._distribution_tab(), "Distributions")
+
+        self.export_charts_button = QPushButton("Export charts...")
+        self.export_charts_button.setEnabled(False)
+        self.export_charts_button.clicked.connect(self._choose_chart_directory)
+        self.workspace_button = QPushButton("Open Chemical Space Hub")
+        self.workspace_button.setEnabled(False)
+        self.workspace_button.clicked.connect(self._request_workspace)
+
+        actions = QHBoxLayout()
+        actions.addWidget(self.export_charts_button)
+        actions.addWidget(self.workspace_button)
+        actions.addStretch(1)
 
         self.view_combo = QComboBox()
         self.view_combo.addItems(VIEWS)
@@ -66,6 +86,7 @@ class ResultsPage(WizardPage):
 
         self.body.addWidget(self.headline)
         self.body.addWidget(self.tabs, stretch=2)
+        self.body.addLayout(actions)
         self.body.addLayout(filters)
         self.body.addWidget(self.table, stretch=3)
         self.body.addWidget(self.table_note)
@@ -83,6 +104,8 @@ class ResultsPage(WizardPage):
     def show_result(self, result) -> None:
         """Populate the page after a run finishes."""
         self._result = result
+        self.export_charts_button.setEnabled(True)
+        self.workspace_button.setEnabled(True)
         self.headline.setText(
             f"{result.decision.selected_count} selected of {result.total_records} records "
             f"({result.invalid_count} invalid, {result.duplicate_count} duplicates, "
@@ -102,6 +125,46 @@ class ResultsPage(WizardPage):
         frame.insert(0, "record_id", frame.index)
         self._frame = frame
         self._refresh_table()
+
+    def export_charts(self, directory: str | Path) -> tuple[Path, ...]:
+        """Write every result chart as both raster and vector output."""
+        if self._result is None:
+            return ()
+
+        output_directory = Path(directory)
+        output_directory.mkdir(parents=True, exist_ok=True)
+        charts_to_export = (
+            ("approval_by_profile", self.profile_canvas),
+            ("violations", self.violation_canvas),
+            ("intersection", self.intersection_canvas),
+            ("distributions", self.distribution_canvas),
+        )
+        paths: list[Path] = []
+        for name, canvas in charts_to_export:
+            for extension in ("png", "svg"):
+                path = output_directory / f"{name}.{extension}"
+                canvas.figure.savefig(path, dpi=200, bbox_inches="tight")
+                paths.append(path)
+        return tuple(paths)
+
+    def _choose_chart_directory(self) -> None:
+        directory = QFileDialog.getExistingDirectory(self, "Export charts")
+        if not directory:
+            return
+        try:
+            paths = self.export_charts(directory)
+        except Exception as exc:
+            QMessageBox.critical(self, "Export failed", str(exc))
+            return
+        QMessageBox.information(
+            self,
+            "Charts exported",
+            f"{len(paths)} chart files written to:\n{Path(directory)}",
+        )
+
+    def _request_workspace(self) -> None:
+        if self._result is not None:
+            self.workspace_requested.emit(self._result)
 
     def _refresh_distribution(self) -> None:
         if self._result is None:

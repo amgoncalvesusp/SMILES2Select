@@ -30,6 +30,7 @@ from smiles2select.gui.pages.results_page import ResultsPage
 from smiles2select.gui.pages.run_page import RunPage
 from smiles2select.gui.pages.standardization_page import StandardizationPage
 from smiles2select.gui.state import WizardState
+from smiles2select.gui.workspace.workspace_window import WorkspaceWindow
 
 STEPS = (
     "1. Files",
@@ -51,6 +52,7 @@ class MainWindow(QMainWindow):
         self.resize(1180, 780)
 
         self.state = WizardState()
+        self._workspace_window: WorkspaceWindow | None = None
         self.pages = QStackedWidget()
         self.steps = QListWidget()
         self.steps.setMaximumWidth(200)
@@ -71,6 +73,7 @@ class MainWindow(QMainWindow):
             self.pages.addWidget(page)
 
         self._page_widgets[5].run_finished.connect(self._on_run_finished)
+        self._page_widgets[6].workspace_requested.connect(self._open_workspace)
 
         self.back_button = QPushButton("Back")
         self.next_button = QPushButton("Next")
@@ -122,5 +125,20 @@ class MainWindow(QMainWindow):
         self.next_button.setEnabled(index < self.pages.count() - 1)
 
     def _on_run_finished(self, result: object) -> None:
+        if self._workspace_window is not None:
+            self._workspace_window.close()
+            self._workspace_window = None
         self._page_widgets[6].show_result(result)
         self._go(6)
+
+    def _open_workspace(self, result: object) -> None:
+        """Open the interactive chemical-space session for a finished run."""
+        try:
+            workspace = WorkspaceWindow(result, parent=self)
+        except Exception as exc:
+            QMessageBox.critical(self, "Chemical Space Hub", str(exc))
+            return
+        self._workspace_window = workspace
+        workspace.show()
+        workspace.raise_()
+        workspace.activateWindow()

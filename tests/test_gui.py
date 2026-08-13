@@ -6,6 +6,7 @@ Runs against the offscreen Qt platform, so no display is required.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -143,3 +144,25 @@ def test_results_page_populates_from_a_run(window, library_csv):
     results_page.show_result(result)
     assert "selected" in results_page.headline.text()
     assert results_page.table.rowCount() > 0
+
+
+def test_results_page_exports_all_charts(window, library_csv, tmp_path):
+    state = window.state
+    state.files.append(FileSelection(path=library_csv, smiles_column="SMILES", id_column="ID"))
+    result = run(
+        RunConfig(
+            sources=tuple(selection.to_source() for selection in state.files),
+            profile_ids=("lipinski", "veber"),
+            alert_catalogs=("brenk",),
+            n_jobs=1,
+            chunk_size=4,
+        )
+    )
+
+    results_page = window.pages.widget(6)
+    results_page.show_result(result)
+    paths = results_page.export_charts(tmp_path / "charts")
+
+    assert len(paths) == 8
+    assert all(isinstance(path, Path) and path.exists() for path in paths)
+    assert {path.suffix for path in paths} == {".png", ".svg"}
