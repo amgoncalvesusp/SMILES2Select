@@ -14,6 +14,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, co
 
 PROJECT_ROOT = Path(SPECPATH).parent
 SOURCE_ROOT = PROJECT_ROOT / "src"
+ASSET_ROOT = SOURCE_ROOT / "smiles2select" / "assets"
 
 # Profile definitions are read from disk at runtime, so they must travel with
 # the binary; without them the application starts with no rules at all.
@@ -22,6 +23,8 @@ datas = [
         str(SOURCE_ROOT / "smiles2select" / "profiles" / "builtins"),
         "smiles2select/profiles/builtins",
     ),
+    (str(ASSET_ROOT / "SMILES2Select.png"), "smiles2select/assets"),
+    (str(ASSET_ROOT / "SMILES2Select.ico"), "smiles2select/assets"),
 ]
 
 # RDKit ships data files (filter catalogues, the SA/NP contrib models) outside
@@ -93,6 +96,7 @@ executable = EXE(
     [],
     exclude_binaries=True,
     name="SMILES2Select",
+    icon=str(ASSET_ROOT / ("SMILES2Select.ico" if sys.platform == "win32" else "SMILES2Select.png")),
     debug=False,
     strip=False,
     upx=False,

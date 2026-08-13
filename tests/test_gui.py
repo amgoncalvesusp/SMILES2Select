@@ -17,6 +17,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
+from smiles2select.app_metadata import app_icon_path  # noqa: E402
 from smiles2select.gui import charts  # noqa: E402
 from smiles2select.gui.main_window import STEPS, MainWindow  # noqa: E402
 from smiles2select.gui.state import FileSelection, WizardState  # noqa: E402
@@ -44,6 +45,12 @@ def test_wizard_has_the_seven_specified_steps(window):
     assert len(STEPS) == 7
     titles = [window.pages.widget(index).title for index in range(7)]
     assert titles == list(STEPS)
+
+
+def test_application_icon_is_loaded(window):
+    assert app_icon_path().is_file()
+    assert not window.windowIcon().isNull()
+    assert window.windowIcon().availableSizes()
 
 
 def test_every_page_builds_and_can_be_entered(window):

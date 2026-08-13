@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smiles2select"
-version = "3.0.2"
+version = "3.0.3"
 description = "Multi-rule drug-likeness selector for large SMILES libraries"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -42,7 +42,7 @@ smiles2select-workspace = "smiles2select.gui.app:workspace_main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-smiles2select = ["profiles/builtins/*.json"]
+smiles2select = ["profiles/builtins/*.json", "assets/*.png", "assets/*.ico"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

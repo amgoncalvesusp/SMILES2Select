@@ -8,6 +8,7 @@ and can go back without losing what they have chosen.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -21,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from smiles2select.app_metadata import APP_NAME, APP_VERSION, DISCLAIMER
+from smiles2select.app_metadata import APP_NAME, APP_VERSION, DISCLAIMER, app_icon_path
 from smiles2select.gui.pages.columns_page import ColumnsPage
 from smiles2select.gui.pages.files_page import FilesPage
 from smiles2select.gui.pages.policy_page import PolicyPage
@@ -49,6 +50,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} {APP_VERSION}")
+        self.setWindowIcon(QIcon(str(app_icon_path())))
         self.resize(1180, 780)
 
         self.state = WizardState()

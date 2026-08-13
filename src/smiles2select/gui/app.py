@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import sys
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from smiles2select.app_metadata import APP_NAME
+from smiles2select.app_metadata import APP_NAME, app_icon_path
 from smiles2select.gui.main_window import MainWindow
 
 
 def main(argv: list[str] | None = None) -> int:
     application = QApplication(argv if argv is not None else sys.argv)
     application.setApplicationName(APP_NAME)
+    application.setWindowIcon(QIcon(str(app_icon_path())))
     window = MainWindow()
     window.show()
     return application.exec()

@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.3 - 2026-08-13
+
+### Added
+
+- Added the SMILES2Select chemical-selection artwork as the application, executable, shortcut and installer icon.
+- Bundled transparent high-resolution PNG and multi-resolution ICO assets for Windows and Linux-compatible runtime use.
+- Windows runtime surfaces now select the multi-resolution ICO; Linux-compatible surfaces retain the transparent PNG.
+
 All notable changes to SMILES2Select are documented here.
 
 ## 3.0.2 — 2026-08-13

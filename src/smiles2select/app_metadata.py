@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
+from pathlib import Path
 from typing import Any
 
 APP_NAME = "SMILES2Select"
-APP_VERSION = "3.0.2"
+APP_VERSION = "3.0.3"
 
 AUTHOR = "Adriano Marques Gonçalves"
 AFFILIATION = "Universidade de Araraquara (UNIARA)"
@@ -18,6 +20,17 @@ DISCLAIMER = (
     "profile is not thereby predicted to be orally bioavailable, effective or "
     "safe; a molecule that fails is not thereby disqualified."
 )
+
+
+def app_icon_path() -> Path:
+    """Return the platform-appropriate bundled application icon.
+
+    Windows uses the multi-resolution ICO so native window chrome and shell
+    surfaces can select the sharpest available size. Other platforms use the
+    transparent PNG, which is the most portable Qt runtime format.
+    """
+    filename = "SMILES2Select.ico" if sys.platform == "win32" else "SMILES2Select.png"
+    return Path(__file__).resolve().parent / "assets" / filename
 
 SELECTION_SENTENCE = (
     "A molecule is selected when it passes the mandatory profiles. Informative "
