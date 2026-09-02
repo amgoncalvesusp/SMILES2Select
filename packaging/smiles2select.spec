@@ -23,6 +23,10 @@ datas = [
         str(SOURCE_ROOT / "smiles2select" / "profiles" / "builtins"),
         "smiles2select/profiles/builtins",
     ),
+    (
+        str(SOURCE_ROOT / "smiles2select" / "preparability" / "builtins"),
+        "smiles2select/preparability/builtins",
+    ),
     (str(ASSET_ROOT / "SMILES2Select.png"), "smiles2select/assets"),
     (str(ASSET_ROOT / "SMILES2Select.ico"), "smiles2select/assets"),
 ]
@@ -96,7 +100,9 @@ executable = EXE(
     [],
     exclude_binaries=True,
     name="SMILES2Select",
-    icon=str(ASSET_ROOT / ("SMILES2Select.ico" if sys.platform == "win32" else "SMILES2Select.png")),
+    icon=str(
+        ASSET_ROOT / ("SMILES2Select.ico" if sys.platform == "win32" else "SMILES2Select.png")
+    ),
     debug=False,
     strip=False,
     upx=False,

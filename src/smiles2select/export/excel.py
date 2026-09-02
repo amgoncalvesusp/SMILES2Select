@@ -188,6 +188,18 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
             )
         )
 
+    if result.preparability is not None and not result.preparability.empty:
+        prep_counts = result.preparability.groupby("flag_id").size().sort_values(ascending=False)
+        blocks.append(
+            pd.DataFrame(
+                {
+                    "section": "Preparability flags",
+                    "item": prep_counts.index,
+                    "value": prep_counts.to_numpy(),
+                }
+            )
+        )
+
     if "qed" in result.scores.columns:
         histogram = qed_scores.distribution(result.scores["qed"])
         blocks.append(

@@ -29,24 +29,34 @@ def evaluate(descriptors: pd.DataFrame, engine: EngineProfile) -> pd.DataFrame:
     flag_map = {f.id: f for f in engine.flags}
 
     for idx, row in descriptors.iterrows():
+        if "valid" in row and not bool(row["valid"]):
+            continue
+
         record_id = row["record_id"] if "record_id" in row else idx
 
-        smiles = row.get("canonical_smiles") or row.get("smiles")
+        smiles = None
+        for key in ("canonical_smiles", "standardized_smiles", "smiles", "original_smiles"):
+            val = row.get(key)
+            if pd.notna(val) and str(val).strip():
+                smiles = str(val).strip()
+                break
+
         mol = None
-        if pd.notna(smiles) and str(smiles).strip():
-            mol = Chem.MolFromSmiles(str(smiles))
+        if smiles:
+            mol = Chem.MolFromSmiles(smiles)
 
         # 1. UNCOMMON_ELEMENT
         if "UNCOMMON_ELEMENT" in flag_map and mol is not None:
             flag = flag_map["UNCOMMON_ELEMENT"]
             uncommon = uncommon_elements(mol, engine.common_elements)
             if uncommon:
+                elem_word = "elemento" if len(uncommon) == 1 else "elementos"
                 rows.append(
                     {
                         "record_id": record_id,
                         "flag_id": flag.id,
                         "severity": flag.severity,
-                        "detail": f"elemento {', '.join(uncommon)} fora do conjunto comum",
+                        "detail": f"{elem_word} {', '.join(uncommon)} fora do conjunto comum",
                     }
                 )
 
@@ -111,7 +121,7 @@ def evaluate(descriptors: pd.DataFrame, engine: EngineProfile) -> pd.DataFrame:
             if undef is not None and pd.notna(undef) and undef >= thresh:
                 raw_taut = row.get("tautomer_count")
                 tauts = int(raw_taut) if (raw_taut is not None and pd.notna(raw_taut)) else 1
-                structures = estimated_3d_structures(int(undef), tauts)
+                structures = estimated_3d_structures(int(undef), max(1, tauts))
                 word = (
                     "estereocentros indefinidos" if int(undef) != 1 else "estereocentro indefinido"
                 )

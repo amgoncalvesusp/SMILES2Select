@@ -46,3 +46,10 @@ def test_malformed_json_rejected(tmp_path):
     missing_field.write_text('{"id": "test"}', encoding="utf-8")
     with pytest.raises(EngineFileError, match="missing required field"):
         load_engine_file(missing_field)
+
+
+def test_load_engine_case_insensitive():
+    profile_upper = load_engine("Vina")
+    assert profile_upper.id == "vina"
+    profile_mixed = load_engine("  Glide  ")
+    assert profile_mixed.id == "glide"

@@ -90,8 +90,9 @@ def load_engine_file(path: str | Path) -> EngineProfile:
 
 
 def load_engine(engine_id: str, directory: Path | None = None) -> EngineProfile:
+    normalized_id = engine_id.strip().lower()
     dir_path = directory if directory is not None else BUILTIN_DIR
-    target = dir_path / f"{engine_id}.json"
+    target = dir_path / f"{normalized_id}.json"
     if not target.is_file():
         raise EngineFileError(
             f"unknown docking engine '{engine_id}'; available: {available_engines(directory)}"

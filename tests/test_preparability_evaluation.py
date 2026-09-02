@@ -77,3 +77,46 @@ def test_undefined_stereo_generates_correct_detail():
     assert row["severity"] == "decide"
     assert "8 estruturas" in row["detail"]
     assert "3 estereocentros indefinidos" in row["detail"]
+
+
+def test_invalid_molecule_is_skipped():
+    engine = load_engine("vina")
+    df = pd.DataFrame(
+        [
+            {
+                "record_id": 4,
+                "valid": False,
+                "canonical_smiles": None,
+                "smiles": "INVALID_SMILES_STRING",
+                "fragment_count": None,
+                "largest_ring_size": None,
+                "amide_bond_count": None,
+                "undefined_stereocenters": None,
+            }
+        ]
+    )
+    result = evaluate(df, engine)
+    assert len(result) == 0
+
+
+def test_fallback_to_smiles_when_canonical_is_nan():
+    engine = load_engine("vina")
+    import numpy as np
+
+    df = pd.DataFrame(
+        [
+            {
+                "record_id": 5,
+                "valid": True,
+                "canonical_smiles": np.nan,
+                "smiles": "OB(O)c1ccccc1",
+                "fragment_count": 1,
+                "largest_ring_size": 6,
+                "amide_bond_count": 0,
+                "undefined_stereocenters": 0,
+            }
+        ]
+    )
+    result = evaluate(df, engine)
+    assert len(result) == 1
+    assert result.iloc[0]["flag_id"] == "UNCOMMON_ELEMENT"

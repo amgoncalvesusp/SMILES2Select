@@ -132,16 +132,22 @@ def verify(bundle: Path) -> dict[str, object]:
         bundle / "_internal" / "smiles2select" / "profiles" / "builtins",
     ]
     required_profiles = [
-        path
-        for root in profile_roots
-        if root.is_dir()
-        for path in root.glob("*.json")
+        path for root in profile_roots if root.is_dir() for path in root.glob("*.json")
+    ]
+    engine_roots = [
+        bundle / "smiles2select" / "preparability" / "builtins",
+        bundle / "_internal" / "smiles2select" / "preparability" / "builtins",
+    ]
+    required_engines = [
+        path for root in engine_roots if root.is_dir() for path in root.glob("*.json")
     ]
     required_names = {"qwindows.dll", "qt6core.dll", "qt6gui.dll", "qt6widgets.dll"}
     present_names = set(by_name)
     missing_runtime = sorted(name for name in required_names if name not in present_names)
     if not required_profiles:
         missing_runtime.append("smiles2select/profiles/builtins/*.json")
+    if not required_engines:
+        missing_runtime.append("smiles2select/preparability/builtins/*.json")
     if not any(path.name == "BaseFeatures.fdef" for path in files):
         missing_runtime.append("rdkit/Data/BaseFeatures.fdef")
 
