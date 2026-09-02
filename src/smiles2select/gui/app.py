@@ -20,15 +20,6 @@ def main(argv: list[str] | None = None) -> int:
     return application.exec()
 
 
-def workspace_main(argv: list[str] | None = None) -> int:
-    """Open the wizard with the workspace reachable from the results screen.
-
-    The workspace needs a finished run to work on, so it cannot be the first
-    screen: this entry point starts the normal flow, and the results step hands
-    the run over.
-    """
-    return main(argv)
-
 
 if __name__ == "__main__":
     # Required before anything else touches multiprocessing: this is the

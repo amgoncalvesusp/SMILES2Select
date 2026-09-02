@@ -18,7 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from smiles2select.chemical_space import pca_projection, tmap_projection, umap_projection
+from smiles2select.chemical_space import pca_projection, umap_projection
 from smiles2select.chemical_space.pca_projection import Projection
 
 #: Scale bands from the specification.
@@ -40,39 +40,16 @@ def available_methods() -> tuple[str, ...]:
     methods = ["pca"]
     if umap_projection.is_available():
         methods.append("umap")
-    if tmap_projection.is_available():
-        methods.append("tmap")
     return tuple(methods)
 
 
 def choose_method(molecule_count: int) -> MethodChoice:
-    """Default method for a library of this size.
-
-    TMAP is preferred above 50k because it was designed for that scale; when it
-    is not installed the choice degrades to PCA *explicitly*, rather than
-    silently attempting a layout that would not finish.
-    """
+    """Default method for a library of this size."""
     methods = available_methods()
-    if molecule_count <= SMALL_LIBRARY:
-        return MethodChoice(
-            "pca",
-            f"{molecule_count} molecules: PCA is deterministic and immediate at this scale",
-            tuple(method for method in methods if method != "pca"),
-        )
-
-    if "tmap" in methods:
-        band = "50 mil a 250 mil" if molecule_count <= LARGE_LIBRARY else "acima de 250 mil"
-        return MethodChoice(
-            "tmap", f"{band} molecules: TMAP was designed for this scale", methods
-        )
-
     return MethodChoice(
         "pca",
-        (
-            f"{molecule_count} molecules: TMAP would be the default at this scale, but it is "
-            "not installed; using deterministic PCA"
-        ),
-        methods,
+        f"{molecule_count} molecules: PCA is deterministic and immediate at this scale",
+        tuple(method for method in methods if method != "pca"),
     )
 
 

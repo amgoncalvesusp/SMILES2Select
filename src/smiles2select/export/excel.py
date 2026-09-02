@@ -84,6 +84,8 @@ def export(result: RunResult, path: str | Path, options: ExportOptions | None = 
         if settings.include_alerts:
             for sheet_name, frame in alert_sheets(result).items():
                 _write(writer, frame, sheet_name)
+        if result.preparability is not None and not result.preparability.empty:
+            _write(writer, preparability_sheet(result), "PREPARABILITY_FLAGS")
         _write(writer, config_sheet(result), "CONFIG")
     return output
 
@@ -137,10 +139,26 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
     blocks.append(
         pd.DataFrame(
             [
-                {"section": "Coverage", "item": "Selected molecules", "value": coverage_report.selected_count},
-                {"section": "Coverage", "item": "Unique scaffolds", "value": coverage_report.unique_scaffolds},
-                {"section": "Coverage", "item": "Selected unique scaffolds", "value": coverage_report.selected_unique_scaffolds},
-                {"section": "Coverage", "item": "Novel candidates", "value": coverage_report.novel_candidate_count},
+                {
+                    "section": "Coverage",
+                    "item": "Selected molecules",
+                    "value": coverage_report.selected_count,
+                },
+                {
+                    "section": "Coverage",
+                    "item": "Unique scaffolds",
+                    "value": coverage_report.unique_scaffolds,
+                },
+                {
+                    "section": "Coverage",
+                    "item": "Selected unique scaffolds",
+                    "value": coverage_report.selected_unique_scaffolds,
+                },
+                {
+                    "section": "Coverage",
+                    "item": "Novel candidates",
+                    "value": coverage_report.novel_candidate_count,
+                },
             ]
         )
     )
@@ -313,9 +331,11 @@ def reserve_sheet(result: RunResult) -> pd.DataFrame:
     frame = export_frame(result)
     if not result.reserve_ids:
         return frame.iloc[0:0].reset_index(drop=True)
-    return frame.loc[frame.index.isin(result.reserve_ids)].assign(
-        Final_Status="RESERVE"
-    ).reset_index(drop=True)
+    return (
+        frame.loc[frame.index.isin(result.reserve_ids)]
+        .assign(Final_Status="RESERVE")
+        .reset_index(drop=True)
+    )
 
 
 def excluded_sheet(result: RunResult) -> pd.DataFrame:
@@ -451,3 +471,15 @@ def config_sheet(result: RunResult) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def preparability_sheet(result: RunResult) -> pd.DataFrame:
+    """Docking preparability flags sheet."""
+    if result.preparability is None or result.preparability.empty:
+        return pd.DataFrame()
+    frame = result.preparability.copy()
+    identifiers = result.descriptors["molecule_id"]
+    smiles = result.descriptors["canonical_smiles"]
+    frame.insert(1, "ID", frame["record_id"].map(identifiers))
+    frame.insert(2, "SMILES", frame["record_id"].map(smiles))
+    return frame.reset_index(drop=True)

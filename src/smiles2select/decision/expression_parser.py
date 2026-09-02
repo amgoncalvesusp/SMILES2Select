@@ -83,7 +83,7 @@ def validate(expression: str, known_names: Mapping[str, Any]) -> list[str]:
 def evaluate(expression: str, variables: pd.DataFrame) -> pd.Series:
     """Evaluate the expression per row.
 
-    ponytail: row-wise evaluation, O(n) Python calls. Vectorising would need
+    Note: row-wise evaluation, O(n) Python calls. Vectorising would need
     ``&``/``|``, whose precedence silently breaks mixed comparisons such as
     ``qed >= 0.5 AND flag``. Custom expressions are the rare path; switch to a
     compiled vector form only if profiling shows it matters.

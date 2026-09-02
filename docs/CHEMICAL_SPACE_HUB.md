@@ -10,7 +10,7 @@ the Python API and CLI through reference libraries, exact overlap detection,
 fingerprint novelty, selection strategies, final/reserve counts and English
 method cards.
 
-Important methodological rule: PCA, UMAP and TMAP coordinates are for
+Important methodological rule: PCA and UMAP coordinates are for
 visualization. Their two-dimensional distance is never used as the molecular
 similarity or novelty metric.
 

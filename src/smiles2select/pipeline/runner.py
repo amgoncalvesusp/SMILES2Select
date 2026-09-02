@@ -35,6 +35,7 @@ from smiles2select.pipeline.config import RunConfig
 from smiles2select.pipeline.resource_estimation import estimate_worker_count
 from smiles2select.pipeline.streaming import run_streaming
 from smiles2select.pipeline.workers import RecordResult, alerts_to_tuples, process_chunk
+from smiles2select.preparability import evaluate, load_engine
 from smiles2select.profiles.loader import builtin_registry
 from smiles2select.profiles.registry import Profile
 from smiles2select.profiles.validator import validate_all
@@ -103,6 +104,7 @@ class RunResult:
     reference_similarity: ReferenceSimilarityResult | None = None
     reserve_ids: tuple[int, ...] = ()
     zone_allocation: ZoneAllocationResult | None = None
+    preparability: pd.DataFrame | None = None
 
     @property
     def total_records(self) -> int:
@@ -175,8 +177,8 @@ def run(
 
     results, cache_stats = _calculate(config, records, plan, substructure_rules, report)
     descriptors = _descriptor_frame(records, results, plan)
-    reference_libraries, background_libraries, reference_duplicates, reference_similarity = _reference_analysis(
-        config, descriptors, report
+    reference_libraries, background_libraries, reference_duplicates, reference_similarity = (
+        _reference_analysis(config, descriptors, report)
     )
     alerts = alert_engine.alerts_frame(row for result in results for row in result.alert_rows)
     alerts = _apply_alert_actions(alerts, config)
@@ -209,12 +211,21 @@ def run(
         decision, diversity_report = _apply_diversity(decision, descriptors, config)
 
     reserve_ids: tuple[int, ...] = ()
-    if config.selection_strategy != "traditional" or config.final_count is not None or config.reserve_count:
+    if (
+        config.selection_strategy != "traditional"
+        or config.final_count is not None
+        or config.reserve_count
+    ):
         decision, reserve_ids, zone_allocation = _apply_selection_strategy(
             decision, descriptors, reference_libraries, config
         )
     else:
         zone_allocation = None
+
+    prep_table = None
+    if config.compute_preparability:
+        engine = load_engine(config.docking_engine or "vina")
+        prep_table = evaluate(descriptors, engine)
 
     database_path = _persist(
         config,
@@ -230,6 +241,7 @@ def run(
         reference_similarity=reference_similarity,
         reserve_ids=reserve_ids,
         zone_allocation=zone_allocation,
+        preparability=prep_table,
     )
     report(1, 1, "Completed")
 
@@ -252,6 +264,7 @@ def run(
         reference_similarity=reference_similarity,
         reserve_ids=reserve_ids,
         zone_allocation=zone_allocation,
+        preparability=prep_table,
     )
 
 
@@ -375,9 +388,7 @@ def _apply_selection_strategy(
             for item in config.zones
             if str(item.get("expression", "")).strip()
         ]
-        ranking_column = (
-            "reference_novelty" if "reference_novelty" in zone_frame.columns else "qed"
-        )
+        ranking_column = "reference_novelty" if "reference_novelty" in zone_frame.columns else "qed"
         ranking = zone_frame[ranking_column].fillna(float("-inf")).to_dict()
         allocation = allocate_zones(
             zone_frame,
@@ -404,13 +415,17 @@ def _apply_selection_strategy(
         if "reference_novelty" in descriptors.columns:
             pool = eligible[descriptors.loc[eligible, "reference_novelty"].notna()]
             if config.exclude_reference_duplicates and "is_reference_duplicate" in descriptors:
-                pool = pool[~descriptors.loc[pool, "is_reference_duplicate"].fillna(False).astype(bool)]
+                pool = pool[
+                    ~descriptors.loc[pool, "is_reference_duplicate"].fillna(False).astype(bool)
+                ]
         else:
             pool = pd.Index([], dtype=eligible.dtype)
         if strategy == "reference_novelty":
-            ordered = descriptors.loc[pool].sort_values(
-                "reference_novelty", ascending=False, kind="mergesort"
-            ).index.tolist()
+            ordered = (
+                descriptors.loc[pool]
+                .sort_values("reference_novelty", ascending=False, kind="mergesort")
+                .index.tolist()
+            )
         else:
             reference_smiles = [
                 str(value)
@@ -771,6 +786,7 @@ def _persist(
     reference_similarity: ReferenceSimilarityResult | None = None,
     reserve_ids: tuple[int, ...] = (),
     zone_allocation: ZoneAllocationResult | None = None,
+    preparability: pd.DataFrame | None = None,
 ) -> Path | None:
     """Write every table to the run database."""
     if config.database_path is None:
@@ -785,6 +801,8 @@ def _persist(
         store.write_frame(_profile_results(evaluation), "profile_results")
         store.write_frame(evaluation.failures, "rule_failures")
         store.write_frame(alerts, "structural_alerts")
+        if preparability is not None and not preparability.empty:
+            store.write_frame(preparability, "preparability_flags")
         store.write_frame(
             decision.decisions.assign(selected=decision.decisions["selected"].astype(int)),
             "final_decisions",
@@ -793,7 +811,10 @@ def _persist(
         if reference_libraries or background_libraries:
             store.write_frame(
                 pd.DataFrame(
-                    [library.spec.as_dict() for library in (*reference_libraries, *background_libraries)]
+                    [
+                        library.spec.as_dict()
+                        for library in (*reference_libraries, *background_libraries)
+                    ]
                 ),
                 "reference_libraries",
             )

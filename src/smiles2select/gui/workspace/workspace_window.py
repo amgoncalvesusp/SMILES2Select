@@ -167,7 +167,6 @@ class WorkspaceWindow(QMainWindow):
         self.projection_selector = QComboBox()
         self.projection_selector.addItem("Property PCA", "property_pca")
         self.projection_selector.addItem("Structural UMAP", "structural_umap")
-        self.projection_selector.addItem("TMAP", "tmap")
         self.color_selector = QComboBox()
         self.color_selector.addItems(["Selection status", "Pareto rank", "Reference similarity"])
         self.reference_overlay = QCheckBox("Show reference overlay")

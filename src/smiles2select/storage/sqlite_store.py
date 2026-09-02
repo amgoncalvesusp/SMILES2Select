@@ -144,10 +144,19 @@ CREATE TABLE IF NOT EXISTS run_config (
     value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS preparability_flags (
+    record_id INTEGER NOT NULL,
+    flag_id TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    detail TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_rule_failures_record ON rule_failures (record_id);
 CREATE INDEX IF NOT EXISTS idx_rule_failures_code ON rule_failures (failure_code);
 CREATE INDEX IF NOT EXISTS idx_alerts_record ON structural_alerts (record_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_catalog ON structural_alerts (catalog_id);
+CREATE INDEX IF NOT EXISTS idx_prep_flags_record ON preparability_flags (record_id);
+CREATE INDEX IF NOT EXISTS idx_prep_flags_flag ON preparability_flags (flag_id);
 """
 
 

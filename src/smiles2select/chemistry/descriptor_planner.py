@@ -19,6 +19,14 @@ SCORE_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     "qed": ("qed",),
     "sa_score": ("sa_score",),
     "np_score": ("np_score",),
+    "preparability": (
+        "undefined_stereocenters",
+        "defined_stereocenters",
+        "fragment_count",
+        "largest_ring_size",
+        "amide_bond_count",
+    ),
+    "preparability_tautomers": ("tautomer_count",),
     "consensus": (),
     "profile_pass_fraction": (),
 }

@@ -36,13 +36,17 @@ build = ["pyinstaller>=6.0", "pefile>=2023.2"]
 [project.scripts]
 smiles2select = "smiles2select.cli:main"
 smiles2select-gui = "smiles2select.gui.app:main"
-smiles2select-workspace = "smiles2select.gui.app:workspace_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-smiles2select = ["profiles/builtins/*.json", "assets/*.png", "assets/*.ico"]
+smiles2select = [
+    "profiles/builtins/*.json",
+    "preparability/builtins/*.json",
+    "assets/*.png",
+    "assets/*.ico",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

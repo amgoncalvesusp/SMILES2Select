@@ -86,18 +86,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="exclude exact candidate/reference duplicates from the final selection",
     )
     parser.add_argument(
-        "--reference-min-similarity", type=float, default=0.0,
+        "--reference-min-similarity",
+        type=float,
+        default=0.0,
         help="lower bound for reference-neighborhood selection",
     )
     parser.add_argument(
-        "--reference-max-similarity", type=float, default=1.0,
+        "--reference-max-similarity",
+        type=float,
+        default=1.0,
         help="upper bound for reference-neighborhood selection",
     )
     parser.add_argument(
         "--selection-strategy",
         choices=(
-            "traditional", "balanced", "diversity_first", "reference_novelty",
-            "reference_neighborhood", "reference_aware_diversity", "stratified", "manual_assisted",
+            "traditional",
+            "balanced",
+            "diversity_first",
+            "reference_novelty",
+            "reference_neighborhood",
+            "reference_aware_diversity",
+            "stratified",
+            "manual_assisted",
         ),
         default="traditional",
         help="optional strategy layer applied after chemical eligibility",
@@ -148,6 +158,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--np-score",
         action="store_true",
         help="compute natural-product likeness (about -5 synthetic to +5 natural-like)",
+    )
+    parser.add_argument(
+        "--docking-readiness", action="store_true", help="liga a camada de preparabilidade"
+    )
+    parser.add_argument(
+        "--tautomers",
+        action="store_true",
+        help="enumera tautômeros (caro: ~1.000 moléculas/s)",
+    )
+    parser.add_argument(
+        "--docking-engine",
+        choices=("vina", "gold", "glide"),
+        default="vina",
+        help="perfil de compatibilidade (padrão: vina)",
     )
     parser.add_argument(
         "--diverse",
@@ -328,6 +352,9 @@ def _build_config(args: argparse.Namespace) -> RunConfig:
         compute_qed=not args.no_qed,
         compute_sa=args.sa_score,
         compute_np=args.np_score,
+        compute_preparability=args.docking_readiness,
+        compute_tautomers=args.tautomers,
+        docking_engine=args.docking_engine if args.docking_readiness else None,
         diversity_pick=args.diverse,
         per_scaffold_limit=args.per_scaffold,
         drop_duplicates=not args.keep_duplicates,
@@ -354,7 +381,9 @@ def _build_config(args: argparse.Namespace) -> RunConfig:
     )
 
 
-def _config_from_selection_plan(args: argparse.Namespace, recipe: recipes.SelectionRecipe) -> RunConfig:
+def _config_from_selection_plan(
+    args: argparse.Namespace, recipe: recipes.SelectionRecipe
+) -> RunConfig:
     """Replay the deterministic Hub layer while letting the caller choose new inputs."""
     profile_ids = tuple(_split(args.profiles))
     standardization_fields = set(StandardizationConfig.__dataclass_fields__)
@@ -373,7 +402,7 @@ def _config_from_selection_plan(args: argparse.Namespace, recipe: recipes.Select
             source = Path(str(item.get("source", "")))
             if source.exists():
                 reference_paths.append(
-                SourceFile(path=source, mapping=guess_mapping(preview_columns(source)))
+                    SourceFile(path=source, mapping=guess_mapping(preview_columns(source)))
                 )
     background_paths = list(_build_background_sources(args))
     if not background_paths:
@@ -393,6 +422,9 @@ def _config_from_selection_plan(args: argparse.Namespace, recipe: recipes.Select
         compute_qed=not args.no_qed,
         compute_sa=args.sa_score,
         compute_np=args.np_score,
+        compute_preparability=args.docking_readiness,
+        compute_tautomers=args.tautomers,
+        docking_engine=args.docking_engine if args.docking_readiness else None,
         diversity_pick=args.diverse,
         per_scaffold_limit=args.per_scaffold,
         fingerprint_config=fingerprint,
@@ -409,7 +441,11 @@ def _config_from_selection_plan(args: argparse.Namespace, recipe: recipes.Select
         diagnostics=_build_diagnostics(args),
         reference_sources=tuple(reference_paths),
         background_sources=tuple(background_paths),
-        reference_search=("fast" if "HNSW" in str(fingerprint_payload.get("search", "")) else args.reference_search),
+        reference_search=(
+            "fast"
+            if "HNSW" in str(fingerprint_payload.get("search", ""))
+            else args.reference_search
+        ),
         exclude_reference_duplicates=args.exclude_reference_duplicates,
         reference_min_similarity=args.reference_min_similarity,
         reference_max_similarity=args.reference_max_similarity,
@@ -429,9 +465,7 @@ def _recipe_from_result(result: RunResult) -> recipes.SelectionRecipe:
         required_filters=tuple(result.config.profile_ids),
         target_count=result.config.final_count,
         strategy=result.config.selection_strategy,
-        reference_libraries=tuple(
-            library.spec.as_dict() for library in result.reference_libraries
-        ),
+        reference_libraries=tuple(library.spec.as_dict() for library in result.reference_libraries),
         background_libraries=tuple(
             library.spec.as_dict() for library in result.background_libraries
         ),
@@ -464,6 +498,9 @@ def _config_from_preset(args: argparse.Namespace, preset: presets.RunPreset) -> 
         compute_qed=preset.compute_qed,
         compute_sa=args.sa_score,
         compute_np=args.np_score,
+        compute_preparability=args.docking_readiness,
+        compute_tautomers=args.tautomers,
+        docking_engine=args.docking_engine if args.docking_readiness else None,
         diversity_pick=args.diverse,
         per_scaffold_limit=args.per_scaffold,
         drop_duplicates=preset.drop_duplicates,

@@ -112,7 +112,7 @@ Legacy 2.0 recipes remain readable.
 
 The workspace provides:
 
-- deterministic property PCA plus optional structural UMAP/TMAP methods;
+- deterministic property PCA plus optional structural UMAP methods;
 - separate reference overlays and layers for candidate/reference/background data;
 - progressive point rendering and density tiles for large libraries;
 - color controls for selection status, Pareto rank and reference similarity;
@@ -293,7 +293,7 @@ legíveis.
 
 O workspace fornece:
 
-- PCA determinística de propriedades e métodos estruturais UMAP/TMAP opcionais;
+- PCA determinística de propriedades e métodos estruturais UMAP opcionais;
 - overlays e camadas separados para dados de candidatos/referências/contexto;
 - renderização progressiva de pontos e tiles de densidade para grandes bibliotecas;
 - controles de cor para status de seleção, ranking de Pareto e similaridade com referências;

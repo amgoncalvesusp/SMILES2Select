@@ -69,7 +69,7 @@ def cluster(
 ) -> ClusterResult:
     """Butina clustering; unparseable molecules get no cluster.
 
-    ponytail: builds the full lower-triangular distance list, which is O(n^2)
+    Note: builds the full lower-triangular distance list, which is O(n^2)
     in memory. Fine for a selection-sized set; cluster a sample upstream for a
     whole screening library.
     """

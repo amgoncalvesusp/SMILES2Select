@@ -6,7 +6,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from smiles2select.chemical_space import clustering, density_tiles, pca_projection, projection_cache
+from smiles2select.chemical_space import (
+    clustering,
+    density_tiles,
+    pca_projection,
+    projection_cache,
+    umap_projection,
+)
 from smiles2select.chemical_space.density_tiles import Viewport
 from smiles2select.chemistry.fingerprints import FingerprintConfig
 from smiles2select.selection_intelligence import rescue
@@ -89,14 +95,45 @@ def test_pca_reports_its_features_and_variance(descriptors):
 
 def test_pca_standardises_so_one_descriptor_cannot_dominate(descriptors):
     """Without scaling, MW (hundreds) would swamp QED (0-1)."""
-    matrix, _ = pca_projection.standardise(descriptors[["mol_wt", "qed"]])
+    matrix, _, _ = pca_projection.standardise(descriptors[["mol_wt", "qed"]])
     assert abs(matrix.mean()) < 1e-9
     assert matrix.std(axis=0) == pytest.approx([1.0, 1.0])
+
+
+def test_standardise_flags_imputed_rows():
+    data = pd.DataFrame(
+        {
+            "mol_wt": [100.0, np.nan, 200.0],
+            "qed": [0.5, 0.6, 0.7],
+        },
+        index=[1, 2, 3],
+    )
+    _, index, imputed = pca_projection.standardise(data)
+    assert imputed.tolist() == [False, True, False]
+    assert imputed.index.tolist() == [1, 2, 3]
+
+
+def test_projection_describe_reports_imputation():
+    data = pd.DataFrame(
+        {
+            "mol_wt": [100.0, np.nan, 200.0, 150.0],
+            "qed": [0.5, 0.6, 0.7, 0.8],
+        },
+        index=[1, 2, 3, 4],
+    )
+    projection = pca_projection.project(data, ["mol_wt", "qed"])
+    desc = dict(projection.describe())
+    assert desc.get("moléculas com descritor imputado") == 1
 
 
 def test_pca_needs_at_least_one_known_descriptor(descriptors):
     with pytest.raises(ValueError, match="none of the requested descriptors"):
         pca_projection.project(descriptors, ["not_a_descriptor"])
+
+
+def test_umap_descriptors_rejects_missing_columns(descriptors):
+    with pytest.raises(ValueError, match="none of the requested descriptors"):
+        umap_projection.project_descriptors(descriptors, ["not_a_descriptor"])
 
 
 def test_projection_rows_carry_optional_clusters(descriptors):

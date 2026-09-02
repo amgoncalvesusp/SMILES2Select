@@ -37,6 +37,9 @@ class RunConfig:
     compute_sa: bool = False
     #: Natural-product likeness, likewise a ranking score only.
     compute_np: bool = False
+    compute_preparability: bool = False
+    compute_tautomers: bool = False
+    docking_engine: str | None = None
     #: Post-selection diversity picking. These act on the selected set, after
     #: every rule has been applied - they narrow a selection, never widen it.
     diversity_pick: int | None = None
@@ -89,7 +92,9 @@ class RunConfig:
         if self.reference_search not in {"exact", "fast"}:
             raise ValueError("reference_search must be 'exact' or 'fast'")
         if not 0.0 <= self.reference_min_similarity <= self.reference_max_similarity <= 1.0:
-            raise ValueError("reference similarity window must satisfy 0 <= minimum <= maximum <= 1")
+            raise ValueError(
+                "reference similarity window must satisfy 0 <= minimum <= maximum <= 1"
+            )
         if self.selection_strategy not in {
             "traditional",
             "balanced",
@@ -125,6 +130,10 @@ class RunConfig:
             scores.append("sa_score")
         if self.compute_np:
             scores.append("np_score")
+        if self.compute_preparability:
+            scores.append("preparability")
+        if self.compute_tautomers:
+            scores.append("preparability_tautomers")
         return tuple(scores)
 
     @property
@@ -148,6 +157,9 @@ class RunConfig:
                 "alerts": sorted(self.alert_catalogs),
                 "custom_alerts": sorted(alert.smarts for alert in self.custom_alerts),
                 "compute_qed": self.compute_qed,
+                "compute_preparability": self.compute_preparability,
+                "compute_tautomers": self.compute_tautomers,
+                "docking_engine": self.docking_engine,
                 "drop_duplicates": self.drop_duplicates,
                 "reference_sources": [source.label for source in self.reference_sources],
                 "background_sources": [source.label for source in self.background_sources],
@@ -181,6 +193,9 @@ class RunConfig:
             ("drop_duplicates", str(self.drop_duplicates)),
             ("sa_score", "computed" if self.compute_sa else "disabled"),
             ("np_score", "computed" if self.compute_np else "disabled"),
+            ("preparabilidade", "calculada" if self.compute_preparability else "desativada"),
+            ("tautômeros", "enumerados" if self.compute_tautomers else "desativado"),
+            ("motor de docking", self.docking_engine or "-"),
             ("diversity_pick", str(self.diversity_pick or "-")),
             ("per_scaffold_limit", str(self.per_scaffold_limit or "-")),
             ("fingerprint", self.fingerprint_config.label()),
@@ -189,11 +204,20 @@ class RunConfig:
             ("chunk_size_inicial", str(self.chunk_size)),
             ("diagnostics_mode", "safe" if self.diagnostics.enabled else "standard"),
             ("config_hash", self.fingerprint()),
-            ("reference_libraries", ", ".join(source.label for source in self.reference_sources) or "-"),
-            ("background_libraries", ", ".join(source.label for source in self.background_sources) or "-"),
+            (
+                "reference_libraries",
+                ", ".join(source.label for source in self.reference_sources) or "-",
+            ),
+            (
+                "background_libraries",
+                ", ".join(source.label for source in self.background_sources) or "-",
+            ),
             ("reference_search", self.reference_search),
             ("exclude_reference_duplicates", str(self.exclude_reference_duplicates)),
-            ("reference_similarity_window", f"{self.reference_min_similarity:g}-{self.reference_max_similarity:g}"),
+            (
+                "reference_similarity_window",
+                f"{self.reference_min_similarity:g}-{self.reference_max_similarity:g}",
+            ),
             ("selection_strategy", self.selection_strategy),
             ("final_count", str(self.final_count or "-")),
             ("reserve_count", str(self.reserve_count or "-")),

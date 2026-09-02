@@ -1,0 +1,38 @@
+{
+  "id": "vina",
+  "name": "AutoDock Vina / AutoDock4",
+  "version": "1.0.0",
+  "notes": "Conjunto orgânico comum apenas. Elementos fora da lista exigem verificação manual pelo usuário; nenhuma afirmação sobre suporte foi assumida.",
+  "common_elements": ["H", "C", "N", "O", "S", "P", "F", "Cl", "Br", "I"],
+  "flags": [
+    {
+      "id": "UNCOMMON_ELEMENT",
+      "label": "Elemento fora do conjunto orgânico comum",
+      "severity": "verify"
+    },
+    {
+      "id": "MULTIPLE_FRAGMENTS",
+      "label": "Mais de um fragmento após padronização",
+      "severity": "verify",
+      "threshold": 1
+    },
+    {
+      "id": "MACROCYCLE",
+      "label": "Macrociclo",
+      "severity": "info",
+      "threshold": 12
+    },
+    {
+      "id": "PEPTIDE_LIKE",
+      "label": "Caráter peptídico",
+      "severity": "info",
+      "threshold": 4
+    },
+    {
+      "id": "UNDEFINED_STEREO",
+      "label": "Estereoquímica indefinida",
+      "severity": "decide",
+      "threshold": 1
+    }
+  ]
+}

@@ -61,6 +61,9 @@ class WizardState:
     compute_qed: bool = True
     drop_duplicates: bool = True
     detailed_export: bool = True
+    compute_preparability: bool = False
+    compute_tautomers: bool = False
+    docking_engine: str = "vina"
     n_jobs: int = -1
     chunk_size: int = 2000
     database_path: Path | None = None
@@ -155,6 +158,9 @@ class WizardState:
             alert_catalogs=tuple(self.active_catalogs),
             custom_alerts=tuple(self.custom_alerts),
             compute_qed=self.compute_qed,
+            compute_preparability=self.compute_preparability,
+            compute_tautomers=self.compute_tautomers,
+            docking_engine=self.docking_engine if self.compute_preparability else None,
             drop_duplicates=self.drop_duplicates,
             n_jobs=self.n_jobs,
             chunk_size=self.chunk_size,

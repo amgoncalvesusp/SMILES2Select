@@ -68,7 +68,7 @@ def tanimoto(first, second) -> float:
 def mean_pairwise_similarity(vectors: Sequence, sample_limit: int = 2000) -> float:
     """Average Tanimoto over all pairs; 0.0 for fewer than two molecules.
 
-    ponytail: O(n^2) over the first ``sample_limit`` fingerprints. Exact for
+    Note: O(n^2) over the first ``sample_limit`` fingerprints. Exact for
     normal report sizes; for a million-molecule library, sample upstream rather
     than waiting for the full matrix.
     """

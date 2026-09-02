@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 
 from smiles2select.app_metadata import rdkit_version
-from smiles2select.chemical_space import pca_projection, tmap_projection, umap_projection
+from smiles2select.chemical_space import pca_projection, umap_projection
 from smiles2select.chemical_space.pca_projection import Projection
 from smiles2select.chemistry.fingerprints import FingerprintConfig
 
@@ -93,22 +93,10 @@ def project(frame: pd.DataFrame, config: ProjectionConfig = ProjectionConfig()) 
         projection = umap_projection.project_fingerprints(
             frame["canonical_smiles"].fillna("").tolist(), frame.index, parameters, config.fingerprint
         )
-    elif config.method == "tmap":
-        if "canonical_smiles" not in frame.columns:
-            raise KeyError("tmap requires a canonical_smiles column")
-        parameters = tmap_projection.TmapParameters(
-            lsh_bits=int(config.parameters.get("lsh_bits", 1024)),
-            permutations=int(config.parameters.get("permutations", 512)),
-            k=int(config.parameters.get("k", 20)),
-            node_size=float(config.parameters.get("node_size", 1 / 37)),
-        )
-        projection = tmap_projection.project_fingerprints(
-            frame["canonical_smiles"].fillna("").tolist(), frame.index, parameters, config.fingerprint
-        )
     else:
         raise ValueError(
             f"unknown projection method '{config.method}'; expected property_pca, "
-            "property_umap, structural_umap or tmap"
+            "property_umap or structural_umap"
         )
     return ProjectionResult(
         projection=projection,

@@ -40,6 +40,7 @@ class Projection:
     features: tuple[str, ...]
     explained_variance: tuple[float, ...] = ()
     parameters: dict[str, object] | None = None
+    imputed: pd.Series | None = None
 
     @property
     def projection_id(self) -> str:
@@ -70,10 +71,12 @@ class Projection:
         ]
         if self.explained_variance:
             rows.append(("explained variance", f"{sum(self.explained_variance) * 100:.1f}%"))
+        if self.imputed is not None and int(self.imputed.sum()) > 0:
+            rows.append(("moléculas com descritor imputado", int(self.imputed.sum())))
         return rows
 
 
-def standardise(frame: pd.DataFrame) -> tuple[np.ndarray, pd.Index]:
+def standardise(frame: pd.DataFrame) -> tuple[np.ndarray, pd.Index, pd.Series]:
     """Z-score the descriptors, dropping rows that have none.
 
     Without standardising, molecular weight (hundreds) would dominate every
@@ -82,14 +85,19 @@ def standardise(frame: pd.DataFrame) -> tuple[np.ndarray, pd.Index]:
     numeric = frame.apply(pd.to_numeric, errors="coerce")
     usable = numeric.dropna(how="all")
     if usable.empty:
-        return np.zeros((0, numeric.shape[1])), usable.index
+        return (
+            np.zeros((0, numeric.shape[1])),
+            usable.index,
+            pd.Series(dtype=bool, index=usable.index),
+        )
 
+    imputed = usable.isna().any(axis=1)
     filled = usable.fillna(usable.mean())
     values = filled.to_numpy(dtype=float)
     centred = values - values.mean(axis=0)
     spread = centred.std(axis=0)
     spread[spread == 0] = 1.0
-    return centred / spread, usable.index
+    return centred / spread, usable.index, imputed
 
 
 def project(
@@ -101,9 +109,15 @@ def project(
     if not chosen:
         raise ValueError(f"none of the requested descriptors are available: {list(requested)}")
 
-    matrix, index = standardise(descriptors[list(chosen)])
+    matrix, index, imputed = standardise(descriptors[list(chosen)])
     if matrix.shape[0] == 0:
-        return Projection(pd.DataFrame(columns=["x", "y"], index=index), "pca", chosen, ())
+        return Projection(
+            pd.DataFrame(columns=["x", "y"], index=index),
+            "pca",
+            chosen,
+            (),
+            imputed=imputed,
+        )
 
     # Sign convention: the largest-magnitude loading of each component is made
     # positive, so the same data never produces a mirrored map.
@@ -134,4 +148,6 @@ def project(
         },
         index=index,
     )
-    return Projection(coordinates, "pca", chosen, explained, {"components": wanted})
+    return Projection(
+        coordinates, "pca", chosen, explained, {"components": wanted}, imputed=imputed
+    )

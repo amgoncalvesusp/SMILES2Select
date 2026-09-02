@@ -93,8 +93,13 @@ def project_descriptors(
     parameters: UmapParameters = UmapParameters(),
 ) -> Projection:
     """Property-space UMAP over standardised descriptors."""
+    requested = tuple(features)
+    chosen = tuple(feature for feature in requested if feature in descriptors.columns)
+    if not chosen:
+        raise ValueError(f"none of the requested descriptors are available: {list(requested)}")
+
     umap = _umap_module()
-    matrix, index = standardise(descriptors[list(features)])
+    matrix, index, imputed = standardise(descriptors[list(chosen)])
     if matrix.shape[0] < 3:
         raise ValueError("UMAP needs at least three molecules with descriptors")
 
@@ -112,8 +117,9 @@ def project_descriptors(
     return Projection(
         coordinates=coordinates,
         method="umap",
-        features=tuple(features),
+        features=chosen,
         parameters={**parameters.as_dict(), "metric": "euclidean"},
+        imputed=imputed,
     )
 
 

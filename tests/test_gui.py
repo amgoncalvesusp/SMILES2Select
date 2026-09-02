@@ -173,3 +173,38 @@ def test_results_page_exports_all_charts(window, library_csv, tmp_path):
     assert len(paths) == 8
     assert all(isinstance(path, Path) and path.exists() for path in paths)
     assert {path.suffix for path in paths} == {".png", ".svg"}
+
+
+def test_gui_docking_preparability_run(window, tmp_path):
+    csv = tmp_path / "test_mols.csv"
+    pd.DataFrame(
+        [
+            ("MOL1", "CC(O)C(N)C=CC1CCCCC1"),
+            ("MOL2", "OB(O)c1ccccc1"),
+            ("MOL3", "CCO"),
+        ],
+        columns=["ID", "SMILES"],
+    ).to_csv(csv, index=False)
+
+    state = window.state
+    state.files.append(FileSelection(path=csv, smiles_column="SMILES", id_column="ID"))
+    state.n_jobs = 1
+    state.chunk_size = 10
+
+    policy_page = window.pages.widget(4)
+    policy_page.on_enter()
+    assert not policy_page.docking_prep_box.isChecked()
+
+    policy_page.docking_prep_box.setChecked(True)
+    assert policy_page.docking_engine_combo.isEnabled()
+    assert policy_page.tautomers_box.isEnabled()
+    assert state.compute_preparability
+
+    config = state.build_config()
+    assert config.compute_preparability
+    assert config.docking_engine == "vina"
+
+    result = run(config)
+    assert result.preparability is not None
+    assert not result.preparability.empty
+    assert len(result.preparability) >= 2

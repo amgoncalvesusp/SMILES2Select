@@ -99,9 +99,32 @@ class PolicyPage(WizardPage):
 
         output_group = QGroupBox("Outputs")
         output_form = QFormLayout(output_group)
-        output_form.addRow("SQLite database:", _with_browse(self.database_edit, self._pick_database))
+        output_form.addRow(
+            "SQLite database:", _with_browse(self.database_edit, self._pick_database)
+        )
         output_form.addRow("Excel report:", _with_browse(self.excel_edit, self._pick_excel))
         output_form.addRow(self.detailed_box)
+
+        self.docking_prep_box = QCheckBox("Avaliar preparabilidade para docking")
+        self.docking_prep_box.setChecked(state.compute_preparability)
+        self.docking_prep_box.stateChanged.connect(self._on_docking_toggled)
+
+        self.docking_engine_combo = QComboBox()
+        self.docking_engine_combo.addItems(["Vina", "GOLD", "Glide"])
+        self.docking_engine_combo.setCurrentText("Vina")
+        self.docking_engine_combo.setEnabled(state.compute_preparability)
+        self.docking_engine_combo.currentTextChanged.connect(self._apply)
+
+        self.tautomers_box = QCheckBox("Enumerar tautômeros (~1.000 mol/s)")
+        self.tautomers_box.setChecked(state.compute_tautomers)
+        self.tautomers_box.setEnabled(state.compute_preparability)
+        self.tautomers_box.stateChanged.connect(self._apply)
+
+        docking_group = QGroupBox("Preparabilidade para docking")
+        docking_form = QFormLayout(docking_group)
+        docking_form.addRow(self.docking_prep_box)
+        docking_form.addRow("Motor de docking:", self.docking_engine_combo)
+        docking_form.addRow(self.tautomers_box)
 
         self.explanation = QLabel("")
         self.explanation.setWordWrap(True)
@@ -123,6 +146,7 @@ class PolicyPage(WizardPage):
         self.body.addWidget(decision_group)
         self.body.addWidget(alert_group, stretch=1)
         self.body.addWidget(output_group)
+        self.body.addWidget(docking_group)
         self.body.addLayout(preset_buttons)
         self.body.addWidget(self.explanation)
         self.body.addWidget(self.warning)
@@ -163,11 +187,26 @@ class PolicyPage(WizardPage):
             self.qed_value.setValue(float(value))
         self.expression_edit.setText(self.state.expression or "")
         self.detailed_box.setChecked(self.state.detailed_export)
+        self.docking_prep_box.setChecked(self.state.compute_preparability)
+        self.tautomers_box.setChecked(self.state.compute_tautomers)
+        engine = self.state.docking_engine or "vina"
+        for i in range(self.docking_engine_combo.count()):
+            if self.docking_engine_combo.itemText(i).lower() == engine.lower():
+                self.docking_engine_combo.setCurrentIndex(i)
+                break
+        self.docking_engine_combo.setEnabled(self.state.compute_preparability)
+        self.tautomers_box.setEnabled(self.state.compute_preparability)
         for catalog_id, box in self._catalog_boxes.items():
             box.setChecked(catalog_id in self.state.active_catalogs)
         for catalog_id, combo in self._action_combos.items():
             combo.setCurrentText(ACTION_LABELS[self.state.alert_actions.get(catalog_id, "warn")])
         self._refresh_explanation()
+
+    def _on_docking_toggled(self) -> None:
+        enabled = self.docking_prep_box.isChecked()
+        self.docking_engine_combo.setEnabled(enabled)
+        self.tautomers_box.setEnabled(enabled)
+        self._apply()
 
     def _build_alert_rows(self) -> None:
         catalogs = available_catalogs()
@@ -225,6 +264,11 @@ class PolicyPage(WizardPage):
             Path(self.database_edit.text()) if self.database_edit.text() else None
         )
         self.state.excel_path = Path(self.excel_edit.text()) if self.excel_edit.text() else None
+        self.state.compute_preparability = self.docking_prep_box.isChecked()
+        self.state.compute_tautomers = (
+            self.tautomers_box.isChecked() if self.docking_prep_box.isChecked() else False
+        )
+        self.state.docking_engine = self.docking_engine_combo.currentText().lower()
 
         self._refresh_explanation()
 

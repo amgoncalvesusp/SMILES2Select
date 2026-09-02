@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from rdkit import Chem
 
 from smiles2select.app_metadata import rdkit_version
+from smiles2select.chemistry import preparability as prep
 from smiles2select.chemistry import rdkit_descriptors as rd
 
 
@@ -283,6 +284,76 @@ BUILTIN_DESCRIPTORS: tuple[DescriptorDefinition, ...] = (
         precision=3,
         compatibility="Ertl-Roggo-Schuffenhauer, about -5 (synthetic) to +5 (natural-like); "
         "ranking score, neither a rule nor a classification",
+    ),
+    _definition(
+        "undefined_stereocenters",
+        "Undefined stereocenters",
+        "Chem.FindPotentialStereo",
+        prep.undefined_stereocenters,
+        dtype="int",
+        precision=0,
+        compatibility="counts unspecified tetrahedral atoms and double bonds",
+    ),
+    _definition(
+        "defined_stereocenters",
+        "Defined stereocenters",
+        "Chem.FindPotentialStereo",
+        prep.defined_stereocenters,
+        dtype="int",
+        precision=0,
+        compatibility="counts specified tetrahedral atoms and double bonds",
+    ),
+    _definition(
+        "fragment_count",
+        "Fragment count",
+        "Chem.GetMolFrags",
+        prep.fragment_count,
+        dtype="int",
+        precision=0,
+        compatibility="number of disconnected fragments",
+    ),
+    _definition(
+        "largest_ring_size",
+        "Largest ring size",
+        "RingInfo.AtomRings",
+        prep.largest_ring_size,
+        dtype="int",
+        precision=0,
+        compatibility="atoms in largest ring; >=12 marks a macrocycle",
+    ),
+    _definition(
+        "amide_bond_count",
+        "Amide bond count",
+        "rdMolDescriptors.CalcNumAmideBonds",
+        prep.amide_bond_count,
+        dtype="int",
+        precision=0,
+        compatibility="amide bonds, proxy for peptide character",
+    ),
+    _definition(
+        "bridgehead_atom_count",
+        "Bridgehead atom count",
+        "rdMolDescriptors.CalcNumBridgeheadAtoms",
+        prep.bridgehead_atom_count,
+        dtype="int",
+        precision=0,
+    ),
+    _definition(
+        "spiro_atom_count",
+        "Spiro atom count",
+        "rdMolDescriptors.CalcNumSpiroAtoms",
+        prep.spiro_atom_count,
+        dtype="int",
+        precision=0,
+    ),
+    _definition(
+        "tautomer_count",
+        "Tautomer count",
+        "MolStandardize.TautomerEnumerator",
+        prep.tautomer_count,
+        dtype="int",
+        precision=0,
+        compatibility="plausible tautomers capped at 16",
     ),
 )
 

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from smiles2select.chemistry.preparability import estimated_3d_structures
 from smiles2select.export.excel import export_frame
 from smiles2select.pipeline.runner import RunResult
 
@@ -58,6 +59,36 @@ def build_frame(result: RunResult, options: DockingExportOptions | None = None) 
         for column in ("MW", "WLOGP", "TPSA", "QED"):
             if column in context.columns:
                 payload[column] = context[column].to_numpy()
+
+    if result.config.compute_preparability:
+        undef_series = (
+            result.descriptors["undefined_stereocenters"]
+            .reindex(payload.index)
+            .fillna(0)
+            .astype(int)
+        )
+        payload["undefined_stereocenters"] = undef_series.to_numpy()
+
+        taut_series = (
+            result.descriptors["tautomer_count"].reindex(payload.index).fillna(1).astype(int)
+            if "tautomer_count" in result.descriptors
+            else pd.Series(1, index=payload.index)
+        )
+        est_structures = [
+            estimated_3d_structures(int(u), int(t)) for u, t in zip(undef_series, taut_series)
+        ]
+        payload["estimated_3d_structures"] = est_structures
+
+        if result.preparability is not None and not result.preparability.empty:
+            flag_counts = (
+                result.preparability.groupby("record_id")
+                .size()
+                .reindex(payload.index, fill_value=0)
+                .astype(int)
+            )
+            payload["preparability_flags_count"] = flag_counts.to_numpy()
+        else:
+            payload["preparability_flags_count"] = 0
 
     return payload.reset_index(drop=True)
 
