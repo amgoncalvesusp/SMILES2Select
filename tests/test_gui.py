@@ -114,6 +114,7 @@ def test_charts_render_without_data(qapp):
     charts.violation_counts(canvas, pd.DataFrame(columns=["failure_code"]))
     charts.intersection_matrix(canvas, pd.DataFrame(), [])
     charts.descriptor_histogram(canvas, pd.DataFrame({"mol_wt": []}), "mol_wt")
+    charts.docking_budget_histogram(canvas, pd.Series(dtype="int64"))
 
 
 def test_charts_render_with_data(qapp):
@@ -208,3 +209,32 @@ def test_gui_docking_preparability_run(window, tmp_path):
     assert result.preparability is not None
     assert not result.preparability.empty
     assert len(result.preparability) >= 2
+
+    results_page = window.pages.widget(6)
+    results_page.show_result(result)
+    assert results_page.tabs.tabText(results_page.tabs.count() - 1) == "Docking budget"
+    summary = results_page.budget_summary.text()
+    assert "selected molecules" in summary
+    assert "estimated 3D structures (engine: vina)" in summary
+    assert "[decide]" in summary  # the undefined-stereo flag reaches the panel
+
+
+def test_docking_budget_panel_absent_without_preparability(window, library_csv):
+    """The panel is a docking budget, so it must not appear when no run asked
+    for one - and must disappear again when a later run does not."""
+    state = window.state
+    state.files.append(FileSelection(path=library_csv, smiles_column="SMILES", id_column="ID"))
+    result = run(
+        RunConfig(
+            sources=tuple(selection.to_source() for selection in state.files),
+            profile_ids=("lipinski", "veber"),
+            n_jobs=1,
+            chunk_size=4,
+        )
+    )
+
+    results_page = window.pages.widget(6)
+    results_page.show_result(result)
+    assert result.preparability is None
+    assert results_page.tabs.indexOf(results_page.budget_tab) < 0
+    assert len(results_page.export_charts(Path(str(library_csv.parent / "charts")))) == 8

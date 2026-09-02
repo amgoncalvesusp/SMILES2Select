@@ -7,6 +7,7 @@ excluded sets differ.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
@@ -76,6 +77,29 @@ def descriptor_histogram(
     axes.set_xlabel(label)
     axes.set_ylabel("Molecules")
     axes.set_title(f"Distribution of {label}")
+    canvas.draw_idle()
+
+
+def docking_budget_histogram(canvas: Canvas, structures: pd.Series) -> None:
+    """How many 3D structures each selected molecule would cost to prepare.
+
+    Logarithmic x-axis: the counts are powers of two, so a linear axis would
+    crush everything below the worst offender into a single bar.
+    """
+    axes = canvas.clear()
+    values = pd.to_numeric(structures, errors="coerce").dropna()
+    values = values[values > 0]
+    if values.empty:
+        axes.set_title("No preparability data")
+        canvas.draw_idle()
+        return
+
+    bins = np.logspace(0, np.log10(max(float(values.max()), 2.0)), 20)
+    axes.hist(values, bins=bins, color="#3b6ea5")
+    axes.set_xscale("log")
+    axes.set_xlabel("Estimated 3D structures per molecule")
+    axes.set_ylabel("Molecules")
+    axes.set_title("Docking preparation cost")
     canvas.draw_idle()
 
 

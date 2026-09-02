@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.1.0 - 2026-09-02
+
+### Added
+
+- Docking preparability layer: per-molecule flags for uncommon elements, multiple fragments, macrocycles, peptide character and undefined stereochemistry, driven by declarative engine profiles (Vina, GOLD, Glide) rather than hardcoded rules. Results reach the `preparability_flags` SQLite table, the `PREPARABILITY_FLAGS` Excel sheet and the docking hand-off.
+- Docking budget panel on the Results screen, shown only when preparability was computed: selected molecules, estimated 3D structures for the selected set, a flag breakdown by severity, and a log-scale histogram of the per-molecule preparation cost. The panel is included in the chart export.
+- New preparability descriptors, computed once in the parallel workers like every other descriptor: undefined and defined stereocenters, fragment count, largest ring size, amide bonds, bridgehead and spiro atoms, and an optional capped tautomer count.
+- Progress reporting for the preparability stage, which is single-threaded and previously left the progress bar silent on large libraries.
+
+### Removed
+
+- Removed TMAP support, which has no reliable Windows installation. Projection defaults to deterministic PCA, with UMAP available when installed.
+- Removed the duplicate `smiles2select-workspace` entry point, which only called the GUI entry point.
+
 ## 3.0.3 - 2026-08-13
 
 ### Added

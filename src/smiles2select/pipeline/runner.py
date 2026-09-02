@@ -224,6 +224,9 @@ def run(
 
     prep_table = None
     if config.compute_preparability:
+        # Single-threaded and roughly 6k molecules/s, so a large library sits
+        # here for a while: say so instead of leaving the progress bar silent.
+        report(0, 1, "Evaluating docking preparability")
         engine = load_engine(config.docking_engine or "vina")
         prep_table = evaluate(descriptors, engine)
 

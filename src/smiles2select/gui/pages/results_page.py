@@ -22,9 +22,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from smiles2select.chemistry.preparability import estimated_3d_structures
 from smiles2select.export.excel import export_frame
 from smiles2select.gui import charts
 from smiles2select.gui.pages.base import WizardPage
+from smiles2select.preparability import load_engine
 
 VIEWS = ("Selected", "Excluded", "All")
 MAX_TABLE_ROWS = 5000
@@ -53,6 +55,10 @@ class ResultsPage(WizardPage):
         self.tabs.addTab(self.violation_canvas, "Violations")
         self.tabs.addTab(self.intersection_canvas, "Intersection")
         self.tabs.addTab(self._distribution_tab(), "Distributions")
+        # Added to the tab bar only when a run computed preparability.
+        self.budget_summary = QLabel("")
+        self.budget_canvas = charts.Canvas()
+        self.budget_tab = self._budget_tab()
 
         self.export_charts_button = QPushButton("Export charts...")
         self.export_charts_button.setEnabled(False)
@@ -101,6 +107,14 @@ class ResultsPage(WizardPage):
         layout.addWidget(self.distribution_canvas, stretch=1)
         return container
 
+    def _budget_tab(self) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        self.budget_summary.setStyleSheet("font-family: monospace; font-size: 12px;")
+        layout.addWidget(self.budget_summary)
+        layout.addWidget(self.budget_canvas, stretch=1)
+        return container
+
     def show_result(self, result) -> None:
         """Populate the page after a run finishes."""
         self._result = result
@@ -120,6 +134,7 @@ class ResultsPage(WizardPage):
             [profile.id for profile in result.profiles],
         )
         self._refresh_distribution()
+        self._refresh_budget(result)
 
         frame = export_frame(result)
         frame.insert(0, "record_id", frame.index)
@@ -139,6 +154,8 @@ class ResultsPage(WizardPage):
             ("intersection", self.intersection_canvas),
             ("distributions", self.distribution_canvas),
         )
+        if self.tabs.indexOf(self.budget_tab) >= 0:
+            charts_to_export += (("docking_budget", self.budget_canvas),)
         paths: list[Path] = []
         for name, canvas in charts_to_export:
             for extension in ("png", "svg"):
@@ -175,6 +192,62 @@ class ResultsPage(WizardPage):
             self.descriptor_combo.currentText(),
             self._result.decision.decisions["selected"],
         )
+
+    def _refresh_budget(self, result) -> None:
+        """What the selected set would cost to prepare for docking.
+
+        Reports the selected molecules only: this is a budget for the run the
+        user is about to do, so molecules dropped as duplicates or by any
+        filter do not belong in it. Every number here is arithmetic over
+        columns the pipeline already computed - no chemistry happens on this
+        screen.
+        """
+        index = self.tabs.indexOf(self.budget_tab)
+        if result.preparability is None:
+            if index >= 0:
+                self.tabs.removeTab(index)
+            return
+
+        selected = result.decision.decisions["selected"].astype(bool)
+        selected_ids = selected[selected].index
+        descriptors = result.descriptors
+        undefined = (
+            descriptors["undefined_stereocenters"].reindex(selected_ids).fillna(0).astype(int)
+        )
+        tautomers = (
+            descriptors["tautomer_count"].reindex(selected_ids).fillna(1).astype(int)
+            if "tautomer_count" in descriptors
+            else pd.Series(1, index=selected_ids)
+        )
+        structures = pd.Series(
+            [
+                estimated_3d_structures(int(count), max(1, int(tautomer)))
+                for count, tautomer in zip(undefined, tautomers, strict=True)
+            ],
+            index=selected_ids,
+            dtype="int64",
+        )
+
+        engine = load_engine(result.config.docking_engine or "vina")
+        labels = {flag.id: flag.label for flag in engine.flags}
+        flags = result.preparability
+        flags = flags[flags["record_id"].isin(selected_ids)]
+
+        lines = [
+            f"{len(selected_ids):,} selected molecules",
+            f"→ {int(structures.sum()):,} estimated 3D structures (engine: {engine.id})",
+            "",
+        ]
+        counts = flags.groupby(["flag_id", "severity"]).size().sort_values(ascending=False)
+        for (flag_id, severity), count in counts.items():
+            lines.append(f"{count:>7,}  {labels.get(flag_id, flag_id)}  [{severity}]")
+        if counts.empty:
+            lines.append("No preparability flags raised on the selected set.")
+        self.budget_summary.setText("\n".join(lines))
+
+        charts.docking_budget_histogram(self.budget_canvas, structures)
+        if index < 0:
+            self.tabs.addTab(self.budget_tab, "Docking budget")
 
     def _refresh_table(self) -> None:
         if self._frame.empty:
