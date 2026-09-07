@@ -1,8 +1,8 @@
 """The selection basket.
 
 Holds the current decision for every candidate and records how it got there.
-All mutations go through :meth:`SelectionBasket.apply`, which is what keeps the
-history complete enough for undo, redo and session restore.
+Decisions are validated before committing and recorded with their previous state,
+keeping history complete enough for undo, redo and session restore.
 
 Two invariants the class enforces rather than trusting callers to respect:
 
@@ -158,6 +158,7 @@ class SelectionBasket:
         targets = [key for key in dict.fromkeys(record_ids) if key in self._states]
         previous: dict[int, dict[str, Any]] = {}
         updated: dict[int, dict[str, Any]] = {}
+        pending: dict[int, MoleculeState] = {}
 
         for record_id in targets:
             before = self._states[record_id]
@@ -173,8 +174,9 @@ class SelectionBasket:
                 continue
             previous[record_id] = before.as_row()
             updated[record_id] = after.as_row()
-            self._states[record_id] = after
+            pending[record_id] = after
 
+        self._states = {**self._states, **pending}
         return self._log.record(
             SelectionAction(
                 action_type=action_type,
@@ -200,6 +202,41 @@ class SelectionBasket:
         return self.apply(
             ActionType.REMOVE_FROM_FINAL, record_ids, status=SelectionStatus.UNDECIDED, **kwargs
         )
+
+    def replace_final(
+        self,
+        record_ids: Sequence[int],
+        *,
+        origin: SelectionOrigin = SelectionOrigin.AUTOMATIC,
+        source: str = "",
+        reason: str = "",
+        note: str | None = None,
+    ) -> SelectionAction:
+        """Replace automatic selection in one undo step, retaining pinned choices."""
+        selected = set(record_ids).intersection(self._states)
+        pending: dict[int, MoleculeState] = {}
+        for record_id, before in self._states.items():
+            if record_id in selected and not before.is_selected:
+                self._require_justification(
+                    before, SelectionStatus.FINAL_SELECTED, origin, reason
+                )
+                pending[record_id] = before.with_selection(
+                    SelectionStatus.FINAL_SELECTED, origin, note or ""
+                )
+            elif record_id not in selected and before.is_selected and not before.pinned:
+                pending[record_id] = before.with_selection(
+                    SelectionStatus.UNDECIDED, origin, note or ""
+                )
+        action = SelectionAction(
+            action_type=ActionType.AUTOMATIC_SELECTION,
+            record_ids=tuple(sorted(selected | pending.keys())),
+            source=source,
+            reason=reason,
+            previous_state={key: self._states[key].as_row() for key in pending},
+            new_state={key: state.as_row() for key, state in pending.items()},
+        )
+        self._states = {**self._states, **pending}
+        return self._log.record(action)
 
     def exclude(self, record_ids: Sequence[int], **kwargs: Any) -> SelectionAction:
         return self.apply(

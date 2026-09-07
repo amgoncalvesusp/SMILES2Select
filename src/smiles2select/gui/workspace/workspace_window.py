@@ -45,6 +45,7 @@ from smiles2select.gui.workspace.panels import BasketPanel, InspectorPanel
 from smiles2select.gui.workspace.views import ChemicalSpaceView, ParetoView
 from smiles2select.pipeline.runner import RunResult
 from smiles2select.selection_intelligence import recipes
+from smiles2select.selection_intelligence.action_log import ActionType
 from smiles2select.selection_intelligence.basket import JustificationRequired, SelectionBasket
 from smiles2select.selection_intelligence.constrained_selection import (
     SelectionConstraints,
@@ -78,7 +79,7 @@ class WorkspaceWindow(QMainWindow):
         self.basket = self._build_basket(result)
         self.ranker = ParetoRanker()
         self.pareto = None
-        self._outcome: SelectionOutcome | None = None
+        self._selection_outcomes: dict[int, SelectionOutcome] = {}
         self._projection_results: dict[tuple[str, bool], tuple[ProjectionResult, pd.DataFrame]] = {}
 
         self.map_view = ChemicalSpaceView()
@@ -349,7 +350,11 @@ class WorkspaceWindow(QMainWindow):
         )
 
     def _auto_select(self) -> None:
-        candidates = self.candidates.copy()
+        eligible = [
+            state.record_id for state in self.basket.states()
+            if state.chemical_status.passed or (state.pinned and state.is_selected)
+        ]
+        candidates = self.candidates.loc[self.candidates.index.intersection(eligible)].copy()
         if self.pareto is not None:
             candidates = candidates.join(self.pareto.table, how="left")
 
@@ -361,13 +366,13 @@ class WorkspaceWindow(QMainWindow):
             pinned_ids=self.basket.pinned_ids(),
             excluded_ids=self.basket.excluded_ids(),
         )
-        self.basket.add_to_final(
+        self.basket.replace_final(
             list(outcome.selected_ids),
             origin=SelectionOrigin.AUTOMATIC,
             source=outcome.strategy.value,
             reason="automatic selection",
         )
-        self._outcome = outcome
+        self._selection_outcomes[len(self.basket.log.applied) - 1] = outcome
         self.warnings.setText("\n".join(outcome.warnings(constraints)))
         self.refresh()
 
@@ -390,7 +395,43 @@ class WorkspaceWindow(QMainWindow):
 
     def build_artifacts(self) -> selection_export.SessionArtifacts:
         """Everything the export needs, assembled from the current session."""
-        outcome = self._outcome or SelectionOutcome(selected_ids=self.basket.final_ids())
+        selected_ids = self.basket.final_ids()
+        selected_set = set(selected_ids)
+        selected = self.candidates.reindex(selected_ids)
+        reasons = {}
+        rejections = {}
+        strategy = Strategy(self.strategy.currentText())
+        for index, action in enumerate(self.basket.log.applied):
+            automatic = (
+                self._selection_outcomes.get(index)
+                if action.action_type is ActionType.AUTOMATIC_SELECTION else None
+            )
+            if automatic is not None:
+                strategy = automatic.strategy
+                rejections = {
+                    rid: why for rid, why in automatic.rejections.items() if rid not in selected_set
+                }
+            for record_id, state in action.new_state.items():
+                previous = action.previous_state.get(record_id, {})
+                if all(state.get(key) == previous.get(key) for key in (
+                    "selection_status", "selection_origin"
+                )):
+                    continue
+                if record_id in selected_set and state.get("selection_status") == "FINAL_SELECTED":
+                    explanation = [action.reason or state.get("selection_origin") or "selected"]
+                    if state.get("selection_origin") == "AUTOMATIC" and automatic is not None:
+                        explanation = automatic.reasons.get(record_id, explanation)
+                    reasons[record_id] = explanation
+        for record_id in self.basket.excluded_ids():
+            rejections[record_id] = ["manually excluded"]
+        outcome = SelectionOutcome(
+            selected_ids=selected_ids,
+            reasons=reasons,
+            rejections=rejections,
+            scaffold_usage=selected["murcko_scaffold"].dropna().astype(str).value_counts().to_dict(),
+            cluster_usage=selected["cluster_id"].dropna().astype(int).value_counts().to_dict(),
+            strategy=strategy,
+        )
         return selection_export.SessionArtifacts(
             result=self.result,
             basket=self.basket,
@@ -401,7 +442,7 @@ class WorkspaceWindow(QMainWindow):
                 input_hash=self.result.config.fingerprint(),
                 objectives=self.objectives().as_dicts(),
                 target_count=self.target_count.value(),
-                strategy=self.strategy.currentText(),
+                strategy=strategy.value,
                 max_per_scaffold=self.per_scaffold.value() or None,
                 max_per_cluster=self.per_cluster.value() or None,
                 pinned_ids=self.basket.pinned_ids(),
@@ -463,7 +504,12 @@ class WorkspaceWindow(QMainWindow):
                 self.pareto.table["pareto_rank"],
                 selected,
             )
+        else:
+            self.pareto_view.set_points(pd.DataFrame(columns=["x", "y"]))
+            self.pareto_view.clear_lasso()
         self.basket_panel.refresh(self.basket, self.candidates.get("molecule_id"))
+        if self.inspector.record_id is not None:
+            self._show_molecule(self.inspector.record_id)
 
     def _map_projection(self) -> tuple[ProjectionResult, pd.DataFrame]:
         """Build/cache the selected map and, for structural methods, references."""

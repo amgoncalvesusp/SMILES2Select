@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Automatic workspace selection now excludes chemically rejected candidates unless already selected and pinned with a manual justification. Re-selection replaces the previous set in one undo step and preserves retained manual decisions.
+- Selection basket updates validate the whole action before changing state, preventing partial changes when justification is missing.
+- Constrained selection prioritizes distinct scaffolds when a minimum is requested and reports pinned molecules that exceed count or quota limits. Coverage remains greedy; unmet minimums are reported.
+- Workspace exports follow the current basket after manual changes and undo/redo. The inspector refreshes after decisions, and invalid Pareto objectives clear outdated points.
+- Exported strategy reflects the last automatic selection still applied, including after undo; changing the strategy control alone does not rewrite its provenance.
+- Pillow now requires version 12.3.0 or later to exclude known vulnerabilities in older versions.
+
 ## 3.1.0 - 2026-09-02
 
 ### Added

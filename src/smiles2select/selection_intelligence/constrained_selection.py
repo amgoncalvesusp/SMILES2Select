@@ -116,14 +116,25 @@ class SelectionOutcome:
         missing = self.shortfall(constraints)
         if missing:
             messages.append(
-                f"{constraints.target_count} molecules were requested, but the constraints "
-                f"allowed only {self.count}. Missing: {missing}."
+                f"{constraints.target_count} molecules were requested, but the selection "
+                f"reached only {self.count}. Missing: {missing}."
             )
         if constraints.min_scaffolds and self.scaffolds_covered < constraints.min_scaffolds:
             messages.append(
                 f"The selection covers {self.scaffolds_covered} scaffolds; the requested minimum was "
                 f"{constraints.min_scaffolds}."
             )
+        if constraints.target_count is not None and self.count > constraints.target_count:
+            messages.append(
+                f"Selected molecules exceed the requested count: {self.count} selected "
+                f"for a target of {constraints.target_count}."
+            )
+        for label, usage, maximum in (
+            ("scaffold", self.scaffold_usage, constraints.max_per_scaffold),
+            ("cluster", self.cluster_usage, constraints.max_per_cluster),
+        ):
+            if maximum is not None and any(count > maximum for count in usage.values()):
+                messages.append(f"Selected molecules exceed the maximum per {label} ({maximum}).")
         return messages
 
 
@@ -236,33 +247,40 @@ def select(
     if constraints.preserve_pinned:
         for raw_id in pinned_ids:
             record_id = int(raw_id)
-            if record_id not in pool.index or record_id in selected:
+            if record_id not in pool.index or record_id in reasons:
                 continue
             row = pool.loc[record_id]
             selected.append(record_id)
             reasons[record_id] = ["pinned molecule"]
             _consume(_scaffold_of(row), _cluster_of(row), scaffold_usage, cluster_usage)
 
-    for raw_id, row in order_candidates(pool, strategy).iterrows():
-        record_id = int(raw_id)
-        if record_id in selected:
-            continue
-        if constraints.target_count is not None and len(selected) >= constraints.target_count:
-            rejections[record_id] = [LIMIT_REACHED]
-            continue
+    ordered = order_candidates(pool, strategy)
+    # ponytail: greedy coverage pass; warn on shortfalls instead of adding a solver.
+    for coverage_first in ((True, False) if constraints.min_scaffolds else (False,)):
+        for raw_id, row in ordered.iterrows():
+            if coverage_first and len(scaffold_usage) >= constraints.min_scaffolds:
+                break
+            record_id = int(raw_id)
+            if record_id in reasons:
+                continue
+            if constraints.target_count is not None and len(selected) >= constraints.target_count:
+                rejections[record_id] = [LIMIT_REACHED]
+                continue
 
-        scaffold = _scaffold_of(row)
-        cluster = _cluster_of(row)
-        blocked_by = _quota_block(scaffold, cluster, scaffold_usage, cluster_usage, constraints)
-        if blocked_by:
-            rejections[record_id] = blocked_by
-            continue
+            scaffold = _scaffold_of(row)
+            if coverage_first and (scaffold is None or scaffold in scaffold_usage):
+                continue
+            cluster = _cluster_of(row)
+            blocked_by = _quota_block(scaffold, cluster, scaffold_usage, cluster_usage, constraints)
+            if blocked_by:
+                rejections[record_id] = blocked_by
+                continue
 
-        selected.append(record_id)
-        reasons[record_id] = _selection_reasons(
-            row, scaffold, cluster, scaffold_usage, cluster_usage
-        )
-        _consume(scaffold, cluster, scaffold_usage, cluster_usage)
+            selected.append(record_id)
+            reasons[record_id] = _selection_reasons(
+                row, scaffold, cluster, scaffold_usage, cluster_usage
+            )
+            _consume(scaffold, cluster, scaffold_usage, cluster_usage)
 
     return SelectionOutcome(
         selected_ids=tuple(selected),
