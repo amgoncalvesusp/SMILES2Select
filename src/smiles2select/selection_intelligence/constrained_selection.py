@@ -11,7 +11,7 @@ is a worse library than 400 from a hundred.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -190,7 +190,7 @@ def _quota_block(
 
 
 def _selection_reasons(
-    row: pd.Series,
+    row: Mapping[str, object] | pd.Series,
     scaffold: str | None,
     cluster: int | None,
     scaffold_usage: dict[str, int],
@@ -228,6 +228,8 @@ def select(
     strategy: Strategy = Strategy.BALANCED,
     pinned_ids: Sequence[int] = (),
     excluded_ids: Sequence[int] = (),
+    *,
+    explain_rejections: bool = True,
 ) -> SelectionOutcome:
     """Compose the final set.
 
@@ -235,6 +237,11 @@ def select(
     ``crowding_distance``, ``robustness_score``, ``qed``, ``murcko_scaffold``
     and ``cluster_id``. Whatever is present is used; whatever is missing is
     skipped rather than faked.
+
+    Set ``explain_rejections=False`` for large-library scenarios: selection and
+    selected explanations are unchanged, but rejected IDs are not retained and
+    scanning stops when the requested count is reached. Sorting still requires
+    memory proportional to the candidate count, not pairwise comparisons.
     """
     reasons: dict[int, list[str]] = {}
     rejections: dict[int, list[str]] = {}
@@ -242,7 +249,12 @@ def select(
     cluster_usage: dict[int, int] = {}
     selected: list[int] = []
 
-    pool = candidates.loc[~candidates.index.isin(set(excluded_ids))]
+    # Only carry columns used here; SMILES and unrelated descriptors can be large.
+    needed = {"murcko_scaffold", "cluster_id", "pareto_rank", "robustness_score"}
+    needed.update(column for column, _ in _STRATEGY_KEYS[strategy])
+    pool = candidates.loc[:, [column for column in candidates.columns if column in needed]]
+    if len(excluded_ids):
+        pool = pool.loc[~pool.index.isin(set(excluded_ids))]
 
     if constraints.preserve_pinned:
         for raw_id in pinned_ids:
@@ -255,30 +267,45 @@ def select(
             _consume(_scaffold_of(row), _cluster_of(row), scaffold_usage, cluster_usage)
 
     ordered = order_candidates(pool, strategy)
+    scaffold_position = (
+        ordered.columns.get_loc("murcko_scaffold") + 1 if ("murcko_scaffold" in ordered) else None
+    )
+    cluster_position = (
+        ordered.columns.get_loc("cluster_id") + 1 if ("cluster_id" in ordered) else None
+    )
     # ponytail: greedy coverage pass; warn on shortfalls instead of adding a solver.
-    for coverage_first in ((True, False) if constraints.min_scaffolds else (False,)):
-        for raw_id, row in ordered.iterrows():
+    for coverage_first in (True, False) if constraints.min_scaffolds else (False,):
+        for values in ordered.itertuples(index=True, name=None):
             if coverage_first and len(scaffold_usage) >= constraints.min_scaffolds:
                 break
-            record_id = int(raw_id)
+            record_id = int(values[0])
             if record_id in reasons:
                 continue
             if constraints.target_count is not None and len(selected) >= constraints.target_count:
+                if not explain_rejections:
+                    break
                 rejections[record_id] = [LIMIT_REACHED]
                 continue
 
-            scaffold = _scaffold_of(row)
+            raw_scaffold = values[scaffold_position] if scaffold_position is not None else None
+            scaffold = None if raw_scaffold is None or pd.isna(raw_scaffold) else str(raw_scaffold)
             if coverage_first and (scaffold is None or scaffold in scaffold_usage):
                 continue
-            cluster = _cluster_of(row)
+            raw_cluster = values[cluster_position] if cluster_position is not None else None
+            cluster = None if raw_cluster is None or pd.isna(raw_cluster) else int(raw_cluster)
             blocked_by = _quota_block(scaffold, cluster, scaffold_usage, cluster_usage, constraints)
             if blocked_by:
-                rejections[record_id] = blocked_by
+                if explain_rejections:
+                    rejections[record_id] = blocked_by
                 continue
 
             selected.append(record_id)
             reasons[record_id] = _selection_reasons(
-                row, scaffold, cluster, scaffold_usage, cluster_usage
+                dict(zip(ordered.columns, values[1:], strict=True)),
+                scaffold,
+                cluster,
+                scaffold_usage,
+                cluster_usage,
             )
             _consume(scaffold, cluster, scaffold_usage, cluster_usage)
 

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from smiles2select.gui.state import WizardState
 
@@ -27,13 +28,20 @@ class WizardPage(QWidget):
         description.setWordWrap(True)
         description.setStyleSheet("color: #444;")
 
-        self.body = QVBoxLayout()
+        content = QWidget()
+        self.body = QVBoxLayout(content)
+        self.body.setContentsMargins(0, 0, 0, 0)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setWidget(content)
 
         layout = QVBoxLayout(self)
         layout.addWidget(heading)
         if self.subtitle:
             layout.addWidget(description)
-        layout.addLayout(self.body, stretch=1)
+        layout.addWidget(self.scroll_area, stretch=1)
 
     def validate(self) -> str | None:
         """Return a message blocking navigation, or None when the step is complete."""

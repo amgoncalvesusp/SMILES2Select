@@ -10,6 +10,7 @@ always written alongside rather than only embedded as a sheet.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +25,8 @@ from smiles2select.selection_intelligence.constrained_selection import (
     SelectionOutcome,
 )
 from smiles2select.selection_intelligence.pareto_ranking import ParetoResult
+from smiles2select.selection_intelligence.scenario_io import save_study, spec_to_dict
+from smiles2select.selection_intelligence.scenarios import ScenarioSnapshot
 from smiles2select.selection_intelligence.selection_explanations import (
     final_alerts,
     manual_decisions,
@@ -66,17 +69,24 @@ class SessionArtifacts:
     clusters: pd.Series | None = None
     scaffolds: pd.Series | None = None
     unrepresented_clusters: list[int] | None = None
+    scenario_snapshot: ScenarioSnapshot | None = None
 
 
 def final_selected_sheet(artifacts: SessionArtifacts) -> pd.DataFrame:
     """The chemistry columns of the selected molecules, plus the decision ones."""
-    frame = export_frame(artifacts.result)
-    frame = frame.loc[frame.index.intersection(pd.Index(list(artifacts.outcome.selected_ids)))]
+    frame = export_frame(artifacts.result, record_ids=artifacts.outcome.selected_ids)
     if frame.empty:
         return frame.reset_index(names="record_id")
 
     frame = frame.copy()
-    states = {state.record_id: state for state in artifacts.basket.states()}
+    states = {
+        record_id: artifacts.basket.state(record_id)
+        for record_id in frame.index if record_id in artifacts.basket
+    }
+    frame["Original_Screen_Status"] = frame["Final_Status"]
+    frame["Final_Status"] = "SELECTED"
+    if artifacts.scenario_snapshot is not None:
+        frame["Scenario_Eligible"] = frame.index.isin(artifacts.scenario_snapshot.eligible_ids)
     frame["Selection_Status"] = [
         states[record_id].selection_status.value
         if record_id in states
@@ -165,6 +175,21 @@ def export(artifacts: SessionArtifacts, path: str | Path) -> tuple[Path, Path]:
         sheets["RESCUE_ANALYSIS"] = artifacts.rescue
     if artifacts.counterfactuals is not None:
         sheets["COUNTERFACTUALS"] = artifacts.counterfactuals
+    snapshot = artifacts.scenario_snapshot
+    if snapshot is not None:
+        sheets["SCENARIO_CONTEXT"] = pd.DataFrame(
+            [
+                ("scenario", snapshot.spec.name),
+                ("input fingerprint", snapshot.data_fingerprint),
+                ("ranking method", snapshot.provenance["ranking_method"]),
+                ("eligible in scenario", len(snapshot.eligible_ids)),
+                ("selected in snapshot", snapshot.outcome.count),
+                ("current basket selected", artifacts.outcome.count),
+                ("criteria", json.dumps(spec_to_dict(snapshot.spec))),
+                ("warnings", "; ".join(snapshot.warnings)),
+                ("profile columns", "Original screening; Scenario_Eligible is the changed policy."),
+            ], columns=["item", "value"],
+        )
 
     with pd.ExcelWriter(workbook_path, engine="openpyxl") as writer:
         for name, frame in sheets.items():
@@ -172,4 +197,6 @@ def export(artifacts: SessionArtifacts, path: str | Path) -> tuple[Path, Path]:
 
     recipe_path = workbook_path.with_suffix("").with_suffix(recipes.RECIPE_SUFFIX)
     recipes.save(artifacts.recipe, recipe_path)
+    if snapshot is not None:
+        save_study(workbook_path.with_suffix(".scenarios.json"), (snapshot,))
     return workbook_path, recipe_path

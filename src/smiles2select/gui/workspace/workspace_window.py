@@ -9,22 +9,13 @@ question on screen, and the rest of the interface supports answering it.
 from __future__ import annotations
 
 import pandas as pd
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
     QFileDialog,
-    QFormLayout,
-    QGroupBox,
-    QHBoxLayout,
     QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
-    QSpinBox,
-    QSplitter,
     QStackedWidget,
-    QVBoxLayout,
     QWidget,
 )
 from rdkit import Chem
@@ -32,15 +23,16 @@ from rdkit import Chem
 from smiles2select.app_metadata import APP_NAME
 from smiles2select.chemical_space.clustering import ClusteringTooLargeError, cluster
 from smiles2select.chemical_space.projection_manager import (
-    ProjectionConfig,
     ProjectionResult,
-    project,
 )
-from smiles2select.chemistry.descriptor_registry import default_registry
 from smiles2select.chemistry.scaffolds import scaffolds_from_smiles
+from smiles2select.decision.engine import DecisionEngine
 from smiles2select.explainability.consequences import explain_change
 from smiles2select.explainability.method_cards import get_method_card
 from smiles2select.export import selection_export
+from smiles2select.gui.workspace.guided_controls import STRATEGY_HELP, build_layout
+from smiles2select.gui.workspace.jobs import ComputationJob
+from smiles2select.gui.workspace.map_compute import compute_map
 from smiles2select.gui.workspace.panels import BasketPanel, InspectorPanel
 from smiles2select.gui.workspace.views import ChemicalSpaceView, ParetoView
 from smiles2select.pipeline.runner import RunResult
@@ -53,8 +45,9 @@ from smiles2select.selection_intelligence.constrained_selection import (
     Strategy,
     select,
 )
-from smiles2select.selection_intelligence.objectives import Direction, Objective, ObjectiveSet
+from smiles2select.selection_intelligence.objectives import ObjectiveSet
 from smiles2select.selection_intelligence.pareto_ranking import ParetoRanker
+from smiles2select.selection_intelligence.scenarios import EXACT_PARETO_LIMIT
 from smiles2select.selection_intelligence.states import (
     MoleculeState,
     SelectionOrigin,
@@ -74,12 +67,17 @@ class WorkspaceWindow(QMainWindow):
         self.setWindowTitle(f"{APP_NAME} - Chemical Space Hub")
         self.resize(1440, 900)
 
+        self._job = None
+        self._papyrus_path = None
+        self._map_requested = False
+        self._scenarios_dialog = None
         self.result = result
         self.candidates = self._build_candidates(result)
         self.basket = self._build_basket(result)
         self.ranker = ParetoRanker()
         self.pareto = None
         self._selection_outcomes: dict[int, SelectionOutcome] = {}
+        self._scenario_snapshots = {}
         self._projection_results: dict[tuple[str, bool], tuple[ProjectionResult, pd.DataFrame]] = {}
 
         self.map_view = ChemicalSpaceView()
@@ -104,10 +102,13 @@ class WorkspaceWindow(QMainWindow):
         """One table with the columns every view and the selector may read."""
         evaluable = result.descriptors[result.descriptors["evaluable"].astype(bool)].copy()
         if "murcko_scaffold" not in evaluable.columns:
-            evaluable["murcko_scaffold"] = scaffolds_from_smiles(
-                evaluable["canonical_smiles"].fillna("").tolist()
+            evaluable["murcko_scaffold"] = (
+                scaffolds_from_smiles(evaluable["canonical_smiles"].fillna("").tolist())
+                if len(evaluable) <= 5000 else pd.NA
             )
         try:
+            if len(evaluable) > 2000:
+                raise ClusteringTooLargeError("Exact clustering deferred for large library")
             clusters = cluster(evaluable["canonical_smiles"].fillna("").tolist(), evaluable.index)
             evaluable["cluster_id"] = clusters.labels
         except ClusteringTooLargeError:
@@ -121,107 +122,39 @@ class WorkspaceWindow(QMainWindow):
 
     def _build_basket(self, result: RunResult) -> SelectionBasket:
         """Seed the basket with the chemical verdict of every record."""
-        decisions = result.decision.decisions
+        # Screening eligibility precedes count/diversity/reference allocation.
+        decisions = DecisionEngine(result.config.policy).decide(
+            result.evaluation.status, result.scores, result.alerts
+        ).decisions
         states = [
             MoleculeState(
                 record_id=int(record_id),
                 chemical_status=chemical_status_from_run(
-                    valid=bool(row["valid"]),
+                    valid=bool(valid),
                     passed=bool(decisions["selected"].get(record_id, False)),
                 ),
             )
-            for record_id, row in result.descriptors.iterrows()
+            for record_id, valid in zip(result.descriptors.index, result.descriptors["valid"])
         ]
         return SelectionBasket(states)
 
     def _build_layout(self) -> QWidget:
-        controls = QGroupBox("Chemical Space Hub")
-        form = QFormLayout(controls)
-
-        self.view_selector = QComboBox()
-        self.view_selector.addItems([VIEW_MAP, VIEW_PARETO])
-
-        numeric = [column for column in OBJECTIVE_CANDIDATES if column in self.candidates.columns]
-        self.first_objective = QComboBox()
-        self.first_objective.addItems(numeric)
-        self.second_objective = QComboBox()
-        self.second_objective.addItems(numeric)
-        if len(numeric) > 1:
-            self.second_objective.setCurrentIndex(1)
-
-        self.target_count = QSpinBox()
-        self.target_count.setRange(1, 100000)
-        self.target_count.setValue(min(50, max(1, len(self.candidates))))
-        self.per_scaffold = QSpinBox()
-        self.per_scaffold.setRange(0, 100)
-        self.per_scaffold.setSpecialValueText("no quota")
-        self.per_cluster = QSpinBox()
-        self.per_cluster.setRange(0, 100)
-        self.per_cluster.setSpecialValueText("no quota")
-        self.strategy = QComboBox()
-        self.strategy.addItems([item.value for item in Strategy])
-        self.method_card = QLabel()
-        self.method_card.setWordWrap(True)
-        self.method_card.setStyleSheet("background: #eef3f8; padding: 6px;")
-        self.consequence = QLabel()
-        self.consequence.setWordWrap(True)
-        self.projection_selector = QComboBox()
-        self.projection_selector.addItem("Property PCA", "property_pca")
-        self.projection_selector.addItem("Structural UMAP", "structural_umap")
-        self.color_selector = QComboBox()
-        self.color_selector.addItems(["Selection status", "Pareto rank", "Reference similarity"])
-        self.reference_overlay = QCheckBox("Show reference overlay")
-        self.reference_overlay.setChecked(bool(self.result.reference_libraries))
-        reference_info = QLabel(
-            f"Reference libraries: {len(self.result.reference_libraries)}\n"
-            "Map distances are for visualization only. Molecular similarity and "
-            "novelty use fingerprints."
-        )
-        reference_info.setWordWrap(True)
-
-        form.addRow("View:", self.view_selector)
-        form.addRow("Objective 1 (maximize):", self.first_objective)
-        form.addRow("Objective 2 (minimize):", self.second_objective)
-        form.addRow("Final count:", self.target_count)
-        form.addRow("Max per scaffold:", self.per_scaffold)
-        form.addRow("Max per cluster:", self.per_cluster)
-        form.addRow("Strategy:", self.strategy)
-        form.addRow("Method card:", self.method_card)
-        form.addRow("Consequence:", self.consequence)
-        form.addRow("Projection:", self.projection_selector)
-        form.addRow("Color by:", self.color_selector)
-        form.addRow(self.reference_overlay)
-        form.addRow(reference_info)
-        form.addRow(self.warnings)
-
-        top = QSplitter(Qt.Horizontal)
-        left = QWidget()
-        left_layout = QVBoxLayout(left)
-        left_layout.addWidget(controls)
-        left_layout.addStretch(1)
-        top.addWidget(left)
-        top.addWidget(self.views)
-        top.addWidget(self.inspector)
-        top.setSizes([280, 780, 340])
-
-        splitter = QSplitter(Qt.Vertical)
-        splitter.addWidget(top)
-        splitter.addWidget(self.basket_panel)
-        splitter.setSizes([620, 260])
-
-        container = QWidget()
-        layout = QHBoxLayout(container)
-        layout.addWidget(splitter)
-        return container
+        return build_layout(self, OBJECTIVE_CANDIDATES)
 
     def _connect(self) -> None:
         self.view_selector.currentTextChanged.connect(self._switch_view)
         self.first_objective.currentTextChanged.connect(self._recompute_pareto)
         self.second_objective.currentTextChanged.connect(self._recompute_pareto)
-        self.projection_selector.currentIndexChanged.connect(lambda _index: self.refresh())
+        self.projection_selector.currentIndexChanged.connect(self._request_map)
         self.color_selector.currentIndexChanged.connect(lambda _index: self.refresh())
-        self.reference_overlay.stateChanged.connect(lambda _state: self.refresh())
+        self.reference_overlay.stateChanged.connect(self._request_map)
         self.strategy.currentTextChanged.connect(self._update_method_card)
+        for widget in (self.target_count, self.per_scaffold, self.per_cluster):
+            widget.valueChanged.connect(self._update_summary)
+        for editor in self.objective_editors:
+            editor.direction.currentIndexChanged.connect(self._recompute_pareto)
+            editor.low.valueChanged.connect(self._recompute_pareto)
+            editor.high.valueChanged.connect(self._recompute_pareto)
         self._update_method_card(self.strategy.currentText())
 
         for view in (self.map_view, self.pareto_view):
@@ -240,16 +173,130 @@ class WorkspaceWindow(QMainWindow):
 
     # -- behaviour ----------------------------------------------------------
 
+    def _update_summary(self) -> None:
+        try:
+            objectives = "; ".join(
+                f"{editor.field.currentText()}: {editor.direction.currentText()}"
+                + (f" [{editor.low.value():g}, {editor.high.value():g}]"
+                   if editor.direction.currentData() == "target_range" else
+                   f" {editor.low.value():g}"
+                   if editor.direction.currentData() == "target_value" else "")
+                for editor in self.objective_editors
+            )
+        except (AttributeError, ValueError):
+            objectives = f"{self.first_objective.currentText()} / {self.second_objective.currentText()}"
+        self.criteria_summary.setText(
+            f"Current criteria: {self.target_count.value():,} molecules; "
+            f"{self.strategy.currentText()}. {objectives}. "
+            f"Scaffold limit: {self.per_scaffold.value() or 'none'}; "
+            f"cluster limit: {self.per_cluster.value() or 'none'}. "
+            "Chemical screening rules remain in effect."
+        )
+
+    def _open_scenarios(self) -> None:
+        from smiles2select.gui.workspace.scenario_dialog import ScenarioDialog
+
+        if self._scenarios_dialog is None:
+            self._scenarios_dialog = ScenarioDialog(self)
+        self._scenarios_dialog.show()
+        self._scenarios_dialog.raise_()
+
+    def _request_map(self) -> None:
+        if self.is_busy:
+            return
+        method = str(self.projection_selector.currentData())
+        overlay = bool(self.reference_overlay.isChecked() and self.result.reference_libraries)
+        key = (method, overlay)
+        self.performance_notice.setText(
+            f"Map: at most {min(5000, len(self.candidates)):,} sampled candidates "
+            f"of {len(self.candidates):,}; fixed seed 42. Reference overlay: at most "
+            "2,000 per library. Selection still considers all candidates."
+        )
+        candidates, result = self.candidates, self.result
+
+        def completed(value):
+            self._projection_results[key] = value
+            self._map_requested = True
+            self.refresh()
+
+        self._start_job(lambda: compute_map(candidates, result, method, overlay), completed,
+                        "Building a bounded map in the background...")
+
+    def _attach_papyrus(self) -> None:
+        from smiles2select.reference.papyrus import read_index_metadata
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose local Papyrus evidence index", "", "SQLite index (*.sqlite *.db);;All files (*)"
+        )
+        if not path:
+            return
+        try:
+            metadata = read_index_metadata(path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Papyrus index unavailable", str(exc))
+            return
+        self._papyrus_path = path
+        self.papyrus_button.setToolTip(str(metadata))
+        self.warnings.setText(
+            "Papyrus evidence attached. Inspect a molecule to query measured evidence. "
+            "Missing evidence is unknown; connectivity matches do not establish stereospecific activity."
+        )
+        if self.inspector.record_id is not None:
+            self._show_molecule(self.inspector.record_id)
+
+    def _start_job(self, function, completed, message) -> None:
+        if self._job is not None:
+            return
+        self.warnings.setText(message)
+        self.job_progress.show()
+        self.controls_scroll.setEnabled(False)
+        self.basket_panel.setEnabled(False)
+        self.inspector.setEnabled(False)
+        self.views.setEnabled(False)
+        self._job = ComputationJob(function, self)
+        self._job.completed.connect(completed)
+        self._job.failed.connect(self.warnings.setText)
+        self._job.finished.connect(self._finish_job)
+        self._job.start()
+
+    def _finish_job(self) -> None:
+        job, self._job = self._job, None
+        self.job_progress.hide()
+        for widget in (self.controls_scroll, self.basket_panel, self.inspector, self.views):
+            widget.setEnabled(True)
+        if job is not None:
+            job.deleteLater()
+
+    @property
+    def is_busy(self) -> bool:
+        return self._job is not None or bool(
+            self._scenarios_dialog is not None and self._scenarios_dialog.is_busy
+        )
+
+    def closeEvent(self, event) -> None:
+        if self._job is not None and self._job.isRunning():
+            self.warnings.setText("Computation is finishing. Close the workspace when it completes.")
+            event.ignore()
+            return
+        if self._scenarios_dialog is not None and self._scenarios_dialog.is_busy:
+            self.warnings.setText("Scenario computation is running; wait for completion before closing.")
+            event.ignore()
+            return
+        super().closeEvent(event)
+
     def _switch_view(self, name: str) -> None:
         self.views.setCurrentIndex(0 if name == VIEW_MAP else 1)
         self.refresh()
 
     def _update_method_card(self, strategy: str) -> None:
         """Keep method bias and consequence visible while changing controls."""
+        strategy = self.strategy.currentData()
         try:
             card = get_method_card(strategy)
         except KeyError:
             card = get_method_card("balanced")
+        self.strategy_help.setText(STRATEGY_HELP.get(strategy, strategy))
+        self._update_summary()
         self.method_card.setText(
             f"<b>{card.title}</b><br>{card.what_it_does}<br>"
             f"<i>Favors:</i> {card.what_it_favors}<br>"
@@ -260,14 +307,19 @@ class WorkspaceWindow(QMainWindow):
         )
 
     def objectives(self) -> ObjectiveSet:
-        return ObjectiveSet(
-            [
-                Objective(self.first_objective.currentText(), Direction.MAXIMIZE),
-                Objective(self.second_objective.currentText(), Direction.MINIMIZE),
-            ]
-        )
+        return ObjectiveSet([editor.objective() for editor in self.objective_editors])
 
     def _recompute_pareto(self) -> None:
+        self._update_summary()
+        if len(self.candidates) > EXACT_PARETO_LIMIT:
+            self.pareto = None
+            self.performance_notice.setText(
+                "Large library: exact Pareto disabled; selection uses available property scores "
+                "and quotas. Map loads on request (at most 5,000 molecules). "
+                "Use Compare scenarios for bounded, documented ranking."
+            )
+            self.refresh()
+            return
         first = self.first_objective.currentText()
         second = self.second_objective.currentText()
         if not first or not second or first == second:
@@ -293,6 +345,25 @@ class WorkspaceWindow(QMainWindow):
             state = self.basket.state(record_id)
             extras["Chemical status"] = state.chemical_status.value
             extras["Selection status"] = state.selection_status.value
+            verdict = self.result.decision.decisions
+            if record_id in verdict.index and not bool(verdict.loc[record_id, "selected"]):
+                extras["Original run decision"] = "Not selected in the original run"
+                extras["Decision stage"] = (
+                    "Passed screening; later allocation/reference/count criteria excluded it"
+                    if state.chemical_status.passed else "Failed original chemical screening"
+                )
+        if self._papyrus_path is not None and record_id in self.candidates.index:
+            from smiles2select.reference.papyrus import lookup_evidence
+
+            try:
+                mol = Chem.MolFromSmiles(str(self.candidates.loc[record_id, "canonical_smiles"]))
+                key = Chem.MolToInchiKey(mol) if mol is not None else None
+                evidence = lookup_evidence(self._papyrus_path, [key])
+                extras.update(evidence.iloc[0].dropna().to_dict())
+                if not evidence.iloc[0].get("papyrus_records", 0):
+                    extras["Papyrus interpretation"] = "No evidence in this index; activity unknown"
+            except Exception as exc:
+                extras["Papyrus query unavailable"] = str(exc)
         self.inspector.show_molecule(record_id, self.candidates, extras)
 
     def _shortlist_region(self, record_ids: list[int]) -> None:
@@ -350,29 +421,55 @@ class WorkspaceWindow(QMainWindow):
         )
 
     def _auto_select(self) -> None:
-        eligible = [
-            state.record_id for state in self.basket.states()
-            if state.chemical_status.passed or (state.pinned and state.is_selected)
-        ]
-        candidates = self.candidates.loc[self.candidates.index.intersection(eligible)].copy()
-        if self.pareto is not None:
-            candidates = candidates.join(self.pareto.table, how="left")
-
+        if self.is_busy:
+            return
+        states = self.basket.states()
         constraints = self.constraints()
-        outcome = select(
-            candidates,
-            constraints,
-            Strategy(self.strategy.currentText()),
-            pinned_ids=self.basket.pinned_ids(),
-            excluded_ids=self.basket.excluded_ids(),
-        )
+        strategy = Strategy(self.strategy.currentData())
+        pinned_ids, excluded_ids = self.basket.pinned_ids(), self.basket.excluded_ids()
+        source, pareto = self.candidates, self.pareto
+
+        def compute():
+            from smiles2select.selection_intelligence.scenarios import _reference_mask
+
+            if self.result.zone_allocation is not None:
+                raise ValueError("This run uses zone allocation. Re-run without zones before "
+                                 "changing automatic selection in the workspace.")
+            eligible = [state.record_id for state in states
+                        if state.chemical_status.passed or (state.pinned and state.is_selected)]
+            candidates = source.loc[source.index.intersection(eligible)].copy()
+            candidates = candidates.loc[_reference_mask(self.result, candidates.index)]
+            if pareto is not None:
+                candidates = candidates.join(pareto.table, how="left")
+            if constraints.max_per_scaffold and candidates["murcko_scaffold"].isna().any():
+                raise ValueError("Scaffold quota requires complete cached molecular cores.")
+            if constraints.max_per_cluster and candidates["cluster_id"].isna().any():
+                raise ValueError("Cluster quota requires complete cached cluster IDs.")
+            if strategy is Strategy.SCAFFOLD_COVERAGE:
+                if candidates["murcko_scaffold"].isna().any():
+                    raise ValueError("Molecular-core coverage requires complete cached scaffolds.")
+                counts = candidates["murcko_scaffold"].value_counts()
+                candidates = candidates.assign(scaffold_size=candidates["murcko_scaffold"].map(counts))
+            return select(candidates, constraints, strategy, pinned_ids=pinned_ids,
+                          excluded_ids=excluded_ids, explain_rejections=len(candidates) <= 5000)
+
+        if len(source) > EXACT_PARETO_LIMIT:
+            self._start_job(compute, lambda outcome: self._apply_selection(outcome, constraints),
+                            "Selecting from the full library in the background...")
+        else:
+            try:
+                self._apply_selection(compute(), constraints)
+            except Exception as exc:
+                self.warnings.setText(str(exc))
+
+    def _apply_selection(self, outcome, constraints):
         self.basket.replace_final(
-            list(outcome.selected_ids),
-            origin=SelectionOrigin.AUTOMATIC,
-            source=outcome.strategy.value,
-            reason="automatic selection",
+            list(outcome.selected_ids), origin=SelectionOrigin.AUTOMATIC,
+            source=outcome.strategy.value, reason="automatic selection",
         )
-        self._selection_outcomes[len(self.basket.log.applied) - 1] = outcome
+        action_index = len(self.basket.log.applied) - 1
+        self._selection_outcomes[action_index] = outcome
+        self._scenario_snapshots.pop(action_index, None)
         self.warnings.setText("\n".join(outcome.warnings(constraints)))
         self.refresh()
 
@@ -388,10 +485,24 @@ class WorkspaceWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(self, "Export selection", "", "Excel (*.xlsx)")
         if not path:
             return
-        workbook, recipe = selection_export.export(self.build_artifacts(), path)
+        try:
+            workbook, recipe = selection_export.export(self.build_artifacts(), path)
+            snapshot = self._active_snapshot()
+            if snapshot is not None:
+                from smiles2select.selection_intelligence.scenario_io import save_study
+                save_study(workbook.with_suffix(".scenarios.json"), (snapshot,))
+        except Exception as exc:
+            QMessageBox.warning(self, "Export unavailable", str(exc))
+            return
         QMessageBox.information(
             self, "Exported", f"Workbook: {workbook.name}\nRecipe: {recipe.name}"
         )
+
+    def _active_snapshot(self):
+        for index in range(len(self.basket.log.applied) - 1, -1, -1):
+            if self.basket.log.applied[index].action_type is ActionType.AUTOMATIC_SELECTION:
+                return self._scenario_snapshots.get(index)
+        return None
 
     def build_artifacts(self) -> selection_export.SessionArtifacts:
         """Everything the export needs, assembled from the current session."""
@@ -400,7 +511,7 @@ class WorkspaceWindow(QMainWindow):
         selected = self.candidates.reindex(selected_ids)
         reasons = {}
         rejections = {}
-        strategy = Strategy(self.strategy.currentText())
+        strategy = Strategy(self.strategy.currentData())
         for index, action in enumerate(self.basket.log.applied):
             automatic = (
                 self._selection_outcomes.get(index)
@@ -432,19 +543,26 @@ class WorkspaceWindow(QMainWindow):
             cluster_usage=selected["cluster_id"].dropna().astype(int).value_counts().to_dict(),
             strategy=strategy,
         )
+        snapshot = self._active_snapshot()
+        selected_constraints = snapshot.spec.constraints if snapshot else self.constraints()
+        objective_values = (tuple(obj.as_dict() for obj in snapshot.spec.objectives)
+                            if snapshot else self.objectives().as_dicts())
         return selection_export.SessionArtifacts(
             result=self.result,
             basket=self.basket,
             outcome=outcome,
-            constraints=self.constraints(),
+            constraints=selected_constraints,
             recipe=recipes.SelectionRecipe(
-                name="workspace",
-                input_hash=self.result.config.fingerprint(),
-                objectives=self.objectives().as_dicts(),
-                target_count=self.target_count.value(),
+                name=f"scenario:{snapshot.spec.name}" if snapshot else "workspace",
+                input_hash=snapshot.data_fingerprint if snapshot else self.result.config.fingerprint(),
+                objectives=objective_values,
+                original_thresholds={rule.id: rule.threshold for profile in self.result.profiles
+                                     for rule in profile.rules if not rule.is_substructure},
+                applied_thresholds=dict(snapshot.spec.thresholds) if snapshot else {},
+                target_count=selected_constraints.target_count,
                 strategy=strategy.value,
-                max_per_scaffold=self.per_scaffold.value() or None,
-                max_per_cluster=self.per_cluster.value() or None,
+                max_per_scaffold=selected_constraints.max_per_scaffold,
+                max_per_cluster=selected_constraints.max_per_cluster,
                 pinned_ids=self.basket.pinned_ids(),
                 excluded_ids=self.basket.excluded_ids(),
                 candidate_library="candidate",
@@ -470,7 +588,8 @@ class WorkspaceWindow(QMainWindow):
                 reserve_count=len(self.result.reserve_ids),
                 seed=self.result.config.selection_seed,
             ),
-            pareto=self.pareto,
+            pareto=None if snapshot else self.pareto,
+            scenario_snapshot=snapshot,
             clusters=self.candidates.get("cluster_id"),
             scaffolds=self.candidates.get("murcko_scaffold"),
         )
@@ -480,7 +599,9 @@ class WorkspaceWindow(QMainWindow):
         selected = self.basket.final_ids()
         ranks = self.pareto.table["pareto_rank"] if self.pareto is not None else None
 
-        if self.views.currentIndex() == 0:
+        if self.views.currentIndex() == 0 and (
+            len(self.candidates) <= 5000 or self._map_requested
+        ):
             try:
                 projection, reference_coordinates = self._map_projection()
             except Exception as exc:
@@ -512,56 +633,11 @@ class WorkspaceWindow(QMainWindow):
             self._show_molecule(self.inspector.record_id)
 
     def _map_projection(self) -> tuple[ProjectionResult, pd.DataFrame]:
-        """Build/cache the selected map and, for structural methods, references."""
         method = str(self.projection_selector.currentData())
         overlay = bool(self.reference_overlay.isChecked() and self.result.reference_libraries)
         key = (method, overlay)
-        if key in self._projection_results:
-            return self._projection_results[key]
-        config = ProjectionConfig(method=method, fingerprint=self.result.config.fingerprint_config)
-        if overlay and method == "property_pca":
-            features = tuple(ProjectionConfig().features)
-            combined = self.candidates[[column for column in features if column in self.candidates]].copy()
-            combined.index = [f"candidate::{record_id}" for record_id in combined.index]
-            reference_frames = []
-            registry = default_registry()
-            for library in self.result.reference_libraries:
-                rows = []
-                for row_id, row in library.valid.iterrows():
-                    mol = Chem.MolFromSmiles(str(row["canonical_smiles"]))
-                    values = registry.compute(mol, features) if mol is not None else {}
-                    rows.append(values)
-                frame = pd.DataFrame(rows, index=library.valid.index)
-                frame.index = [
-                    f"reference::{library.library_id}::{row_id}" for row_id in frame.index
-                ]
-                reference_frames.append(frame)
-            combined = pd.concat([combined, *reference_frames], axis=0)
-            result = project(combined, config)
-            coordinates = result.projection.coordinates
-            candidate_coordinates = coordinates.loc[coordinates.index.str.startswith("candidate::")]
-            candidate_coordinates.index = pd.Index(
-                [int(value.split("::", 1)[1]) for value in candidate_coordinates.index]
-            )
-            reference_coordinates = coordinates.loc[coordinates.index.str.startswith("reference::")]
-            self._projection_results[key] = (
-                ProjectionResult(
-                    projection=type(result.projection)(
-                        coordinates=candidate_coordinates,
-                        method=result.projection.method,
-                        features=result.projection.features,
-                        explained_variance=result.projection.explained_variance,
-                        parameters=result.projection.parameters,
-                    ),
-                    config=result.config,
-                    input_hash=result.input_hash,
-                    software_versions=result.software_versions,
-                ),
-                reference_coordinates,
-            )
-        else:
-            result = project(self.candidates, config)
-            self._projection_results[key] = (result, pd.DataFrame(columns=["x", "y"]))
+        if key not in self._projection_results:
+            self._projection_results[key] = compute_map(self.candidates, self.result, method, overlay)
         return self._projection_results[key]
 
     def _colour_values(self, coordinates: pd.DataFrame, ranks: pd.Series | None) -> pd.Series:

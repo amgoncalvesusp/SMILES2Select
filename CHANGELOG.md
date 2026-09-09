@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased
+## 3.2.0 - 2026-09-08
+
+### Added
+
+- Guided workspace controls for researchers: essential actions first, expandable advanced criteria, notebook-friendly scrolling, human-readable strategy labels and on-demand 2D structures.
+- Independent A/B scenario previews, threshold overrides, explicit adoption with undo/redo, selection versus eligibility frequencies, complete CSV output and fingerprint-bound study JSON replay.
+- Chunked replay of cached chemical criteria, preserving profile roles, violation tolerances, structural alerts and global QED percentile policy. Unsupported zone allocations are reported explicitly.
+- Optional local Papyrus evidence indexes scoped by target, endpoint, quality and molecular identity. Compressed input is streamed; indexed evidence is queried on inspection, with source and identity limitations preserved. No download or biological inference is performed automatically.
+- Reproducible cached-descriptor selection benchmark with seeded random and ranked baselines, fixed molecule-count limits, optional external activity labels and input/software hashes.
+- Adopted-scenario export context and replay sidecars. Original screening status is distinguished from scenario eligibility and the actual final selection.
+
+### Performance
+
+- Large selections can omit per-rejection dictionaries and stop scanning once the target is reached; selection IDs and quota semantics remain unchanged.
+- Scenario pools above 2,000 candidates use explicitly labeled weighted objective percentiles instead of quadratic exact Pareto ranking. Large maps and tables bound display work without subsampling the final selector's candidate universe.
+- Scenario, map and export work uses background jobs; closing windows while jobs run is guarded. Final-selection Excel data is materialized only for selected records.
+- Benchmarks cover synthetic cached libraries up to three million records. They do not claim end-to-end SMILES processing or biological performance; run/basket RAM still grows with input size.
 
 ### Fixed
 

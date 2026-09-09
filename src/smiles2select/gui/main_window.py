@@ -81,6 +81,7 @@ class MainWindow(QMainWindow):
         self.next_button = QPushButton("Next")
         self.back_button.clicked.connect(lambda: self._go(self.pages.currentIndex() - 1))
         self.next_button.clicked.connect(lambda: self._go(self.pages.currentIndex() + 1))
+        self.progress_label = QLabel()
 
         disclaimer = QLabel(DISCLAIMER)
         disclaimer.setWordWrap(True)
@@ -92,6 +93,7 @@ class MainWindow(QMainWindow):
         navigation.addWidget(self.next_button)
 
         content = QVBoxLayout()
+        content.addWidget(self.progress_label)
         content.addWidget(self.pages, stretch=1)
         content.addLayout(navigation)
 
@@ -125,16 +127,25 @@ class MainWindow(QMainWindow):
             item.setForeground(Qt.black if position <= index else Qt.gray)
         self.back_button.setEnabled(index > 0)
         self.next_button.setEnabled(index < self.pages.count() - 1)
+        self.progress_label.setText(f"Step {index + 1} of {len(STEPS)} — {STEPS[index][3:]}")
+        self.next_button.setText(
+            f"Next: {STEPS[index + 1][3:]}" if index + 1 < len(STEPS) else "Completed"
+        )
 
     def _on_run_finished(self, result: object) -> None:
         if self._workspace_window is not None:
-            self._workspace_window.close()
-            self._workspace_window = None
+            if self._workspace_window.close():
+                self._workspace_window = None
         self._page_widgets[6].show_result(result)
         self._go(6)
 
     def _open_workspace(self, result: object) -> None:
         """Open the interactive chemical-space session for a finished run."""
+        if self._workspace_window is not None and self._workspace_window.result is result:
+            self._workspace_window.show()
+            self._workspace_window.raise_()
+            self._workspace_window.activateWindow()
+            return
         try:
             workspace = WorkspaceWindow(result, parent=self)
         except Exception as exc:
@@ -144,3 +155,16 @@ class MainWindow(QMainWindow):
         workspace.show()
         workspace.raise_()
         workspace.activateWindow()
+
+    def closeEvent(self, event) -> None:
+        worker = self._page_widgets[5]._worker
+        busy = worker is not None and worker.isRunning()
+        if busy or any(workspace.is_busy for workspace in self.findChildren(WorkspaceWindow)):
+            QMessageBox.information(
+                self, "Calculation in progress",
+                "Wait for calculations to finish before closing. "
+                "Processing can be cancelled from the Processing step.",
+            )
+            event.ignore()
+            return
+        super().closeEvent(event)

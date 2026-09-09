@@ -44,7 +44,7 @@ class RunPage(WizardPage):
         self.chunk_spin.setSingleStep(100)
         self.chunk_spin.setValue(2000)
 
-        settings = QGroupBox("Paralelismo")
+        settings = QGroupBox("Processing resources")
         form = QFormLayout(settings)
         form.addRow("Processes:", self.jobs_spin)
         form.addRow("Molecules per batch:", self.chunk_spin)
@@ -59,7 +59,7 @@ class RunPage(WizardPage):
 
         self.start_button = QPushButton("Run")
         self.start_button.clicked.connect(self._start)
-        self.cancel_button = QPushButton("Cancelar")
+        self.cancel_button = QPushButton("Cancel")
         self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self._cancel)
 

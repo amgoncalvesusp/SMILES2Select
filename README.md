@@ -1,10 +1,19 @@
-# SMILES2Select 3.1.0
+# SMILES2Select 3.2.0
 
 [![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21920596.svg)](https://doi.org/10.5281/zenodo.21920596)
 
 Author: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA)
 
 ## English
+
+### New in 3.2
+
+Guided controls, explicit A/B scenario previews, selection stability, scalable
+cached-descriptor ranking, and optional local Papyrus evidence. The budget is a
+molecule count; no prices or currencies are assumed. See the [GUI guide](docs/GUI_GUIDE.md),
+[benchmark protocol](docs/SELECTION_BENCHMARK.md) and [Papyrus integration](docs/PAPYRUS.md)
+for usage and measured limits. Large scenario pools use explicitly labeled
+weighted percentiles instead of exact quadratic Pareto ranking.
 
 SMILES2Select is a multi-rule drug-likeness and chemical-space selection tool
 for large SMILES libraries. Version 3.0 adds the Chemical Space Selection Hub:

@@ -8,7 +8,8 @@ screen can disagree with anything else.
 from __future__ import annotations
 
 import pandas as pd
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -20,6 +21,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from rdkit import Chem
+from rdkit.Chem.Draw import rdMolDraw2D
 
 from smiles2select.selection_intelligence.basket import SelectionBasket
 
@@ -52,6 +55,11 @@ class InspectorPanel(QWidget):
 
         self.title = QLabel("No molecule selected")
         self.title.setStyleSheet("font-weight: 600;")
+        self.title.setWordWrap(True)
+        self.structure = QLabel()
+        self.structure.setAlignment(Qt.AlignCenter)
+        self.structure.setMaximumHeight(150)
+        self._structure_smiles = None
         self.details = QTextEdit()
         self.details.setReadOnly(True)
 
@@ -68,6 +76,7 @@ class InspectorPanel(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.title)
+        layout.addWidget(self.structure)
         layout.addWidget(self.details, stretch=1)
         layout.addLayout(buttons)
 
@@ -86,9 +95,29 @@ class InspectorPanel(QWidget):
         if record_id not in descriptors.index:
             self.title.setText(f"Record {record_id} not found")
             self.details.setPlainText("")
+            self.structure.clear()
+            self._structure_smiles = None
             return
 
         row = descriptors.loc[record_id]
+        smiles = row.get("canonical_smiles")
+        if isinstance(smiles, str) and smiles != self._structure_smiles:
+            self.structure.clear()
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is not None:
+                try:
+                    drawing = rdMolDraw2D.MolDraw2DCairo(280, 150)
+                    rdMolDraw2D.PrepareAndDrawMolecule(drawing, mol)
+                    drawing.FinishDrawing()
+                    pixmap = QPixmap()
+                    pixmap.loadFromData(drawing.GetDrawingText(), "PNG")
+                    self.structure.setPixmap(pixmap)
+                except (RuntimeError, ValueError):
+                    self.structure.setText("Structure preview unavailable")
+            self._structure_smiles = smiles
+        elif not isinstance(smiles, str):
+            self.structure.clear()
+            self._structure_smiles = None
         lines = [f"record_id: {record_id}"]
         for column, label in INSPECTOR_FIELDS:
             if column in descriptors.columns and not pd.isna(row.get(column)):
@@ -115,7 +144,10 @@ class BasketPanel(QWidget):
         super().__init__(parent)
 
         self.counters = QLabel("")
+        self.counters.setWordWrap(True)
         self.counters.setStyleSheet("font-weight: 600;")
+        self.display_notice = QLabel()
+        self.display_notice.setWordWrap(True)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["ID", "Status", "Origin", "Note"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -139,6 +171,7 @@ class BasketPanel(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.counters)
+        layout.addWidget(self.display_notice)
         layout.addWidget(self.table, stretch=1)
         layout.addLayout(buttons)
 
@@ -152,8 +185,12 @@ class BasketPanel(QWidget):
         self.redo_button.setEnabled(basket.log.can_redo)
 
         decided = [state for state in basket.states() if state.origin is not None]
-        self.table.setRowCount(len(decided))
-        for row, state in enumerate(decided):
+        self.display_notice.setText(
+            f"Displaying {min(500, len(decided))} of {len(decided)} decisions. "
+            "Export includes the complete selection."
+        )
+        self.table.setRowCount(min(500, len(decided)))
+        for row, state in enumerate(decided[:500]):
             label = (
                 str(identifiers.get(state.record_id, state.record_id))
                 if identifiers is not None

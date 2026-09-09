@@ -1,9 +1,9 @@
 ; Inno Setup definition for the portable PyInstaller onedir bundle.
 ; Build the bundle first, then compile this file with:
-;   ISCC.exe /DAppVersion=3.1.0 /DSourceDir=...\dist\SMILES2Select packaging\smiles2select.iss
+;   ISCC.exe /DAppVersion=3.2.0 /DSourceDir=...\dist\SMILES2Select packaging\smiles2select.iss
 
 #ifndef AppVersion
-  #define AppVersion "3.1.0"
+  #define AppVersion "3.2.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\SMILES2Select"

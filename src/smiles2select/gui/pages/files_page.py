@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
     QHBoxLayout,
+    QLabel,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -35,6 +36,12 @@ class FilesPage(WizardPage):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.empty_hint = QLabel(
+            "Start with a CSV, TSV or Excel file containing a SMILES column and, "
+            "optionally, molecule IDs. Add your file below, then choose the columns. "
+            "Existing criteria can be reviewed at each step before processing."
+        )
+        self.empty_hint.setWordWrap(True)
 
         add_button = QPushButton("Add files...")
         remove_button = QPushButton("Remove selected")
@@ -46,6 +53,7 @@ class FilesPage(WizardPage):
         buttons.addWidget(remove_button)
         buttons.addStretch(1)
 
+        self.body.addWidget(self.empty_hint)
         self.body.addWidget(self.table, stretch=1)
         self.body.addLayout(buttons)
 
@@ -73,6 +81,7 @@ class FilesPage(WizardPage):
         self.on_enter()
 
     def on_enter(self) -> None:
+        self.empty_hint.setVisible(not self.state.files)
         self.table.setRowCount(len(self.state.files))
         for row, selection in enumerate(self.state.files):
             self.table.setItem(row, 0, QTableWidgetItem(selection.path.name))

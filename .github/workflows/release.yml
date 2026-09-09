@@ -127,9 +127,9 @@ jobs:
           body: |
             See the repository CHANGELOG for the complete release notes.
 
-            This release registers SMILES2Select in Zenodo and provides a DOI
-            for citation. Authorship: Adriano Marques Gonçalves, Universidade
-            de Araraquara (UNIARA).
+            For citation, see CITATION.cff and the repository's Zenodo link.
+            Authorship: Adriano Marques Gonçalves, Universidade de Araraquara
+            (UNIARA).
 
             **Downloads**
             - Windows portable bundle: `SMILES2Select-windows.zip`.

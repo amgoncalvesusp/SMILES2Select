@@ -45,7 +45,10 @@ ACTION_ORDER = ("inform", "warn", "penalize", "exclude")
 
 class PolicyPage(WizardPage):
     title = "5. Selection policy"
-    subtitle = "Define how profiles, QED and alerts combine in the final decision."
+    subtitle = (
+        "Review the selection summary and choose where to save results. "
+        "Expand advanced settings only when you need to change how criteria combine."
+    )
 
     def __init__(self, state) -> None:
         super().__init__(state)
@@ -74,6 +77,7 @@ class PolicyPage(WizardPage):
 
         decision_group = QGroupBox("Decision")
         decision_form = QFormLayout(decision_group)
+        decision_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         decision_form.addRow("Approve in at least N consensus profiles:", self.consensus_spin)
         decision_form.addRow("Custom expression:", self.expression_edit)
         decision_form.addRow("QED:", self.qed_mode)
@@ -83,6 +87,7 @@ class PolicyPage(WizardPage):
         self.alert_table.setHorizontalHeaderLabels(["Catalog", "Use", "Action"])
         self.alert_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.alert_table.horizontalHeader().setStretchLastSection(True)
+        self.alert_table.setMinimumHeight(150)
         self._catalog_boxes: dict[str, QCheckBox] = {}
         self._action_combos: dict[str, QComboBox] = {}
         self._build_alert_rows()
@@ -105,7 +110,7 @@ class PolicyPage(WizardPage):
         output_form.addRow("Excel report:", _with_browse(self.excel_edit, self._pick_excel))
         output_form.addRow(self.detailed_box)
 
-        self.docking_prep_box = QCheckBox("Avaliar preparabilidade para docking")
+        self.docking_prep_box = QCheckBox("Check preparation requirements for docking")
         self.docking_prep_box.setChecked(state.compute_preparability)
         self.docking_prep_box.stateChanged.connect(self._on_docking_toggled)
 
@@ -115,15 +120,15 @@ class PolicyPage(WizardPage):
         self.docking_engine_combo.setEnabled(state.compute_preparability)
         self.docking_engine_combo.currentTextChanged.connect(self._apply)
 
-        self.tautomers_box = QCheckBox("Enumerar tautômeros (~1.000 mol/s)")
+        self.tautomers_box = QCheckBox("Enumerate tautomers (optional; adds computation)")
         self.tautomers_box.setChecked(state.compute_tautomers)
         self.tautomers_box.setEnabled(state.compute_preparability)
         self.tautomers_box.stateChanged.connect(self._apply)
 
-        docking_group = QGroupBox("Preparabilidade para docking")
+        docking_group = QGroupBox("Docking preparation (optional)")
         docking_form = QFormLayout(docking_group)
         docking_form.addRow(self.docking_prep_box)
-        docking_form.addRow("Motor de docking:", self.docking_engine_combo)
+        docking_form.addRow("Docking program:", self.docking_engine_combo)
         docking_form.addRow(self.tautomers_box)
 
         self.explanation = QLabel("")
@@ -143,13 +148,24 @@ class PolicyPage(WizardPage):
         preset_buttons.addWidget(load_button)
         preset_buttons.addStretch(1)
 
-        self.body.addWidget(decision_group)
-        self.body.addWidget(alert_group, stretch=1)
-        self.body.addWidget(output_group)
-        self.body.addWidget(docking_group)
-        self.body.addLayout(preset_buttons)
+        self.advanced_toggle = QCheckBox("Show advanced decision and alert settings")
+        self.advanced_options = QWidget()
+        advanced_layout = QVBoxLayout(self.advanced_options)
+        advanced_layout.setContentsMargins(0, 0, 0, 0)
+        advanced_layout.addWidget(decision_group)
+        advanced_layout.addWidget(alert_group)
+        self.advanced_options.hide()
+        self.advanced_toggle.toggled.connect(self.advanced_options.setVisible)
+        self.expression_edit.setToolTip("Optional Boolean rule. Leave empty to use profile roles.")
+        self.qed_mode.setToolTip("QED summarizes drug-likeness; it is not an activity prediction.")
         self.body.addWidget(self.explanation)
         self.body.addWidget(self.warning)
+        self.body.addWidget(output_group)
+        self.body.addWidget(docking_group)
+        self.body.addWidget(self.advanced_toggle)
+        self.body.addWidget(self.advanced_options)
+        self.body.addLayout(preset_buttons)
+        self.body.addStretch(1)
 
     def _save_preset(self) -> None:
         """Store the current choices; files and output paths are not included."""
@@ -186,6 +202,7 @@ class PolicyPage(WizardPage):
         if value is not None:
             self.qed_value.setValue(float(value))
         self.expression_edit.setText(self.state.expression or "")
+        self.advanced_toggle.setChecked(bool(self.state.expression or self.state.consensus_min_pass))
         self.detailed_box.setChecked(self.state.detailed_export)
         self.docking_prep_box.setChecked(self.state.compute_preparability)
         self.tautomers_box.setChecked(self.state.compute_tautomers)

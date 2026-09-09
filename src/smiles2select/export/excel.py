@@ -11,6 +11,7 @@ Every sheet is derived from the run result; nothing is recomputed here.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -273,10 +274,12 @@ def summary_sheet(result: RunResult) -> pd.DataFrame:
     return summary[ordered]
 
 
-def export_frame(result: RunResult) -> pd.DataFrame:
+def export_frame(result: RunResult, *, record_ids: Sequence[int] | None = None) -> pd.DataFrame:
     """Wide per-record table shared by the selected sheet, the excluded sheet
     and the results screen of the interface."""
     descriptors = result.descriptors
+    if record_ids is not None:
+        descriptors = descriptors.loc[descriptors.index.intersection(record_ids)]
     decisions = result.decision.decisions
     frame = pd.DataFrame(index=descriptors.index)
     frame["ID"] = descriptors["molecule_id"]
