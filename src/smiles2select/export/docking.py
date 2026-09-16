@@ -11,13 +11,14 @@ docking would silently undo the selection the user just made.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
 
 from smiles2select.chemistry.preparability import estimated_3d_structures
-from smiles2select.export.excel import export_frame
+from smiles2select.export.excel import export_frame, write_frame
 from smiles2select.pipeline.runner import RunResult
 
 #: Column names expected by SMILES2Docking (config/settings.yaml).
@@ -38,21 +39,47 @@ class DockingExportOptions:
     include_context: bool = False
 
 
-def build_frame(result: RunResult, options: DockingExportOptions | None = None) -> pd.DataFrame:
-    """Two-column table (plus optional context) ready for SMILES2Docking."""
+def build_frame(
+    result: RunResult,
+    options: DockingExportOptions | None = None,
+    *,
+    record_ids: Sequence[int] | None = None,
+) -> pd.DataFrame:
+    """Build a hand-off using explicit final IDs or, by default, screening IDs.
+
+    Explicit IDs are authoritative: a molecule rescued in the workspace must
+    not be removed by the original screening verdict. Their order is preserved
+    and missing structures raise an error instead of silently reducing N.
+    """
     settings = options or DockingExportOptions()
-    frame = export_frame(result)
-    if settings.selected_only:
+    if record_ids is not None:
+        if len(set(record_ids)) != len(record_ids):
+            raise ValueError("duplicate record IDs in the final docking selection")
+        unknown = set(record_ids).difference(result.descriptors.index)
+        if unknown:
+            raise ValueError(f"unknown record IDs in the final docking selection: {sorted(unknown)}")
+    frame = export_frame(result, record_ids=record_ids)
+    if record_ids is not None:
+        frame = frame.reindex(record_ids)
+    elif settings.selected_only:
         frame = frame[frame["Final_Status"] == "SELECTED"]
 
     source = "Canonical_SMILES" if settings.use_canonical else "Original_SMILES"
+    smiles = frame[source].fillna("").astype(str).str.strip()
+    valid = result.descriptors["valid"].reindex(frame.index).fillna(False).astype(bool)
+    usable = valid & smiles.ne("")
+    if not usable.all() and (record_ids is not None or settings.selected_only):
+        raise ValueError(
+            "missing or invalid SMILES for selected record IDs: "
+            f"{frame.index[~usable].tolist()}"
+        )
+    frame = frame.loc[usable]
     payload = pd.DataFrame(
         {
             settings.access_code_column: frame["ID"].astype(str),
-            settings.smiles_column: frame[source].astype(str),
+            settings.smiles_column: smiles.loc[frame.index],
         }
     )
-    payload = payload[payload[settings.smiles_column].str.strip() != ""]
 
     if settings.include_context:
         context = frame.loc[payload.index]
@@ -94,22 +121,26 @@ def build_frame(result: RunResult, options: DockingExportOptions | None = None) 
 
 
 def export(
-    result: RunResult, path: str | Path, options: DockingExportOptions | None = None
+    result: RunResult, path: str | Path, options: DockingExportOptions | None = None,
+    *, record_ids: Sequence[int] | None = None,
 ) -> Path:
     """Write the hand-off file; the suffix chooses spreadsheet or CSV."""
     settings = options or DockingExportOptions()
     output = Path(path)
-    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.suffix.lower() not in {".xlsx", ".csv"}:
+        raise ValueError("unsupported docking export format; use .xlsx or .csv")
 
-    frame = build_frame(result, settings)
+    frame = build_frame(result, settings, record_ids=record_ids)
     if frame.empty:
         raise ValueError(
             "nothing to export for docking: the selection is empty "
             "(use selected_only=False to hand over every valid molecule)"
         )
 
-    if output.suffix.lower() in {".xlsx", ".xlsm"}:
-        frame.to_excel(output, index=False, sheet_name="molecules")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.suffix.lower() == ".xlsx":
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            write_frame(writer, frame, "molecules")
     else:
         frame.to_csv(output, index=False)
     return output

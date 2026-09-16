@@ -11,7 +11,7 @@ from smiles2select.chemical_space.density_tiles import tiles
 
 @dataclass(frozen=True)
 class ProgressiveLayer:
-    """A bounded point layer plus optional density tiles."""
+    """A bounded context layer preserving all finals, plus density tiles."""
 
     points: pd.DataFrame
     density: pd.DataFrame
@@ -29,7 +29,8 @@ def progressive_layer(
 ) -> ProgressiveLayer:
     """Return deterministic display data without changing scientific data.
 
-    Points are sampled by stable row order when zoomed out; the complete
+    Context is sampled by stable row order when zoomed out; every selected
+    molecule is retained even if the selection exceeds max_points. The complete
     population remains available for lasso/coverage calculations.  Above the
     threshold, density tiles are supplied as a second, aggregate layer.
     """
@@ -37,7 +38,11 @@ def progressive_layer(
         raise ValueError("max_points and density_threshold must be positive")
     if coordinates.empty:
         return ProgressiveLayer(coordinates.copy(), pd.DataFrame(), False, 0)
-    display = coordinates.iloc[:max_points].copy()
+    selected_mask = coordinates.index.isin(selected_ids if selected_ids is not None else [])
+    final = coordinates.loc[selected_mask]
+    context = coordinates.loc[~selected_mask].iloc[: max(0, max_points - len(final))]
+    retained = final.index.union(context.index, sort=False)
+    display = coordinates.loc[coordinates.index.isin(retained)].copy()
     aggregated = len(coordinates) > density_threshold
     density = tiles(coordinates, selected_ids, resolution) if aggregated else pd.DataFrame()
     return ProgressiveLayer(display, density, aggregated, len(coordinates))

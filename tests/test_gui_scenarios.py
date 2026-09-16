@@ -109,6 +109,7 @@ def test_adoption_refuses_stale_manual_choices(window):
 
 
 def test_worker_failure_recovers_controls_and_allows_close(window, monkeypatch):
+    original = window.basket.final_ids()
     dialog = ScenarioDialog(window)
     monkeypatch.setattr("smiles2select.gui.workspace.scenario_dialog.evaluate_scenario",
                         lambda *a, **k: (_ for _ in ()).throw(ValueError("Invalid threshold")))
@@ -116,7 +117,7 @@ def test_worker_failure_recovers_controls_and_allows_close(window, monkeypatch):
     wait_job(dialog)
     assert "Invalid threshold" in dialog.report.toPlainText()
     assert dialog.preview_button.isEnabled()
-    assert not window.basket.final_ids()
+    assert window.basket.final_ids() == original
     assert dialog.close()
 
 
@@ -132,12 +133,13 @@ def test_new_preview_invalidates_previous_stability(window):
 
 
 def test_draft_edits_require_a_new_preview_before_adoption(window):
+    original = window.basket.final_ids()
     dialog = ScenarioDialog(window)
     preview(dialog)
     dialog.count.setValue(1)
     dialog.adopt()
     assert "Draft criteria changed" in dialog.report.toPlainText()
-    assert not window.basket.final_ids()
+    assert window.basket.final_ids() == original
 
 
 def test_threshold_relaxation_requires_written_original_policy_override(window):

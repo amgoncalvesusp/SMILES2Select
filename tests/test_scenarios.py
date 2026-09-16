@@ -253,3 +253,29 @@ def test_json_rejects_invalid_objective_weight(bad):
     payload["objectives"][0]["weight"] = bad
     with pytest.raises(ValueError):
         spec_from_dict(payload)
+
+
+@pytest.mark.parametrize(
+    "strategy_name",
+    ["balanced", "pareto_first", "diversity_first", "scaffold_coverage", "manual_assisted"],
+)
+def test_large_ranking_priority_survives_selection_and_ignores_stale_scores(
+    cached, monkeypatch, strategy_name
+):
+    import smiles2select.selection_intelligence.scenarios as module
+    from smiles2select.selection_intelligence.constrained_selection import Strategy
+    from smiles2select.selection_intelligence.objectives import Direction
+
+    result, candidates = cached
+    candidates = candidates.assign(selection_priority=[-999, 0, 0, 0])
+    monkeypatch.setattr(module, "EXACT_PARETO_LIMIT", 2)
+    scenario = ScenarioSpec(
+        "objective priority",
+        thresholds={"mw_limit": 1000},
+        objectives=(Objective("mw", direction=Direction.MINIMIZE),),
+        constraints=SelectionConstraints(target_count=2),
+        strategy=Strategy(strategy_name),
+    )
+    snapshot = evaluate_scenario(result, candidates, scenario)
+    assert snapshot.outcome.selected_ids == (1, 2)
+    assert snapshot.provenance["tie_breaker"] == "record_id ascending"

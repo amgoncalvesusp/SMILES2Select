@@ -1,10 +1,22 @@
-# SMILES2Select 3.2.0
+# SMILES2Select 3.3.0
 
 [![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21920596.svg)](https://doi.org/10.5281/zenodo.21920596)
 
 Author: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA)
 
 ## English
+
+### New in 3.3.0
+
+The Chemical Space Hub preserves the completed run's selection, highlights every
+final molecule with an explicit export marker and distinguishes overlapping points
+from density summaries. Export the current basket directly to SMILES2Docking as
+CSV/XLSX with an accompanying audit manifest. Applied criteria survive control
+edits and undo/redo; deterministic quota repair improves fulfillment of the
+requested count. See [the GUI guide](docs/GUI_GUIDE.md),
+[selection methods](docs/SELECTION_STRATEGIES.md) and
+[reproducibility](docs/REPRODUCIBILITY.md).
+
 
 ### New in 3.2
 

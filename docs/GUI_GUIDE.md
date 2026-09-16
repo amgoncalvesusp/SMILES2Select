@@ -88,3 +88,26 @@ queried on inspection, not by running millions of remote or similarity searches.
 Check target, endpoint, quality, source and identity level. Connectivity matches
 do not establish stereoisomer-specific activity, and absent evidence remains
 unknown. Papyrus evidence does not silently replace selection rules.
+## Final molecules and docking export (3.3)
+
+The Chemical Space Hub opens with the molecules selected by the completed run.
+Gold squares identify the actual final molecules that will be exported. Circles
+give candidate context; triangles are references. Pale density bubbles summarize
+population and are not selected molecules or cluster centroids. The map displays
+the number of finals shown against the total final count.
+
+Use **Show final molecules only** to isolate the final library. Overlapping
+molecules keep their true projection coordinates; click the location to choose a
+record from the inspection menu. Clicking only inspects. The inspector explicitly
+states whether the molecule is included in docking export. Clicking a basket row
+also opens that molecule, and final rows are listed first.
+
+Set **Number of molecules**, strategy and optional quotas, then click **Create
+selection**. The summary distinguishes the applied count from edited criteria
+that have not been applied, and reports count differences. Changing controls alone
+does not alter the final set. Undo restores the previous final library and criteria.
+
+Use **Export to SMILES2Docking** for a CSV or XLSX table with `access_code` and
+`smiles`; choose those columns in SMILES2Docking. The adjacent `.docking.json`
+contains the file hash and decision provenance. **Export scientific report** saves
+the full analysis workbook and selection recipe. Both use the current final set.

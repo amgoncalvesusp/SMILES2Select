@@ -139,6 +139,8 @@ class BasketPanel(QWidget):
     redo_requested = Signal()
     auto_select_requested = Signal()
     export_requested = Signal()
+    docking_export_requested = Signal()
+    molecule_requested = Signal(int)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -152,11 +154,14 @@ class BasketPanel(QWidget):
         self.table.setHorizontalHeaderLabels(["ID", "Status", "Origin", "Note"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.cellClicked.connect(self._inspect_row)
 
         self.undo_button = QPushButton("Undo")
         self.redo_button = QPushButton("Redo")
         auto_button = QPushButton("Auto-select")
-        export_button = QPushButton("Export selection...")
+        export_button = QPushButton("Export scientific report...")
+        self.docking_button = QPushButton("Export to SMILES2Docking...")
+        self.docking_button.clicked.connect(self.docking_export_requested)
         self.undo_button.clicked.connect(self.undo_requested)
         self.redo_button.clicked.connect(self.redo_requested)
         auto_button.clicked.connect(self.auto_select_requested)
@@ -168,6 +173,7 @@ class BasketPanel(QWidget):
         buttons.addStretch(1)
         buttons.addWidget(auto_button)
         buttons.addWidget(export_button)
+        buttons.addWidget(self.docking_button)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.counters)
@@ -178,13 +184,17 @@ class BasketPanel(QWidget):
     def refresh(self, basket: SelectionBasket, identifiers: pd.Series | None = None) -> None:
         """Redraw the counters and the decided molecules."""
         counters = basket.counters()
+        self.docking_button.setEnabled(bool(basket.final_ids()))
         self.counters.setText(
             " | ".join(f"{label}: {value}" for label, value in counters.as_rows())
         )
         self.undo_button.setEnabled(basket.log.can_undo)
         self.redo_button.setEnabled(basket.log.can_redo)
 
-        decided = [state for state in basket.states() if state.origin is not None]
+        decided = sorted(
+            (state for state in basket.states() if state.origin is not None),
+            key=lambda state: (not state.is_selected, state.record_id),
+        )
         self.display_notice.setText(
             f"Displaying {min(500, len(decided))} of {len(decided)} decisions. "
             "Export includes the complete selection."
@@ -197,8 +207,14 @@ class BasketPanel(QWidget):
                 else str(state.record_id)
             )
             self.table.setItem(row, 0, QTableWidgetItem(label))
+            self.table.item(row, 0).setData(Qt.UserRole, state.record_id)
             self.table.setItem(row, 1, QTableWidgetItem(state.selection_status.value))
             self.table.setItem(
                 row, 2, QTableWidgetItem(state.origin.value if state.origin else "-")
             )
             self.table.setItem(row, 3, QTableWidgetItem(state.note or ""))
+
+    def _inspect_row(self, row: int, _column: int) -> None:
+        item = self.table.item(row, 0)
+        if item is not None:
+            self.molecule_requested.emit(int(item.data(Qt.UserRole)))

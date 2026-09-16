@@ -10,13 +10,15 @@ always written alongside rather than only embedded as a sheet.
 
 from __future__ import annotations
 
+import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import pandas as pd
 
-from smiles2select.export.excel import export_frame, sanitize_sheet_name
+from smiles2select.export import docking
+from smiles2select.export.excel import export_frame, write_frame
 from smiles2select.pipeline.runner import RunResult
 from smiles2select.selection_intelligence import recipes
 from smiles2select.selection_intelligence.basket import SelectionBasket
@@ -132,7 +134,8 @@ def selection_summary_sheet(artifacts: SessionArtifacts) -> pd.DataFrame:
         {"section": "basket", "item": label, "value": value} for label, value in counters.as_rows()
     ]
     rows += [
-        {"section": "selection", "item": label, "value": value}
+        {"section": "selection", "item": label,
+         "value": artifacts.recipe.strategy if label == "strategy" else value}
         for label, value in summary_rows(artifacts.outcome, artifacts.constraints)
     ]
     rows += [
@@ -193,10 +196,49 @@ def export(artifacts: SessionArtifacts, path: str | Path) -> tuple[Path, Path]:
 
     with pd.ExcelWriter(workbook_path, engine="openpyxl") as writer:
         for name, frame in sheets.items():
-            frame.to_excel(writer, sheet_name=sanitize_sheet_name(name), index=False)
+            write_frame(writer, frame, name)
 
     recipe_path = workbook_path.with_suffix("").with_suffix(recipes.RECIPE_SUFFIX)
     recipes.save(artifacts.recipe, recipe_path)
     if snapshot is not None:
         save_study(workbook_path.with_suffix(".scenarios.json"), (snapshot,))
     return workbook_path, recipe_path
+
+
+def export_docking(artifacts: SessionArtifacts, path: str | Path) -> tuple[Path, Path]:
+    """Export the current final set and an audit manifest for that exact file.
+
+    The first worksheet contains the two columns consumed by SMILES2Docking.
+    The adjacent JSON keeps record identity, decisions and the recipe without
+    making a downstream reader mistake a report summary for molecular input.
+    """
+    ids = artifacts.outcome.selected_ids
+    frame = docking.build_frame(artifacts.result, record_ids=ids)
+    output = docking.export(artifacts.result, path, record_ids=ids)
+    molecules = [
+        {
+            "record_id": int(record_id),
+            **row,
+            "selection_reasons": artifacts.outcome.reasons.get(record_id, []),
+        }
+        for record_id, row in zip(ids, frame.to_dict(orient="records"))
+    ]
+    manifest = {
+        "schema_version": "1.0",
+        "table": output.name,
+        "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        "smiles_source": "canonical_smiles",
+        "selected_record_ids": [int(record_id) for record_id in ids],
+        "target_count": artifacts.constraints.target_count,
+        "exported_count": len(frame),
+        "shortfall": artifacts.outcome.shortfall(artifacts.constraints),
+        "warnings": artifacts.outcome.warnings(artifacts.constraints),
+        "molecules": molecules,
+        "recipe": artifacts.recipe.as_dict(),
+        "action_history": [asdict(action) for action in artifacts.basket.log.applied],
+    }
+    manifest_path = output.with_suffix(".docking.json")
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    if artifacts.scenario_snapshot is not None:
+        save_study(output.with_suffix(".scenarios.json"), (artifacts.scenario_snapshot,))
+    return output, manifest_path

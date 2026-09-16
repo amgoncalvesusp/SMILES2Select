@@ -80,11 +80,12 @@ def test_auto_select_preserves_justified_pinned_override(window, monkeypatch):
 
 def test_inspector_tracks_decision_and_undo(window):
     record_id = int(window.candidates.index[0])
+    previous_status = window.basket.state(record_id).selection_status.value
     window._show_molecule(record_id)
     window._decide(record_id, "exclude")
     assert "Selection status: MANUALLY_EXCLUDED" in window.inspector.details.toPlainText()
     window._undo()
-    assert "Selection status: UNDECIDED" in window.inspector.details.toPlainText()
+    assert f"Selection status: {previous_status}" in window.inspector.details.toPlainText()
 
 
 def test_invalid_pareto_objectives_clear_previous_points(window):

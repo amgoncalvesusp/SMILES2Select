@@ -73,6 +73,8 @@ class SelectionRecipe:
     projection: dict[str, Any] = field(default_factory=dict)
     reserve_count: int | None = None
     seed: int | None = None
+    final_selected_ids: tuple[int, ...] = ()
+    provenance: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=utc_timestamp)
     updated_at: str = field(default_factory=utc_timestamp)
 
@@ -112,6 +114,7 @@ class SelectionRecipe:
                 "selection_strategy": self.strategy,
                 "max_per_scaffold": self.max_per_scaffold,
                 "max_per_cluster": self.max_per_cluster,
+                "selected_ids": list(self.final_selected_ids),
             },
             "libraries": {
                 "candidate": self.candidate_library,
@@ -123,6 +126,7 @@ class SelectionRecipe:
             "zones": [dict(zone) for zone in self.zones],
             "projection": dict(self.projection),
             "seed": self.seed,
+            "provenance": dict(self.provenance),
             "manual_overrides": [asdict(override) for override in self.manual_overrides],
             "pinned_ids": list(self.pinned_ids),
             "excluded_ids": list(self.excluded_ids),
@@ -144,6 +148,9 @@ class SelectionRecipe:
             ("target_count", self.target_count or "-"),
             ("reserve_count", self.reserve_count or "-"),
             ("strategy", self.strategy),
+            ("final_selected_count", len(self.final_selected_ids)),
+            ("selection_source", self.provenance.get("source", "-")),
+            ("selection_data_hash", self.provenance.get("selection_data_hash", "-")),
             ("max_per_scaffold", self.max_per_scaffold or "-"),
             ("max_per_cluster", self.max_per_cluster or "-"),
             ("changed thresholds", len(self.changed_thresholds)),
@@ -205,6 +212,8 @@ def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRe
         zones=tuple(payload.get("zones", ())),
         projection=dict(payload.get("projection") or {}),
         seed=payload.get("seed"),
+        final_selected_ids=tuple(final.get("selected_ids", ())),
+        provenance=dict(payload.get("provenance") or {}),
         created_at=payload.get("created_at", utc_timestamp()),
         updated_at=payload.get("updated_at", utc_timestamp()),
     )

@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtGui import QColor, QCursor
+from PySide6.QtWidgets import QCheckBox, QLabel, QMenu, QVBoxLayout, QWidget
 
 from smiles2select.chemical_space.density_tiles import lasso_contains
 from smiles2select.chemical_space.layers import progressive_layer
@@ -51,6 +51,16 @@ class ScatterView(QWidget):
         self.scatter = pg.ScatterPlotItem(size=7, pen=None, hoverable=True)
         self.scatter.sigClicked.connect(self._on_click)
         self.plot.addItem(self.scatter)
+        self.selected_scatter = pg.ScatterPlotItem(
+            size=13,
+            symbol="s",
+            brush=pg.mkBrush("#e69f00"),
+            pen=pg.mkPen(SELECTED, width=2),
+            hoverable=True,
+        )
+        self.selected_scatter.setZValue(10)
+        self.selected_scatter.sigClicked.connect(self._on_click)
+        self.plot.addItem(self.selected_scatter)
         self.reference_scatter = pg.ScatterPlotItem(
             size=10, symbol="t", brush=pg.mkBrush("#a33a3a"), pen=pg.mkPen("#6e2222", width=1)
         )
@@ -62,11 +72,31 @@ class ScatterView(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.legend_note = QLabel(
+            "■ Gold square: final molecule for export · ● Circle: candidate context · "
+            "▲ Red triangle: reference · Pale bubbles: aggregate density, not centroids."
+        )
+        self.legend_note.setWordWrap(True)
+        self.selection_summary = QLabel("Projected: 0 · Final molecules shown: 0 / 0")
+        self.selection_summary.setWordWrap(True)
+        self.selection_only = QCheckBox("Show final molecules only")
+        self.selection_only.toggled.connect(self._set_selection_only)
+        self.overlap_note = QLabel(
+            "Each square is an actual final molecule. Points may overlap: click to choose "
+            "a record for inspection. Coordinates are never shifted for display."
+        )
+        self.overlap_note.setWordWrap(True)
+        layout.addWidget(self.legend_note)
+        layout.addWidget(self.selection_summary)
+        layout.addWidget(self.selection_only)
         layout.addWidget(self.plot)
+        layout.addWidget(self.overlap_note)
 
         self._coordinates = pd.DataFrame(columns=["x", "y"])
         self._lasso: list[tuple[float, float]] = []
         self._lasso_item = None
+        self._selected_ids: set[int] = set()
+        self._overlap_menu = None
         self.plot.scene().sigMouseClicked.connect(self._on_scene_click)
 
     # -- data ---------------------------------------------------------------
@@ -77,13 +107,24 @@ class ScatterView(QWidget):
         selected_ids: Sequence[int] = (),
         colour_by: pd.Series | None = None,
     ) -> None:
-        """Draw the points, marking the selection with a heavier outline.
-
-        Selection is encoded by outline as well as fill, so it survives being
-        printed in greyscale or read by someone who cannot distinguish the
-        colours.
-        """
+        """Draw actual final molecules above context without moving coordinates."""
         self._coordinates = coordinates
+        self._selected_ids = {int(value) for value in selected_ids}
+        selected_coordinates = coordinates.loc[coordinates.index.isin(self._selected_ids)]
+        self.selection_summary.setText(
+            f"Projected: {len(coordinates):,} · Final molecules shown: "
+            f"{len(selected_coordinates):,} / {len(self._selected_ids):,}"
+            + (
+                " · Some finals are outside this projection; recompute the map."
+                if len(selected_coordinates) < len(self._selected_ids)
+                else ""
+            )
+        )
+        self.selected_scatter.setData(
+            x=selected_coordinates["x"].to_numpy(dtype=float),
+            y=selected_coordinates["y"].to_numpy(dtype=float),
+            data=[int(value) for value in selected_coordinates.index],
+        )
         if coordinates.empty:
             self.scatter.setData([])
             self.density_scatter.setData([])
@@ -116,6 +157,11 @@ class ScatterView(QWidget):
         else:
             self.density_scatter.setData([])
 
+    def _set_selection_only(self, enabled: bool) -> None:
+        self.scatter.setVisible(not enabled)
+        self.density_scatter.setVisible(not enabled)
+        self.reference_scatter.setVisible(not enabled)
+
     def set_reference_points(self, coordinates: pd.DataFrame | None) -> None:
         """Show reference compounds as a separate triangular overlay layer."""
         if coordinates is None or coordinates.empty:
@@ -137,9 +183,34 @@ class ScatterView(QWidget):
 
     # -- interaction --------------------------------------------------------
 
-    def _on_click(self, _scatter, points) -> None:
-        if points:
-            self.point_clicked.emit(int(points[0].data()))
+    def _on_click(self, _scatter, points, event=None) -> None:
+        """Offer every hit/identical-position record, including covered context."""
+        if not len(points) or (event is not None and event.modifiers() & Qt.ControlModifier):
+            return
+        hit_points = list(points)
+        if event is not None:
+            for layer in (self.scatter, self.selected_scatter):
+                if layer.isVisible():
+                    hit_points.extend(layer.pointsAt(layer.mapFromScene(event.scenePos())))
+        positions = {(point.pos().x(), point.pos().y()) for point in hit_points}
+        overlaps = pd.MultiIndex.from_frame(self._coordinates[["x", "y"]]).isin(positions)
+        record_ids = {int(value) for value in self._coordinates.index[overlaps]}
+        if self.selection_only.isChecked():
+            record_ids &= self._selected_ids
+        if len(record_ids) == 1:
+            self.point_clicked.emit(next(iter(record_ids)))
+            return
+        if self._overlap_menu is not None:
+            self._overlap_menu.close()
+            self._overlap_menu.deleteLater()
+        self._overlap_menu = QMenu(self)
+        for record_id in sorted(record_ids):
+            status = "final for export" if record_id in self._selected_ids else "context"
+            action = self._overlap_menu.addAction(f"Record {record_id} — {status}")
+            action.triggered.connect(
+                lambda _checked=False, value=record_id: self.point_clicked.emit(value)
+            )
+        self._overlap_menu.popup(QCursor.pos())
 
     def _on_scene_click(self, event) -> None:
         """Ctrl-click builds a lasso; a plain click closes it."""
@@ -162,7 +233,12 @@ class ScatterView(QWidget):
         self.clear_lasso()
         if len(polygon) < 3 or self._coordinates.empty:
             return []
-        inside = [int(value) for value in lasso_contains(self._coordinates, polygon)]
+        eligible = (
+            self._coordinates.loc[self._coordinates.index.isin(self._selected_ids)]
+            if self.selection_only.isChecked()
+            else self._coordinates
+        )
+        inside = [int(value) for value in lasso_contains(eligible, polygon)]
         self.region_selected.emit(inside)
         return inside
 

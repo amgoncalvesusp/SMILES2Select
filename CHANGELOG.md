@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.3.0 - 2026-09-16
+
+### Fixed
+
+- The Chemical Space Hub now opens with the original final selection. Every final molecule is retained in the map and display layers, with gold-square markers above contextual points, explicit counts/legend, a final-only filter and inspection of overlapping records without coordinate jitter.
+- Added a direct SMILES2Docking CSV/XLSX export of the current basket, including justified manual changes, with a SHA-256 manifest, exact identities, active history and applied criteria. Formula-like identifiers remain literal text in all XLSX exports.
+- Automatic decisions freeze count, quotas, objectives and ranking evidence. Control edits and undo/redo no longer rewrite the criteria associated with an existing selection. Original pipeline decisions are distinguished from subsequent Hub selections.
+- Deterministic record-ID tie-breaking and explicit weighted-percentile priority for large libraries. The Hub now applies its objective controls above the exact Pareto limit as well.
+- Crossed scaffold/cluster quotas use deterministic augmenting-path repair when ranked greedy filling misses a feasible target. Pins remain fixed; count excesses, shortfalls and unmet heuristic scaffold minima are disclosed. The first chosen cluster member is no longer described as a centroid or structural representative.
+
+### Scientific provenance
+
+- Recipes record ordered-data hashes, complete run/profile configuration, software versions, actual final IDs, manual overrides and map sampling metadata. The displayed applied target is separate from unapplied edits.
+- Updated method documentation defines ordering, ranking universes, quotas, map limitations and the distinction between audit records and supported scenario replay. These changes do not assert biological activity or optimal global selection quality.
+
 ## 3.2.0 - 2026-09-08
 
 ### Added

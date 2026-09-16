@@ -63,7 +63,7 @@ def test_light_empty_and_minimal_library():
     constraints = SelectionConstraints(target_count=2)
     assert select(pd.DataFrame(), constraints, explain_rejections=False).count == 0
     result = select(pd.DataFrame(index=[12, 2, 30]), constraints, explain_rejections=False)
-    assert result.selected_ids == (12, 2)
+    assert result.selected_ids == (2, 12)
     assert result.reasons == {12: ["strategy ordering"], 2: ["strategy ordering"]}
 
 

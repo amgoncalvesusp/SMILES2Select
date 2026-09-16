@@ -177,10 +177,11 @@ def test_auto_selection_respects_the_target(window):
 
 
 def test_undo_and_redo_walk_the_selection(window):
+    original = window.basket.final_ids()
     window.target_count.setValue(2)
     window._auto_select()
     window._undo()
-    assert window.basket.counters().final_selected == 0
+    assert window.basket.final_ids() == original
     window._redo()
     assert window.basket.counters().final_selected == 2
 
@@ -232,6 +233,8 @@ def test_summary_sheet_reports_counters_and_constraints(window):
 
 
 def test_recipe_records_the_objectives(window):
+    assert window.build_artifacts().recipe.objectives == ()
+    window._auto_select()
     artifacts = window.build_artifacts()
     assert len(artifacts.recipe.objectives) == 2
     assert artifacts.recipe.input_hash

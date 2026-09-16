@@ -115,7 +115,7 @@ def build_layout(window, objective_candidates):
                         "Compare alternatives before exporting. Click a map point to inspect it."))
     window.target_count = QSpinBox()
     window.target_count.setRange(1, 10_000_000)
-    window.target_count.setValue(min(50, max(1, len(window.candidates))))
+    window.target_count.setValue(window.result.config.final_count or max(1, len(window.basket.final_ids())))
     window.strategy = StrategyCombo()
     window.strategy_help = wrapped(STRATEGY_HELP["balanced"])
     window.select_button = QPushButton("Create selection")
@@ -124,11 +124,13 @@ def build_layout(window, objective_candidates):
     window.compare_button = QPushButton("Compare scenarios A / B...")
     window.compare_button.clicked.connect(window._open_scenarios)
     window.criteria_summary = wrapped()
+    window.selection_summary = wrapped()
+    window.selection_summary.setStyleSheet("font-weight: 600;")
     for label, widget in (("Number of molecules", window.target_count),
                           ("Selection strategy", window.strategy)):
         form.addRow(label, widget)
     for widget in (window.strategy_help, window.select_button, window.compare_button,
-                   window.criteria_summary):
+                   window.criteria_summary, window.selection_summary):
         form.addRow(widget)
 
     window.advanced_toggle = QToolButton()
@@ -184,9 +186,9 @@ def build_layout(window, objective_candidates):
     advanced.addRow(window.reference_overlay)
     advanced.addRow(wrapped("Map distances are visual guidance, not measured molecular similarity. "
                             "Large maps use a disclosed sample; selection uses the full library."))
-    window.map_button = QPushButton("Load / refresh map sample")
+    window.map_button = QPushButton("Show final molecules + map context")
     window.map_button.clicked.connect(window._request_map)
-    advanced.addRow(window.map_button)
+    form.addRow(window.map_button)
     window.papyrus_button = QPushButton("Attach local Papyrus evidence index...")
     window.papyrus_button.clicked.connect(window._attach_papyrus)
     advanced.addRow(window.papyrus_button)

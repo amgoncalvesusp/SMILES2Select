@@ -233,6 +233,7 @@ def _rank(pool: pd.DataFrame, spec: ScenarioSpec) -> tuple[pd.DataFrame, str, tu
                 "crowding_distance",
                 "distance_to_ideal",
                 "robustness_score",
+                "selection_priority",
             )
             if c in pool
         ]
@@ -254,7 +255,11 @@ def _rank(pool: pd.DataFrame, spec: ScenarioSpec) -> tuple[pd.DataFrame, str, tu
         desirability = objective.desirability(clean[objective.field])
         score += desirability.rank(method="average", pct=True) * objective.weight
     # ponytail: O(M N log N) percentile ordering above 2000; no claimed Pareto fronts.
-    ordered = clean.loc[score.sort_values(ascending=False, kind="stable").index]
+    ordered = (
+        clean.assign(selection_priority=-score)
+        .sort_index(kind="stable")
+        .sort_values("selection_priority", kind="stable")
+    )
     return (
         ordered,
         "weighted_percentile",
@@ -302,9 +307,6 @@ def evaluate_scenario(
             **{name: updated_scores[name].reindex(pool.index) for name in updated_scores}
         )
     ranked, method, warnings = _rank(pool, spec)
-    if method == "weighted_percentile":
-        # Existing selector sorts QED when Pareto is absent; drop ranking-only tie breakers.
-        ranked = ranked.drop(columns=[c for c in ("qed",) if c in ranked])
     outcome = select(
         ranked, spec.constraints, spec.strategy, flags[0], flags[2], explain_rejections=False
     )
@@ -339,6 +341,9 @@ def evaluate_scenario(
         MappingProxyType(
             {
                 "ranking_method": method,
+                "tie_breaker": "record_id ascending",
+                "quota_shortfall_repair": "deterministic augmenting paths; fixed pins",
+                "minimum_scaffolds_method": "greedy reservation; feasibility not guaranteed",
                 "cached_descriptors": True,
                 "exact_pareto_limit": EXACT_PARETO_LIMIT,
                 "manual_overrides_are_not_chemical_approval": True,

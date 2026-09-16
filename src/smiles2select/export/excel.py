@@ -92,7 +92,22 @@ def export(result: RunResult, path: str | Path, options: ExportOptions | None = 
 
 
 def _write(writer: pd.ExcelWriter, frame: pd.DataFrame, sheet_name: str) -> None:
-    frame.to_excel(writer, sheet_name=sanitize_sheet_name(sheet_name), index=False)
+    write_frame(writer, frame, sheet_name)
+
+
+def write_frame(writer: pd.ExcelWriter, frame: pd.DataFrame, sheet_name: str) -> None:
+    """Write scientific data literally, never executing identifier/note formulas.
+
+    These exports contain data only. openpyxl infers a formula for strings
+    beginning with ``=``; forcing its cell type back to text preserves the exact
+    original value without adding apostrophes to downstream molecular IDs.
+    """
+    name = sanitize_sheet_name(sheet_name)
+    frame.to_excel(writer, sheet_name=name, index=False)
+    for row in writer.sheets[name].iter_rows():
+        for cell in row:
+            if cell.data_type == "f":
+                cell.data_type = "s"
 
 
 def sanitize_sheet_name(name: str) -> str:

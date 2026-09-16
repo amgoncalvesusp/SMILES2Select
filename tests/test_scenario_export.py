@@ -33,7 +33,7 @@ def test_scenario_export_keeps_original_and_new_verdicts_distinct(window, tmp_pa
 
 def test_final_sheet_materializes_only_requested_records(window, monkeypatch):
     selected_id = int(window.candidates.index[0])
-    window.basket.add_to_final([selected_id])
+    window.basket.replace_final([selected_id])
     original = selection_export.export_frame
     requested = []
 
