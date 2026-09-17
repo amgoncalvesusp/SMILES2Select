@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.3.1 - 2026-09-16
+
+- Fixed final selection by molecular cores for libraries above 5,000 evaluable molecules: missing Murcko scaffolds are now calculated on demand in the background. Previously the operation failed and left the original, potentially much larger selection unchanged.
+- Molecular-core coverage allocates the first feasible molecule from each core before filling the requested count, including the large-library percentile-ranking path. Ties remain deterministic; quotas and preserved pins can still constrain the achievable count and are disclosed.
+- Both GUI exports are disabled for unapplied criteria and running jobs. A count different from the requested value requires explicit acknowledgement. Undo/redo restores the acknowledged controls, and adopted scenarios synchronize supported objectives and quotas.
+- Background completion errors are shown in the interface, controls recover, and completed map jobs no longer retain a misleading building message. Large-library selection refreshes the map automatically.
+- Added in-app criterion guidance covering strategy use, descriptor directions, quotas, ranking limits and scientific interpretation.
+- Scenario-study schema 2 verifies selector version, final-ID identity and required scaffold inputs on replay; legacy schema 1 studies are rejected explicitly rather than silently replayed with a changed algorithm. Cached scaffold availability does not change the underlying candidate identity.
+
 ## 3.3.0 - 2026-09-16
 
 ### Fixed

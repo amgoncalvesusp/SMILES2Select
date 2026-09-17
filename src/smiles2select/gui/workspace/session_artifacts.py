@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
     """Everything the export needs, assembled from the current session."""
     selected_ids = self.basket.final_ids()
+    snapshot = self._active_snapshot()
+    scaffolds = self.candidates["murcko_scaffold"]
+    if snapshot is not None and snapshot.scaffolds is not None:
+        scaffolds = snapshot.scaffolds.combine_first(scaffolds)
     selected_set = set(selected_ids)
     selected = self.candidates.reindex(selected_ids)
     reasons = {
@@ -59,11 +63,10 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
         selected_ids=selected_ids,
         reasons=reasons,
         rejections=rejections,
-        scaffold_usage=selected["murcko_scaffold"].dropna().astype(str).value_counts().to_dict(),
+        scaffold_usage=scaffolds.reindex(selected_ids).dropna().astype(str).value_counts().to_dict(),
         cluster_usage=selected["cluster_id"].dropna().astype(int).value_counts().to_dict(),
         strategy=strategy,
     )
-    snapshot = self._active_snapshot()
     applied = self._active_applied_selection()
     selected_constraints = (snapshot.spec.constraints if snapshot else applied.constraints
                             if applied else SelectionConstraints(
@@ -140,5 +143,5 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
         pareto=applied.pareto if applied and not snapshot else None,
         scenario_snapshot=snapshot,
         clusters=self.candidates.get("cluster_id"),
-        scaffolds=self.candidates.get("murcko_scaffold"),
+        scaffolds=scaffolds,
     )

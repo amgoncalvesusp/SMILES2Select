@@ -42,6 +42,28 @@ not a claim of an automatic replay loader for arbitrary manual sessions. The
 existing scenario-study JSON loader replays supported A/B studies against their
 recorded data fingerprint.
 
+Version 3.3.1 calculates missing Murcko scaffolds on demand when the chosen
+strategy or quotas require them, including libraries above 5,000 molecules.
+Each distinct canonical SMILES is calculated once within the operation. A known
+empty scaffold represents an acyclic molecule; a missing value is not treated as
+an acyclic core. Invalid structures fail explicitly. The completed scaffold
+values are included in the scientific export.
+
+Scenario-study schema 2 binds replay to the selector version and SHA-256 of the
+sorted final record IDs. Scaffold-based studies also verify the completed
+scaffold inputs. Availability of this derived cache alone does not change the
+candidate fingerprint. Legacy schema 1 studies cannot prove parity with the
+changed coverage algorithm and are refused explicitly; preserve the original
+software and study for those analyses. A new study is a new analysis, not a
+replacement for historical evidence.
+
+GUI exports require the displayed criteria to have been applied. If pins, quotas
+or manual decisions produce a different final count, the export dialog states
+both numbers and requires explicit acknowledgement. A scenario whose options
+cannot be represented by the Hub controls can be previewed but cannot be adopted
+through those controls. The original library is not silently exported in place
+of a requested selection that failed.
+
 Map metadata records the projected candidate IDs, sampling seed and population
 counts. Every final molecule is included even if the usual display budget is
 exceeded. Recomputing a projection after the selected set changes may change its

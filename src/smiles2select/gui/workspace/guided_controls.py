@@ -19,16 +19,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from smiles2select.gui.workspace.selection_help import (
+    DIRECTION_HELP,
+    OBJECTIVE_HELP,
+    STRATEGY_HELP,
+    show_selection_help,
+)
 from smiles2select.selection_intelligence.constrained_selection import Strategy
 from smiles2select.selection_intelligence.objectives import Direction, Objective
-
-STRATEGY_HELP = {
-    "balanced": "Balance property quality, spread and available evidence of threshold margin.",
-    "pareto_first": "Favor molecules with favorable trade-offs between the two objectives.",
-    "diversity_first": "Favor spread across objective values; this is not pairwise structural diversity.",
-    "scaffold_coverage": "Represent more distinct molecular cores (Murcko scaffolds).",
-    "manual_assisted": "Keep justified pinned choices, then fill remaining places by ranking.",
-}
 
 STRATEGY_LABELS = {
     "balanced": "Balance properties and representation",
@@ -78,6 +76,11 @@ class ObjectiveControls(QWidget):
         ):
             self.direction.addItem(label, value)
         self.direction.setCurrentIndex(0 if direction is Direction.MAXIMIZE else 1)
+        self.direction.setToolTip(DIRECTION_HELP)
+        self.help_label = wrapped(OBJECTIVE_HELP.get(field.currentText(), ""))
+        field.currentTextChanged.connect(
+            lambda name: self.help_label.setText(OBJECTIVE_HELP.get(name, ""))
+        )
         self.low, self.high = QDoubleSpinBox(), QDoubleSpinBox()
         for widget in (self.low, self.high):
             widget.setRange(-1_000_000, 1_000_000)
@@ -87,7 +90,7 @@ class ObjectiveControls(QWidget):
         self.high.setPrefix("Upper: ")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        for widget in (field, self.direction, self.low, self.high):
+        for widget in (field, self.help_label, self.direction, self.low, self.high):
             layout.addWidget(widget)
         self.direction.currentIndexChanged.connect(self._visibility)
         self._visibility()
@@ -118,6 +121,8 @@ def build_layout(window, objective_candidates):
     window.target_count.setValue(window.result.config.final_count or max(1, len(window.basket.final_ids())))
     window.strategy = StrategyCombo()
     window.strategy_help = wrapped(STRATEGY_HELP["balanced"])
+    window.selection_help_button = QPushButton("How to choose criteria...")
+    window.selection_help_button.clicked.connect(lambda: show_selection_help(window))
     window.select_button = QPushButton("Create selection")
     window.select_button.setToolTip("Replace the current selection. Undo restores the previous set.")
     window.select_button.clicked.connect(window._auto_select)
@@ -129,7 +134,8 @@ def build_layout(window, objective_candidates):
     for label, widget in (("Number of molecules", window.target_count),
                           ("Selection strategy", window.strategy)):
         form.addRow(label, widget)
-    for widget in (window.strategy_help, window.select_button, window.compare_button,
+    for widget in (window.strategy_help, window.selection_help_button,
+                   window.select_button, window.compare_button,
                    window.criteria_summary, window.selection_summary):
         form.addRow(widget)
 
@@ -146,8 +152,8 @@ def build_layout(window, objective_candidates):
     window.first_objective, window.second_objective = QComboBox(), QComboBox()
     for widget in (window.first_objective, window.second_objective):
         widget.addItems(numeric)
-        widget.setToolTip("QED: drug-likeness estimate; mol_wt: molecular weight; "
-                          "WLOGP: lipophilicity; TPSA: polar surface area. These do not predict activity.")
+        for index in range(widget.count()):
+            widget.setItemData(index, OBJECTIVE_HELP.get(widget.itemText(index), ""), Qt.ToolTipRole)
     if len(numeric) > 1:
         window.second_objective.setCurrentIndex(1)
     window.objective_editors = (
@@ -160,11 +166,10 @@ def build_layout(window, objective_candidates):
     for widget in (window.per_scaffold, window.per_cluster):
         widget.setRange(0, 10_000_000)
         widget.setSpecialValueText("No limit")
-    window.per_scaffold.setToolTip("Maximum molecules sharing a Murcko molecular core.")
+    window.per_scaffold.setToolTip("Maximum molecules sharing a Murcko molecular core. "
+                                   "Missing cores are computed when you click Create selection. "
+                                   "A strict limit may prevent reaching the requested count.")
     window.per_cluster.setToolTip("Maximum molecules in an available structural cluster.")
-    if window.candidates["murcko_scaffold"].isna().any():
-        window.per_scaffold.setEnabled(False)
-        window.per_scaffold.setToolTip("Unavailable: complete cached molecular cores are required.")
     if window.candidates["cluster_id"].isna().any():
         window.per_cluster.setEnabled(False)
         window.per_cluster.setToolTip("Unavailable: complete clustering is not cached; large exact "

@@ -1,4 +1,4 @@
-"""Independent decisions on cached descriptors; no chemistry or pairwise large ranking."""
+"""Independent decisions on cached descriptors, with missing scaffolds computed on demand."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from smiles2select.rules.evaluator import evaluate_profiles
 from smiles2select.scores.consensus import score_table
 from smiles2select.scores.qed import QedSelection
 from smiles2select.selection_intelligence.constrained_selection import (
+    CORE_VERSION,
     SelectionConstraints,
     SelectionOutcome,
     Strategy,
@@ -26,6 +27,7 @@ from smiles2select.selection_intelligence.constrained_selection import (
 )
 from smiles2select.selection_intelligence.objectives import Direction, Objective, ObjectiveSet
 from smiles2select.selection_intelligence.pareto_ranking import rank_candidates
+from smiles2select.selection_intelligence.preparation import ensure_selection_scaffolds
 
 EXACT_PARETO_LIMIT = 2000
 EVALUATION_CHUNK_SIZE = 10000
@@ -33,7 +35,7 @@ EVALUATION_CHUNK_SIZE = 10000
 
 @dataclass(frozen=True)
 class ScenarioSpec:
-    """Threshold overrides use existing rule IDs; descriptors are never recalculated."""
+    """Threshold overrides reuse descriptors; missing molecular cores are computed on demand."""
 
     name: str
     thresholds: Mapping[str, object] = field(default_factory=dict)
@@ -99,6 +101,7 @@ class ScenarioSnapshot:
     pinned_ids: tuple[int, ...] = ()
     rescued_ids: tuple[int, ...] = ()
     excluded_ids: tuple[int, ...] = ()
+    scaffolds: pd.Series | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -112,17 +115,40 @@ class ScenarioComparison:
 
 
 def data_fingerprint(result: RunResult, candidates: pd.DataFrame) -> str:
-    """Hash exact ordered input values and policy, including external objective columns."""
+    """Hash source values/policy without making derived scaffold cache state input identity.
+
+    Canonical SMILES identify derivable candidate scaffolds. Authoritative descriptors
+    and all other candidate columns (including external objectives) remain exact inputs.
+    Scenario provenance separately hashes the effective scaffolds when criteria use them.
+    """
     digest = hashlib.sha256()
-    for frame in (result.descriptors, candidates, result.alerts, result.scores):
-        digest.update(json.dumps(list(frame.columns)).encode())
+    for position, frame in enumerate((result.descriptors, candidates, result.alerts, result.scores)):
+        columns = [column for column in frame
+                   if not (position == 1 and "canonical_smiles" in frame
+                           and column == "murcko_scaffold")]
+        digest.update(json.dumps(columns).encode())
         # ponytail: hash one column at a time to bound scratch RAM at O(N).
         digest.update(pd.util.hash_pandas_object(frame.index).values.tobytes())
-        for column in frame:
+        for column in columns:
             digest.update(pd.util.hash_pandas_object(frame[column], index=False).values.tobytes())
     digest.update(repr(result.config).encode())
     digest.update(json.dumps([p.as_dict() for p in result.profiles], sort_keys=True).encode())
     return digest.hexdigest()
+
+
+def selected_ids_fingerprint(record_ids: Sequence[int]) -> str:
+    """SHA-256 of compact JSON sorted integer record IDs, independent of ranking order."""
+    payload = json.dumps(sorted(int(record_id) for record_id in record_ids), separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _scaffold_inputs_fingerprint(pool: pd.DataFrame, spec: ScenarioSpec) -> str | None:
+    """Bind the effective record-to-core mapping only when it affects selection."""
+    if not (spec.strategy is Strategy.SCAFFOLD_COVERAGE
+            or spec.constraints.max_per_scaffold or spec.constraints.min_scaffolds):
+        return None
+    values = pool.murcko_scaffold.sort_index(kind="stable")
+    return hashlib.sha256(pd.util.hash_pandas_object(values, index=True).values.tobytes()).hexdigest()
 
 
 def _profiles(result: RunResult, spec: ScenarioSpec) -> tuple:
@@ -302,6 +328,7 @@ def evaluate_scenario(
     eligible = chemical & reference
     manual = candidates.index.isin(flags[1])
     pool = candidates.loc[(eligible | (manual & reference)) & ~candidates.index.isin(flags[2])]
+    pool = ensure_selection_scaffolds(pool, spec.constraints, spec.strategy)
     if len(updated_scores.columns):
         pool = pool.assign(
             **{name: updated_scores[name].reindex(pool.index) for name in updated_scores}
@@ -341,15 +368,24 @@ def evaluate_scenario(
         MappingProxyType(
             {
                 "ranking_method": method,
+                "selection_algorithm_version": CORE_VERSION,
+                "selected_ids_sha256": selected_ids_fingerprint(outcome.selected_ids),
+                "scaffold_inputs_sha256": _scaffold_inputs_fingerprint(pool, spec),
                 "tie_breaker": "record_id ascending",
                 "quota_shortfall_repair": "deterministic augmenting paths; fixed pins",
                 "minimum_scaffolds_method": "greedy reservation; feasibility not guaranteed",
+                "scaffold_coverage_method": (
+                    "one member per feasible core before filling; rare cores first; "
+                    "property ranking then record_id; acyclic molecules share one group"
+                ),
+                "missing_scaffolds": "computed on demand from canonical SMILES using RDKit",
                 "cached_descriptors": True,
                 "exact_pareto_limit": EXACT_PARETO_LIMIT,
                 "manual_overrides_are_not_chemical_approval": True,
             }
         ),
         *flags,
+        scaffolds=pool.murcko_scaffold.copy() if "murcko_scaffold" in pool else None,
     )
 
 

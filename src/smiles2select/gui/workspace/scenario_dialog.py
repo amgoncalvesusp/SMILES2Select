@@ -3,6 +3,7 @@
 from dataclasses import replace
 from pathlib import Path
 
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from smiles2select.gui.workspace import criteria_state
 from smiles2select.gui.workspace.guided_controls import StrategyCombo
 from smiles2select.gui.workspace.jobs import ComputationJob
 from smiles2select.selection_intelligence.constrained_selection import Strategy
@@ -41,6 +43,8 @@ class ScenarioDialog(QDialog):
         self.snapshots = {}
         self._draft_thresholds = {}
         self._job = None
+        self._job_callback = None
+        self._job_message = ""
         self._stability = None
         self.setWindowTitle("3. Compare alternatives before adopting")
         self.resize(760, 720)
@@ -261,6 +265,14 @@ class ScenarioDialog(QDialog):
         if self.capture_spec() != snapshot.spec:
             self.report.setPlainText("Draft criteria changed. Preview again before adopting.")
             return
+        try:
+            adopted_criteria = criteria_state.from_scenario(workspace, snapshot.spec)
+        except ValueError as exc:
+            self.report.setPlainText(
+                f"The workspace cannot represent this scenario's criteria: {exc}. "
+                "Selection unchanged. Keep the saved study or preview compatible criteria."
+            )
+            return
         rejected = [rid for rid in selected if not workspace.basket.state(rid).chemical_status.passed]
         reason = self.justification.text().strip()
         if rejected and not reason:
@@ -280,8 +292,9 @@ class ScenarioDialog(QDialog):
         index = len(workspace.basket.log.applied) - 1
         workspace._selection_outcomes[index] = snapshot.outcome
         workspace._scenario_snapshots[index] = snapshot
-        workspace.target_count.setValue(snapshot.spec.constraints.target_count or len(selected))
-        workspace.strategy.setCurrentText(snapshot.spec.strategy.value)
+        workspace._selection_message = ""
+        criteria_state.apply(workspace, adopted_criteria)
+        workspace._record_current_criteria(index)
         workspace.refresh()
         self.report.setPlainText(f"Scenario {snapshot.spec.name} adopted. Undo restores the prior selection.")
 
@@ -327,17 +340,35 @@ class ScenarioDialog(QDialog):
         if self.is_busy:
             return
         self.progress.show()
-        self.report.setPlainText("Computing from cached descriptors. Current selection unchanged.")
+        self._job_message = "Computing molecular criteria. Current selection unchanged."
+        self.report.setPlainText(self._job_message)
         for widget in (*self._actions, self.slot, self.count, self.strategy, self.apply_threshold):
             widget.setEnabled(False)
+        self._job_callback = completed
         self._job = ComputationJob(function, self)
-        self._job.completed.connect(completed)
-        self._job.failed.connect(self.report.setPlainText)
-        self._job.finished.connect(self._finished)
+        self._job.completed.connect(self._completed, Qt.ConnectionType.QueuedConnection)
+        self._job.failed.connect(self._failed, Qt.ConnectionType.QueuedConnection)
+        self._job.finished.connect(self._finished, Qt.ConnectionType.QueuedConnection)
         self._job.start()
 
+    @Slot(object)
+    def _completed(self, value):
+        if self.report.toPlainText() == self._job_message:
+            self.report.clear()
+        try:
+            self._job_callback(value)
+        except Exception as exc:
+            self.report.setPlainText(f"Could not apply the computation result: {exc}")
+
+    @Slot(str)
+    def _failed(self, message):
+        self.report.setPlainText(f"Computation failed: {message}")
+
+    @Slot()
     def _finished(self):
         job, self._job = self._job, None
+        self._job_callback = None
+        self._job_message = ""
         self.progress.hide()
         for widget in (*self._actions, self.slot, self.count, self.strategy, self.apply_threshold):
             widget.setEnabled(True)

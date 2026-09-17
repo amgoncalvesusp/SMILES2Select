@@ -66,6 +66,90 @@ def test_threshold_replay_changes_eligibility_without_mutation(cached):
     assert table.loc[2, "selection_frequency"] == 0.5
 
 
+def test_scenario_prepares_missing_scaffolds_and_recipe_replays_original_input(cached, tmp_path):
+    from smiles2select.selection_intelligence.constrained_selection import Strategy
+    from smiles2select.selection_intelligence.scenario_io import load_study, save_study
+
+    result, candidates = cached
+    candidates = candidates.assign(
+        murcko_scaffold=pd.NA, canonical_smiles=["c1ccccc1", "c1ccncc1", "CCO", "CCCC"]
+    )
+    spec = ScenarioSpec("cores", constraints=SelectionConstraints(target_count=2),
+                        strategy=Strategy.SCAFFOLD_COVERAGE)
+    snapshot = evaluate_scenario(result, candidates, spec)
+    assert snapshot.outcome.count == 2
+    assert snapshot.outcome.scaffolds_covered == 2
+    assert snapshot.scaffolds.to_dict() == {1: "c1ccccc1", 2: "c1ccncc1"}
+    assert candidates.murcko_scaffold.isna().all()
+    path = tmp_path / "cores.json"
+    save_study(path, (snapshot,))
+    replay = load_study(path, result, candidates)[0]
+    assert replay.outcome.selected_ids == snapshot.outcome.selected_ids
+
+
+@pytest.mark.parametrize("save_filled", [False, True])
+def test_study_replays_across_lazy_scaffold_cache_state(cached, tmp_path, save_filled):
+    from smiles2select.selection_intelligence.constrained_selection import Strategy
+    from smiles2select.selection_intelligence.preparation import ensure_selection_scaffolds
+    from smiles2select.selection_intelligence.scenario_io import load_study, save_study
+
+    result, original = cached
+    lazy = original.assign(murcko_scaffold=pd.NA,
+                           canonical_smiles=["c1ccccc1", "c1ccncc1", "CCO", "CCCC"])
+    spec = ScenarioSpec("cores", constraints=SelectionConstraints(target_count=2),
+                        strategy=Strategy.SCAFFOLD_COVERAGE)
+    filled = ensure_selection_scaffolds(lazy, spec.constraints, spec.strategy)
+    before, after = (filled, lazy) if save_filled else (lazy, filled)
+    snapshot = evaluate_scenario(result, before, spec)
+    path = tmp_path / "cache-independent-study.json"
+    save_study(path, (snapshot,))
+    replay = load_study(path, result, after)[0]
+    assert replay.outcome.selected_ids == snapshot.outcome.selected_ids
+    assert replay.provenance["scaffold_inputs_sha256"] == snapshot.provenance["scaffold_inputs_sha256"]
+    assert lazy.murcko_scaffold.isna().all()
+    for column, value in (("canonical_smiles", "C1CCCCC1"), ("qed", 0.11)):
+        changed = after.copy()
+        changed.loc[1, column] = value
+        with pytest.raises(ValueError, match="same input"):
+            load_study(path, result, changed)
+    # Preserve IDs but falsify the cores used to report scientific coverage.
+    changed_core = filled.assign(murcko_scaffold=["X", "Y", "Z", "W"])
+    with pytest.raises(ValueError, match="scaffold inputs"):
+        load_study(path, result, changed_core)
+
+
+@pytest.mark.parametrize("change", ["legacy", "algorithm", "ids", "criteria"])
+def test_study_rejects_legacy_algorithm_or_changed_final_ids(cached, tmp_path, change):
+    import json
+
+    from smiles2select.selection_intelligence.scenario_io import load_study, save_study
+
+    result, candidates = cached
+    snapshot = evaluate_scenario(result, candidates,
+                                 ScenarioSpec("A", constraints=SelectionConstraints(target_count=1)))
+    path = tmp_path / "versioned-study.json"
+    save_study(path, (snapshot,))
+    payload = json.loads(path.read_text())
+    assert payload["schema_version"] == 2
+    assert payload["scenarios"][0]["selection_algorithm_version"] == "3.3.1"
+    assert len(payload["scenarios"][0]["selected_ids_sha256"]) == 64
+    if change == "legacy":
+        payload["schema_version"] = 1
+        match = "legacy.*cannot.*replay"
+    elif change == "algorithm":
+        payload["scenarios"][0]["selection_algorithm_version"] = "3.3.0"
+        match = "algorithm"
+    elif change == "criteria":
+        payload["scenarios"][0]["spec"]["constraints"]["target_count"] = 2
+        match = "selected IDs"
+    else:
+        payload["scenarios"][0]["selected_ids_sha256"] = "0" * 64
+        match = "selected IDs"
+    path.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match=match):
+        load_study(path, result, candidates)
+
+
 def test_allowed_violations_and_informative_profiles_are_preserved(cached):
     result, candidates = cached
     result.profiles = (

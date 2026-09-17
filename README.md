@@ -1,10 +1,18 @@
-# SMILES2Select 3.3.0
+# SMILES2Select 3.3.1
 
 [![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21920596.svg)](https://doi.org/10.5281/zenodo.21920596)
 
 Author: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA)
 
 ## English
+
+### New in 3.3.1
+
+Large-library molecular-core selection now calculates missing scaffolds in the
+background and applies the requested count. Unapplied edits block GUI exports,
+and completed jobs clear their progress messages. The in-app **How to choose
+criteria...** guide explains uses, trade-offs and limitations. Scenario studies
+verify algorithm version and selected IDs on replay.
 
 ### New in 3.3.0
 

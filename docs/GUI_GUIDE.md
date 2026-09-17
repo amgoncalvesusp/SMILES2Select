@@ -13,12 +13,24 @@ expanded. Hiding settings never resets them. Drug-likeness profiles are heuristi
 the defaults are a starting configuration, not a biological recommendation.
 
 In the Chemical Space Hub, set the number of molecules and choose a strategy.
+Open **How to choose criteria...** beside the strategy for a scrollable guide to
+each strategy, descriptor, ranking direction, quota and reproducibility limit.
+Each property selector also shows a short explanation of its selected descriptor.
+Changing a descriptor preserves the chosen direction, so review the pair together.
 Expand advanced controls for objective directions, target intervals, scaffold or
 cluster quotas and map settings. Inspect a point to see its structure, properties
 and decision. Molecular drawings are generated only for the inspected molecule.
 
 No universal prices, exchange rates or regional purchasing assumptions are used.
 The budget in this version is a **molecule count**.
+
+For a first comparison, state your question: property quality, coverage of
+molecular cores, a justified property interval or expert fixed choices. Use
+**Cover more molecular cores** to take one eligible representative per feasible
+Murcko core before filling remaining places. It computes missing cores on demand;
+it does not depend on drawing the map. Review acyclic structures, which share the
+empty core, before imposing a strict maximum per scaffold. See the
+[selection guide](SELECTION_STRATEGIES.md) for meanings, limitations and sources.
 
 ## Compare before adopting
 
@@ -70,9 +82,16 @@ in the UI and exported provenance. This is a different ranking method, not an
 exact Pareto front and not a structural-diversity guarantee. There is no hidden
 subsample of candidates used to make final selections.
 
-Maps and tables limit display work. Missing scaffold/cluster data cannot be used
-to enforce corresponding quotas; the interface or scenario evaluator reports
-the unavailable analysis instead of treating missing data as measured coverage.
+The property-based strategies may return the same set above this threshold for
+identical objectives and quotas. Core coverage retains its first-per-core policy;
+weighted property percentiles order alternatives after scaffold rarity. The
+threshold concerns the candidate pool, not the requested final molecule count.
+
+Maps and tables limit display work. Missing scaffolds are computed when needed
+for core coverage or scaffold quotas. Missing structural cluster assignments
+still prevent cluster quotas; the interface reports their unavailability.
+The property PCA cloud is a projection of descriptors, not a set of structural
+clusters, and it does not determine export membership.
 Scenario replay currently rejects runs with zone allocations. Such analyses
 continue to use the existing pipeline, rather than silently losing zone rules.
 

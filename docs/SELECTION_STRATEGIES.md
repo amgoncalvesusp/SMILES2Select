@@ -1,5 +1,53 @@
 # Selection strategies and reproducibility
 
+## Choosing criteria for a new study
+
+The Hub's **How to choose criteria...** button opens the same scientific guidance
+next to the selection controls. Define a study objective before choosing a
+strategy. No ranking listed here predicts experimental activity or docking success.
+
+| Research intention | Control and interpretation | Limitation to check |
+| --- | --- | --- |
+| Favor property trade-offs while retaining spread | Balance properties and representation | Property spread is not fingerprint diversity |
+| Favor the best available trade-offs | Prioritize favorable property trade-offs | A Pareto front can contain extreme values; specify appropriate directions |
+| Explore a broad range of property values | Spread across property values | May favor property extremes; does not maximize structural dissimilarity |
+| Represent different molecular cores | Cover more molecular cores | One representative per feasible core first, then fill; coverage under crossed quotas is heuristic |
+| Preserve expert choices and complete a library | Complete my pinned choices | Pins require justification and are also preserved by other strategies |
+
+The initial QED/maximize and molecular-weight/minimize controls are defaults, not
+a universal medicinal chemistry recommendation. Choose a different property pair
+or interval when the scientific question requires it. The software retains your
+direction when changing a descriptor: review both together.
+
+| Property | Meaning and direction to consider | What it does not establish |
+| --- | --- | --- |
+| `qed` | QED combines property desirabilities into a drug-likeness estimate from 0 to 1; maximize to prefer that profile | Target activity or safety; its component properties already include weight and lipophilicity |
+| `mol_wt` | Molecular weight in g/mol; minimizing favors smaller structures; an interval expresses a size window | That the smallest molecule is the best ligand |
+| `rdkit_wlogp` | Calculated Wildman–Crippen logP; an interval can express the desired lipophilicity window | Measured solubility, or pH-dependent logD |
+| `tpsa` | Topological polar surface area in Å²; an interval can express a polarity window | Experimental permeability or absorption |
+| `sa_score` | Synthetic accessibility heuristic, 1–10; lower suggests easier synthesis | A synthesis route, supplier availability, yield or price |
+| `np_score` | Natural-product likeness; higher favors fragment patterns associated with natural products | Natural origin, safety or activity |
+
+Descriptor definitions follow [RDKit QED](https://www.rdkit.org/docs/source/rdkit.Chem.QED.html),
+the [RDKit Book](https://rdkit.org/docs/RDKit_Book.html), and
+the [RDKit SA/NP implementation notes and original papers](https://greglandrum.github.io/rdkit-blog/posts/2023-12-01-using_sascore_and_npscore.html).
+These definitions explain the descriptors; the study-specific choice of objectives
+and bounds remains a scientific decision that should be recorded.
+
+**Higher/lower is better** continually prefers one direction. **Desired value**
+prefers the smallest absolute deviation. **Desired interval** gives every value
+inside the interval equal desirability, and penalizes distance outside it. These
+are ranking preferences, not new hard eligibility filters. To require an absolute
+property cutoff, configure screening or a supported scenario policy accordingly.
+
+**Maximum per scaffold** caps analogues sharing a Murcko core. Missing cores are
+computed on demand when selecting. Acyclic structures share the empty Murcko
+scaffold, so a limit of 1 can retain only one automatic choice from that group.
+**Maximum per cluster** requires actual cached structural cluster assignments;
+the shape of a PCA cloud does not define those assignments. Tight quotas can make
+the requested count unattainable. Compare scenarios and inspect the count,
+property distributions and core coverage before adopting one.
+
 ## Original pipeline and Selection Hub are separate decision stages
 
 The original run applies chemical screening and its configured post-selection
@@ -53,13 +101,16 @@ priority key is used only when all earlier available keys tie.
 | `balanced` | `pareto_rank` ascending; `crowding_distance` descending; `robustness_score` descending; `qed` descending |
 | `pareto_first` | `pareto_rank` ascending; `distance_to_ideal` ascending; `qed` descending |
 | `diversity_first` | `crowding_distance` descending; `pareto_rank` ascending; `robustness_score` descending |
-| `scaffold_coverage` | `scaffold_size` ascending; `pareto_rank` ascending; `robustness_score` descending |
+| `scaffold_coverage` | one feasible representative per core first; `scaffold_size` ascending; `pareto_rank` ascending; `robustness_score` descending; then fill remaining places |
 | `manual_assisted` | `pareto_rank` ascending; `qed` descending |
 
 Unavailable columns are skipped, missing values within a present ranking column
 sort last, and ascending integer `record_id` resolves the final tie. For
 `scaffold_coverage`, scaffold size is the number of candidates sharing that
-scaffold in the applicable selection pool. Crowding distance measures separation
+scaffold in the eligible selection pool after manual exclusions. The first-per-core
+pass respects upper quotas and already represented pinned cores. Missing Murcko
+cores are calculated on demand before this policy is applied; this is independent
+of whether the map has been built. Crowding distance measures separation
 in objective space, not pairwise fingerprint diversity. Objective weights do
 not change Pareto dominance and are not an additional key in this exact Hub
 ordering.
@@ -76,7 +127,11 @@ ranks:
 Percentiles use average ranks for ties. Higher scores are better. The internal
 `selection_priority` is `-score`, so smaller priority is better; ascending
 `record_id` resolves equal priorities. This explicit priority replaces the
-strategy keys in the table above. Scaffold and cluster constraints still apply.
+property strategy keys in the table above. Consequently, balanced, Pareto-first,
+property-spread and manual-assisted strategies can return the same set when
+objectives, quotas and pins are identical. For `scaffold_coverage`, the first-per-core
+pass and scaffold rarity remain active; property percentiles order alternatives
+after scaffold size. Scaffold and cluster constraints still apply.
 It is a deterministic weighted-percentile approximation, not an exact Pareto
 front, fingerprint diversity optimization or random sample. Objective weights
 therefore have a different role in this mode than in exact Pareto ordering.
@@ -96,9 +151,12 @@ The Hub selector uses this sequence:
 1. Remove explicitly excluded IDs from the candidate pool.
 2. When preservation is enabled, add eligible fixed molecules in ascending ID
    order. Fixed molecules have precedence over automatic count and upper quotas.
-3. When a minimum scaffold count is requested, reserve candidates from new
+3. For `scaffold_coverage`, reserve one candidate from each feasible new core
+   before filling remaining places, preferring rarer cores. Otherwise, when a
+   minimum scaffold count is requested, reserve candidates from new
    scaffolds greedily in ranking order, respecting the available count and upper
-   quotas.
+   quotas. Fixed molecules already represent their cores. This coverage pass
+   does not establish a globally optimal coverage under crossed quotas.
 4. Fill remaining places in ranking order, skipping candidates that would exceed
    the maximum per scaffold or cluster.
 5. If crossed scaffold and cluster upper quotas leave a count shortfall, repair

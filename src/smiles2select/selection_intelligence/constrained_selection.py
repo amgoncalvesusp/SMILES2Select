@@ -18,6 +18,8 @@ from enum import Enum
 
 import pandas as pd
 
+CORE_VERSION = "3.3.1"
+
 
 class Strategy(str, Enum):
     """How candidates are ordered before the quotas are applied."""
@@ -155,6 +157,12 @@ def order_candidates(
     ]
     if "selection_priority" in candidates:
         keys = [("selection_priority", True)]
+        if (
+            strategy is Strategy.SCAFFOLD_COVERAGE
+            and "murcko_scaffold" in candidates
+            and "scaffold_size" in candidates
+        ):
+            keys = [("scaffold_size", True), *keys]
     if not keys:
         return candidates
     return candidates.sort_values(
@@ -368,8 +376,10 @@ def select(
 
     Strategy keys are compared lexicographically, with missing values last;
     ascending record_id breaks ties. An upstream ``selection_priority`` column
-    explicitly replaces strategy keys (smaller is better). Exclusions precede sorted fixed pins,
-    greedy minimum-scaffold reservation, and ranked filling. When crossed upper
+    replaces property-ranking keys (smaller is better). Scaffold coverage prioritizes
+    rare cores, then property ranking, reserving one member of each feasible core
+    before ranked filling. Exclusions precede sorted fixed pins and greedy scaffold
+    reservation. Empty Murcko SMILES form one acyclic group. When crossed upper
     quotas leave a count shortfall, deterministic augmenting paths maximize the
     cardinality up to the target without moving pins or losing covered scaffolds.
     This does not globally optimize ranking quality or minimum scaffold coverage.
@@ -401,6 +411,10 @@ def select(
     pool = candidates.loc[:, [column for column in candidates.columns if column in needed]]
     if len(excluded_ids):
         pool = pool.loc[~pool.index.isin(set(excluded_ids))]
+    if strategy is Strategy.SCAFFOLD_COVERAGE and "murcko_scaffold" in pool:
+        pool = pool.assign(
+            scaffold_size=pool.murcko_scaffold.map(pool.murcko_scaffold.value_counts(dropna=True))
+        )
 
     if constraints.preserve_pinned:
         for raw_id in sorted(set(pinned_ids)):
@@ -420,9 +434,12 @@ def select(
         ordered.columns.get_loc("cluster_id") + 1 if ("cluster_id" in ordered) else None
     )
     # Reserve scaffold coverage before ranked filling; pins have precedence.
-    for coverage_first in (True, False) if constraints.min_scaffolds else (False,):
+    coverage_target = constraints.min_scaffolds or 0
+    if strategy is Strategy.SCAFFOLD_COVERAGE and "murcko_scaffold" in pool:
+        coverage_target = max(coverage_target, pool.murcko_scaffold.nunique(dropna=True))
+    for coverage_first in (True, False) if coverage_target else (False,):
         for values in ordered.itertuples(index=True, name=None):
-            if coverage_first and len(scaffold_usage) >= constraints.min_scaffolds:
+            if coverage_first and len(scaffold_usage) >= coverage_target:
                 break
             record_id = int(values[0])
             if record_id in reasons:

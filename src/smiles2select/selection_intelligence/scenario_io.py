@@ -7,16 +7,20 @@ import math
 from dataclasses import asdict
 from pathlib import Path
 
-from smiles2select.selection_intelligence.constrained_selection import SelectionConstraints
+from smiles2select.selection_intelligence.constrained_selection import (
+    CORE_VERSION,
+    SelectionConstraints,
+)
 from smiles2select.selection_intelligence.objectives import objective_from_dict
 from smiles2select.selection_intelligence.scenarios import (
     ScenarioSnapshot,
     ScenarioSpec,
     data_fingerprint,
     evaluate_scenario,
+    selected_ids_fingerprint,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MAX_RECIPE_BYTES = 8_000_000
 
 
@@ -74,6 +78,8 @@ def save_study(path: str | Path, snapshots: tuple[ScenarioSnapshot, ...]) -> Non
         raise ValueError("study requires scenarios from the same input")
     if len({s.spec.name for s in snapshots}) != len(snapshots):
         raise ValueError("scenario names must be distinct")
+    if any(s.provenance.get("selection_algorithm_version") != CORE_VERSION for s in snapshots):
+        raise ValueError("selection algorithm version changed; create a new scenario study")
     payload = {
         "schema_version": SCHEMA_VERSION,
         "data_fingerprint": snapshots[0].data_fingerprint,
@@ -85,6 +91,9 @@ def save_study(path: str | Path, snapshots: tuple[ScenarioSnapshot, ...]) -> Non
                 "excluded_ids": s.excluded_ids,
                 "ranking_method": s.provenance["ranking_method"],
                 "exact_pareto_limit": s.provenance["exact_pareto_limit"],
+                "selection_algorithm_version": s.provenance["selection_algorithm_version"],
+                "selected_ids_sha256": selected_ids_fingerprint(s.outcome.selected_ids),
+                "scaffold_inputs_sha256": s.provenance["scaffold_inputs_sha256"],
             }
             for s in snapshots
         ],
@@ -108,6 +117,11 @@ def load_study(path: str | Path, result, candidates) -> tuple[ScenarioSnapshot, 
         raise ValueError("scenario recipe exceeds 8 MB")
     payload = json.loads(recipe.read_text(encoding="utf-8"), object_pairs_hook=_no_duplicate_keys)
     _keys(payload, {"schema_version", "data_fingerprint", "scenarios"})
+    if type(payload["schema_version"]) is int and payload["schema_version"] == 1:
+        raise ValueError(
+            "This legacy scenario recipe cannot safely replay: schema 1 did not record "
+            "the selection algorithm version or selected IDs hash. Create a new scenario study."
+        )
     if type(payload["schema_version"]) is not int or payload["schema_version"] != SCHEMA_VERSION:
         raise ValueError("unsupported scenario schema version")
     fingerprint = data_fingerprint(result, candidates)
@@ -127,8 +141,13 @@ def load_study(path: str | Path, result, candidates) -> tuple[ScenarioSnapshot, 
                 "excluded_ids",
                 "ranking_method",
                 "exact_pareto_limit",
+                "selection_algorithm_version",
+                "selected_ids_sha256",
+                "scaffold_inputs_sha256",
             },
         )
+        if row["selection_algorithm_version"] != CORE_VERSION:
+            raise ValueError("selection algorithm version changed; create a new scenario study")
         flags = {name: row[name] for name in ("pinned_ids", "rescued_ids", "excluded_ids")}
         if any(
             not isinstance(ids, list) or any(type(i) is not int for i in ids)
@@ -141,6 +160,10 @@ def load_study(path: str | Path, result, candidates) -> tuple[ScenarioSnapshot, 
         for name in ("ranking_method", "exact_pareto_limit"):
             if snapshot.provenance[name] != row[name]:
                 raise ValueError("ranking implementation changed; create a new scenario study")
+        if selected_ids_fingerprint(snapshot.outcome.selected_ids) != row["selected_ids_sha256"]:
+            raise ValueError("Replayed selected IDs differ from the saved study; adoption is blocked.")
+        if snapshot.provenance["scaffold_inputs_sha256"] != row["scaffold_inputs_sha256"]:
+            raise ValueError("Replayed scaffold inputs differ from the saved study; adoption is blocked.")
         snapshots.append(snapshot)
     if len({s.spec.name for s in snapshots}) != len(snapshots):
         raise ValueError("scenario names must be distinct")
