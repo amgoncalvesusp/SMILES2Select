@@ -41,6 +41,7 @@ train = [
     "onnxscript>=0.2",
     "onnxruntime>=1.18",
     "skl2onnx>=1.17",
+    "protobuf<7",
 ]
 
 [project.scripts]
