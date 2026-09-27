@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.4.0 - integration candidate
+## 3.4.0 - 2026-09-26
 
 - Integrated S2S-Decision into the SMILES2Select package and desktop workspace, with target-specific ONNX previews, explicit adoption, undo/redo and model-aware exports.
 - Added complete, integrity-checked `.s2s.sqlite` sessions that restore processed results, basket and history without original source or model files for historical export.

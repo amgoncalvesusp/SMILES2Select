@@ -6,25 +6,46 @@ Author: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA)
 
 ## English
 
-### Integration candidate 3.4.0
+### New in 3.4.0: one application, two selection methods
 
-SMILES2Select now includes S2S-Decision in one install. The usual chemical
-screening remains the default. Three validation-frozen, target-specific ONNX
-packages ship with the product under a separate CC BY-SA 4.0 notice. In the
-Chemical Space Hub, **Prioritize by model** compares a compatible proposal with the current basket;
-adoption is explicit and undoable. Models score the eligible pool before the
-final count is applied. A score is specific to its declared target and endpoint,
-not a guarantee of activity. See the [GUI guide](docs/GUI_GUIDE.md) and
-[model catalog qualification](docs/MODEL_CATALOG_QUALIFICATION.md).
+SMILES2Select now includes S2S-Decision in one installation and workspace.
+Chemical screening remains the default. After processing a SMILES library,
+open **Chemical Space Hub → Prioritize by model**, choose a target, endpoint
+and compatible model, then select **Preview model selection**. The preview
+scores the chemically eligible pool under the current count, quotas, pins,
+exclusions and reference rules. Compare retained, added and removed molecules
+before **Adopt proposal**. Adoption is explicit and undoable; preview or
+cancellation never changes the basket.
 
-Save the Hub as a `.s2s.sqlite` session and reopen it from the main window.
-The session retains source-independent results, basket, history and model scores
-for inspection and export. Recomputing a model proposal still requires its
-compatible ONNX package. Training and evaluation live under **Advanced model
-tools** and need an optional Python runtime with `.[train]`; the desktop
-bundle does not include PyTorch or training converters. Source installations
-need `.[inference]` for ONNX proposals. The legacy `s2s-decision` command remains
-available; `s2s-decision-gui` opens the unified application.
+Three validation-frozen ONNX packages ship with this release:
+
+| Target | Endpoint | Model |
+| --- | --- | --- |
+| Q72547_WT | IC50 | gradient boosting, scalar descriptors |
+| P0DMS8_WT | Ki | logistic regression, scalar descriptors + Morgan fingerprint |
+| Q07869_WT | EC50 | logistic regression, scalar descriptors + Morgan fingerprint |
+
+These models are specific to their declared tasks. Their scores do not
+guarantee activity, and no universal activity model is included. Tiny remains
+an experimental option for separately trained packages. Bundled model data
+carry a separate CC BY-SA 4.0 notice; application code remains MIT-licensed.
+See [model qualification](docs/MODEL_CATALOG_QUALIFICATION.md) for source,
+validation choices, hashes and limits.
+
+Use **Save session** in the Hub to store a `.s2s.sqlite` file. **Open saved
+session** in the main window restores processed results, final basket,
+criteria, undo/redo history and model scores, even if input files or the model
+have moved. Historical inspection and export work without them; a new model
+preview still needs the compatible ONNX package. Excel exports include a
+`MODEL_SCORES` sheet while the adopted model selection remains active,
+alongside the original SMILES, IDs and model hashes.
+
+**Advanced model tools** provides training and evaluation through a separately
+configured Python runtime with `smiles2select[train]`. Desktop bundles include
+ONNX Runtime CPU for inference, but omit PyTorch and training converters.
+Source installations need `smiles2select[inference]` to use models. The legacy
+`s2s-decision` CLI remains available; `s2s-decision-gui` opens the unified app.
+See the [GUI guide](docs/GUI_GUIDE.md) for the full workflow.
 
 ### New in 3.3.1
 
@@ -82,10 +103,24 @@ Optional capabilities are available as extras:
 pip install -e ".[maps,fastsearch,parquet]"
 ```
 
+For model proposals from source, install the inference extra. Training uses a
+separate runtime and is never required for chemical screening:
+
+```bash
+pip install -e ".[inference]"
+# In an external training environment only:
+pip install -e ".[train]"
+```
+
+Python 3.11 or newer is required. RDKit is pinned to 2026.3.5 to preserve the
+chemistry contract of the bundled models.
+
 On Windows, the release provides a portable bundle and a Setup executable.
 The Setup package installs the complete PyInstaller bundle, including Qt,
 RDKit, NumPy and all bundled DLL/PYD files. The published dependency manifest
 records the native import verification performed during the build.
+Linux releases provide a portable bundle. Both desktop bundles include the
+three ONNX packages and work without a separate training installation.
 
 ### Quick start
 
@@ -233,6 +268,35 @@ recipes, persistence, GUI interaction, cancellation and CLI integration.
 
 ## Português
 
+### Novidades da versão 3.4.0
+
+SMILES2Select e S2S-Decision agora formam um único aplicativo. A seleção
+química continua como padrão. Após processar a biblioteca, abra **Chemical
+Space Hub → Prioritize by model**, escolha alvo, endpoint e modelo compatível,
+e use **Preview model selection**. A prévia pontua todas as moléculas
+quimicamente elegíveis respeitando quantidade, cotas, moléculas fixadas,
+exclusões e regras de referência. Compare moléculas mantidas, adicionadas e
+removidas antes de **Adopt proposal**. A adoção altera a cesta em uma ação
+reversível; a prévia sozinha não altera a seleção.
+
+Esta versão inclui três modelos ONNX escolhidos por validação para tarefas
+específicas: Q72547_WT/IC50, P0DMS8_WT/Ki e Q07869_WT/EC50. Nenhum deles
+prediz atividade universal ou garante atividade experimental. Tiny permanece
+opcional e experimental. Os dados dos modelos têm aviso CC BY-SA 4.0 separado
+da licença MIT do código. Consulte a [qualificação dos modelos](docs/MODEL_CATALOG_QUALIFICATION.md).
+
+Use **Save session** para guardar um arquivo `.s2s.sqlite` e **Open saved
+session** para recuperar resultados, cesta, critérios, histórico de desfazer/
+refazer e escores. A inspeção e a exportação históricas não exigem os arquivos
+de entrada nem o modelo original. Uma nova prévia exige o pacote ONNX
+compatível. Enquanto a seleção adotada por modelo permanecer ativa, a
+exportação Excel inclui `MODEL_SCORES` e a procedência do modelo, preservando
+IDs e SMILES originais.
+
+**Advanced model tools** mantém treinamento e avaliação em um Python externo
+com `smiles2select[train]`; os bundles desktop incluem apenas a inferência
+ONNX CPU. Consulte o [guia da interface](docs/GUI_GUIDE.md) para o fluxo completo.
+
 O SMILES2Select é uma ferramenta de seleção de drug-likeness e espaço químico
 com múltiplas regras para grandes bibliotecas de SMILES. A versão 3.0 adiciona
 o Chemical Space Selection Hub: bibliotecas explícitas de candidatos,
@@ -261,10 +325,17 @@ Capacidades opcionais estão disponíveis como extras:
 pip install -e ".[maps,fastsearch,parquet]"
 ```
 
+Para usar modelos em uma instalação por código, instale também
+`pip install -e ".[inference]"`. O treinamento exige um ambiente externo com
+`pip install -e ".[train]"`. Python 3.11 ou superior é obrigatório; RDKit
+2026.3.5 está fixado para preservar o contrato químico dos modelos incluídos.
+
 No Windows, o release fornece um bundle portátil e um executável Setup. O
 pacote Setup instala o bundle completo do PyInstaller, incluindo Qt, RDKit,
 NumPy e todas as DLL/PYD incluídas. O manifesto de dependências publicado
 registra a verificação dos imports nativos realizada durante a compilação.
+O release Linux fornece um bundle portátil. Os dois bundles desktop incluem
+os três modelos ONNX e não exigem instalação de bibliotecas de treinamento.
 
 ### Início rápido
 

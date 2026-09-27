@@ -1,9 +1,10 @@
 # Guided selection and scenario comparison
 
-## Model proposals and saved sessions (3.4 candidate)
+## Model proposals and saved sessions (3.4.0)
 
 After processing, open the Chemical Space Hub and expand **Prioritize by model**.
-Import a compatible ONNX model folder, then choose its target, endpoint and model.
+Choose one of the three bundled task-specific models, or import a compatible
+ONNX model folder, then choose its target, endpoint and model.
 The panel shows task threshold, estimator, calibration status and training
 reference count. Preview scores the chemically eligible pool using the current
 count, quotas, pins, exclusions and reference rules. The basket stays unchanged
