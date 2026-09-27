@@ -30,6 +30,7 @@ SYSTEM_DLLS = {
     "D3D12.DLL",
     "D3D9.DLL",
     "D2D1.DLL",
+    "DBGHELP.DLL",
     "DWrite.DLL",
     "DNSAPI.DLL",
     "DWMAPI.DLL",
