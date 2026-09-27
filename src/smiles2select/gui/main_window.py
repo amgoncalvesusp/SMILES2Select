@@ -10,6 +10,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -55,6 +56,7 @@ class MainWindow(QMainWindow):
 
         self.state = WizardState()
         self._workspace_window: WorkspaceWindow | None = None
+        self._advanced_tools = None
         self.pages = QStackedWidget()
         self.steps = QListWidget()
         self.steps.setMaximumWidth(200)
@@ -79,6 +81,10 @@ class MainWindow(QMainWindow):
 
         self.back_button = QPushButton("Back")
         self.next_button = QPushButton("Next")
+        self.advanced_tools_button = QPushButton("Advanced model tools…")
+        self.open_session_button = QPushButton("Open saved session…")
+        self.advanced_tools_button.clicked.connect(self._open_advanced_tools)
+        self.open_session_button.clicked.connect(self._open_saved_session_dialog)
         self.back_button.clicked.connect(lambda: self._go(self.pages.currentIndex() - 1))
         self.next_button.clicked.connect(lambda: self._go(self.pages.currentIndex() + 1))
         self.progress_label = QLabel()
@@ -89,6 +95,8 @@ class MainWindow(QMainWindow):
 
         navigation = QHBoxLayout()
         navigation.addWidget(disclaimer, stretch=1)
+        navigation.addWidget(self.advanced_tools_button)
+        navigation.addWidget(self.open_session_button)
         navigation.addWidget(self.back_button)
         navigation.addWidget(self.next_button)
 
@@ -135,6 +143,7 @@ class MainWindow(QMainWindow):
     def _on_run_finished(self, result: object) -> None:
         if self._workspace_window is not None:
             if self._workspace_window.close():
+                self._workspace_window.deleteLater()
                 self._workspace_window = None
         self._page_widgets[6].show_result(result)
         self._go(6)
@@ -151,10 +160,46 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Chemical Space Hub", str(exc))
             return
+        self._show_workspace(workspace)
+
+    def _open_saved_session_dialog(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open workspace session", "",
+            "SMILES2Select session (*.s2s.sqlite *.sqlite)",
+        )
+        if path:
+            self._open_saved_workspace(path)
+
+    def _open_saved_workspace(self, path: str) -> None:
+        try:
+            workspace = WorkspaceWindow.from_session(path, parent=self)
+        except Exception as exc:
+            QMessageBox.warning(self, "Session not opened", str(exc))
+            return
+        self._show_workspace(workspace)
+
+    def _show_workspace(self, workspace: WorkspaceWindow) -> None:
+        if self._workspace_window is not None:
+            if not self._workspace_window.close():
+                workspace.close()
+                workspace.deleteLater()
+                return
+            self._workspace_window.deleteLater()
         self._workspace_window = workspace
+        workspace.session_open_requested.connect(self._open_saved_workspace)
         workspace.show()
         workspace.raise_()
         workspace.activateWindow()
+
+    def _open_advanced_tools(self) -> None:
+        """Open the optional training and evaluation tools in this application."""
+        if self._advanced_tools is None:
+            from s2s_decision.gui import Studio
+
+            self._advanced_tools = Studio(parent=self)
+        self._advanced_tools.show()
+        self._advanced_tools.raise_()
+        self._advanced_tools.activateWindow()
 
     def closeEvent(self, event) -> None:
         worker = self._page_widgets[5]._worker

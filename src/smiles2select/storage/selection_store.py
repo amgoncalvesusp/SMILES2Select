@@ -69,6 +69,13 @@ CREATE TABLE IF NOT EXISTS selection_actions (
     new_state_json TEXT
 );
 
+CREATE TABLE IF NOT EXISTS selection_session (
+    session_key INTEGER PRIMARY KEY CHECK (session_key = 1),
+    schema_version INTEGER NOT NULL,
+    action_cursor INTEGER NOT NULL,
+    target_count INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS selection_recipes (
     recipe_id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -138,13 +145,19 @@ CREATE INDEX IF NOT EXISTS idx_selection_status ON selection_state (selection_st
 class SelectionStore:
     """Read/write access to the selection tables of one run database."""
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, *, readonly: bool = False) -> None:
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._connection = sqlite3.connect(self.path)
+        if not readonly:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._connection = (
+            sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)
+            if readonly
+            else sqlite3.connect(self.path)
+        )
         self._connection.row_factory = sqlite3.Row
-        self._connection.executescript(SCHEMA)
-        self._connection.commit()
+        if not readonly:
+            self._connection.executescript(SCHEMA)
+            self._connection.commit()
 
     def __enter__(self) -> SelectionStore:
         return self
@@ -159,9 +172,10 @@ class SelectionStore:
     # -- selection state ----------------------------------------------------
 
     def save_basket(self, basket: SelectionBasket) -> int:
-        """Write the current decision of every molecule, replacing what was there."""
+        """Atomically replace the decision, history and undo cursor."""
         stamp = utc_timestamp()
-        rows = [
+        states = basket.states()
+        rows = (
             (
                 state.record_id,
                 state.chemical_status.value,
@@ -171,23 +185,44 @@ class SelectionStore:
                 state.note or None,
                 stamp,
             )
-            for state in basket.states()
-        ]
-        self._connection.executemany(
-            "INSERT OR REPLACE INTO selection_state (record_id, chemical_status, "
-            "selection_status, selection_origin, pinned, manual_note, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            rows,
+            for state in states
         )
-        self._save_actions(basket.log)
-        self._connection.commit()
-        return len(rows)
+        with self._connection:
+            self._connection.execute("DELETE FROM selection_state")
+            self._connection.executemany(
+                "INSERT INTO selection_state (record_id, chemical_status, "
+                "selection_status, selection_origin, pinned, manual_note, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                rows,
+            )
+            self._save_actions(basket.log)
+            self._connection.execute(
+                "INSERT INTO selection_session (session_key, schema_version, action_cursor, "
+                "target_count) VALUES (1, 1, ?, ?) "
+                "ON CONFLICT(session_key) DO UPDATE SET "
+                "schema_version = excluded.schema_version, "
+                "action_cursor = excluded.action_cursor, "
+                "target_count = excluded.target_count",
+                (basket.log.cursor, basket.target_count),
+            )
+        return len(states)
 
     def load_basket(self, target_count: int | None = None) -> SelectionBasket:
         """Restore a saved session: decisions plus the history behind them."""
         states = [dict(row) for row in self._connection.execute("SELECT * FROM selection_state")]
+        session = self._connection.execute(
+            "SELECT schema_version, target_count FROM selection_session WHERE session_key = 1"
+        ).fetchone()
+        if session is not None and session["schema_version"] != 1:
+            raise ValueError(f"unsupported selection session schema {session['schema_version']}")
         basket = basket_from_rows(states, log=self.load_log())
-        basket.target_count = target_count
+        basket.target_count = (
+            target_count
+            if target_count is not None
+            else session["target_count"]
+            if session
+            else None
+        )
         return basket
 
     def _save_actions(self, log: ActionLog) -> None:
@@ -215,7 +250,10 @@ class SelectionStore:
                 "SELECT * FROM selection_actions ORDER BY action_id"
             )
         ]
-        return from_rows(rows)
+        session = self._connection.execute(
+            "SELECT action_cursor FROM selection_session WHERE session_key = 1"
+        ).fetchone()
+        return from_rows(rows, cursor=session["action_cursor"] if session else None)
 
     # -- recipes ------------------------------------------------------------
 

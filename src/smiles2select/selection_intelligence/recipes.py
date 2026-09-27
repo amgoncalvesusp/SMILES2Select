@@ -21,6 +21,7 @@ from smiles2select.app_metadata import APP_VERSION, rdkit_version
 from smiles2select.selection_intelligence.action_log import utc_timestamp
 
 SCHEMA_VERSION = "3.0"
+MODEL_SCHEMA_VERSION = "4.0"
 LEGACY_SCHEMA_VERSIONS = frozenset({"2.0"})
 RECIPE_SUFFIX = ".selection.json"
 
@@ -75,6 +76,7 @@ class SelectionRecipe:
     seed: int | None = None
     final_selected_ids: tuple[int, ...] = ()
     provenance: dict[str, Any] = field(default_factory=dict)
+    model: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=utc_timestamp)
     updated_at: str = field(default_factory=utc_timestamp)
 
@@ -88,8 +90,10 @@ class SelectionRecipe:
         }
 
     def as_dict(self) -> dict[str, Any]:
+        if (self.strategy == "experimental_model") != bool(self.model):
+            raise RecipeError("model strategy requires model metadata, and model metadata requires model strategy")
         return {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": MODEL_SCHEMA_VERSION if self.model else SCHEMA_VERSION,
             "app_version": APP_VERSION,
             "name": self.name,
             "input_hash": self.input_hash,
@@ -127,6 +131,7 @@ class SelectionRecipe:
             "projection": dict(self.projection),
             "seed": self.seed,
             "provenance": dict(self.provenance),
+            **({"model": dict(self.model)} if self.model else {}),
             "manual_overrides": [asdict(override) for override in self.manual_overrides],
             "pinned_ids": list(self.pinned_ids),
             "excluded_ids": list(self.excluded_ids),
@@ -137,7 +142,7 @@ class SelectionRecipe:
     def summary_rows(self) -> list[tuple[str, object]]:
         """Tabular form for the SELECTION_RECIPE sheet."""
         return [
-            ("schema_version", SCHEMA_VERSION),
+            ("schema_version", MODEL_SCHEMA_VERSION if self.model else SCHEMA_VERSION),
             ("name", self.name),
             ("input_hash", self.input_hash or "-"),
             ("descriptor_version", self.descriptor_version),
@@ -170,7 +175,7 @@ class SelectionRecipe:
 def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRecipe:
     """Rebuild a recipe, refusing a schema this version does not understand."""
     schema = payload.get("schema_version", SCHEMA_VERSION)
-    if schema != SCHEMA_VERSION and schema not in LEGACY_SCHEMA_VERSIONS:
+    if schema not in {SCHEMA_VERSION, MODEL_SCHEMA_VERSION, *LEGACY_SCHEMA_VERSIONS}:
         raise RecipeError(
             f"{source}: schema '{schema}' is not supported (this version reads '{SCHEMA_VERSION}')"
         )
@@ -180,6 +185,19 @@ def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRe
     robustness = payload.get("robustness") or {}
     final = payload.get("final_selection") or {}
     libraries = payload.get("libraries") or {}
+    model = payload.get("model") or {}
+    if schema == MODEL_SCHEMA_VERSION and (
+        not isinstance(model, dict)
+        or not all(model.get(key) for key in (
+            "model_sha256", "model_manifest_sha256", "reference_records_sha256",
+            "target", "endpoint",
+        ))
+    ):
+        raise RecipeError(f"{source}: model recipe requires model/reference hashes, target and endpoint")
+    if schema != MODEL_SCHEMA_VERSION and model:
+        raise RecipeError(f"{source}: model metadata requires schema '{MODEL_SCHEMA_VERSION}'")
+    if (schema == MODEL_SCHEMA_VERSION) != (final.get("strategy") == "experimental_model"):
+        raise RecipeError(f"{source}: model schema requires experimental_model strategy")
 
     return SelectionRecipe(
         name=payload.get("name", "selection"),
@@ -214,6 +232,7 @@ def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRe
         seed=payload.get("seed"),
         final_selected_ids=tuple(final.get("selected_ids", ())),
         provenance=dict(payload.get("provenance") or {}),
+        model=dict(model),
         created_at=payload.get("created_at", utc_timestamp()),
         updated_at=payload.get("updated_at", utc_timestamp()),
     )
@@ -273,4 +292,6 @@ def compare(first: SelectionRecipe, second: SelectionRecipe) -> list[str]:
         differences.append("fingerprint settings changed")
     if first.zones != second.zones:
         differences.append("selection zones changed")
+    if first.model != second.model:
+        differences.append("model or target changed")
     return differences

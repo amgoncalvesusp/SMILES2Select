@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QStackedWidget,
     QWidget,
 )
@@ -69,6 +70,7 @@ class WorkspaceWindow(QMainWindow):
     """Turns a finished run into an interactive selection session."""
 
     computation_progress = Signal(str)
+    session_open_requested = Signal(str)
 
     def __init__(self, result: RunResult, parent=None) -> None:
         super().__init__(parent)
@@ -77,6 +79,7 @@ class WorkspaceWindow(QMainWindow):
 
         self._job = None
         self._job_completed = None
+        self._job_cancel = None
         self._transient_message = ""
         self._selection_message = ""
         self._papyrus_path = None
@@ -93,6 +96,7 @@ class WorkspaceWindow(QMainWindow):
         self._criteria_snapshots = {}
         self._run_provenance = None
         self._scenario_snapshots = {}
+        self._model_scores_by_action: dict[int, pd.DataFrame] = {}
         self._projection_results: dict[tuple[str, bool], tuple[ProjectionResult, pd.DataFrame]] = {}
 
         self.map_view = ChemicalSpaceView()
@@ -108,6 +112,10 @@ class WorkspaceWindow(QMainWindow):
         self.warnings.setStyleSheet("color: #a33;")
 
         self.setCentralWidget(self._build_layout())
+        self.cancel_job_button = QPushButton("Cancel preview", self)
+        self.cancel_job_button.hide()
+        self.cancel_job_button.clicked.connect(self._cancel_job)
+        self.statusBar().addPermanentWidget(self.cancel_job_button)
         self._initial_criteria = criteria_state.capture(self)
         self._connect()
         self._recompute_pareto()
@@ -247,8 +255,12 @@ class WorkspaceWindow(QMainWindow):
 
     def _active_applied_selection(self):
         for index in range(len(self.basket.log.applied) - 1, -1, -1):
-            if self.basket.log.applied[index].action_type is ActionType.AUTOMATIC_SELECTION:
-                return self._applied_selections.get(index)
+            action = self.basket.log.applied[index]
+            if action.action_type is ActionType.AUTOMATIC_SELECTION:
+                if index in self._scenario_snapshots:
+                    return None
+                applied = self._applied_selections.get(index)
+                return applied if applied is not None and action.source == applied.strategy else None
         return None
 
     def _provenance(self):
@@ -312,10 +324,13 @@ class WorkspaceWindow(QMainWindow):
         if self.inspector.record_id is not None:
             self._show_molecule(self.inspector.record_id)
 
-    def _start_job(self, function, completed, message) -> None:
+    def _start_job(self, function, completed, message, *, cancel=None) -> None:
         if self._job is not None:
             return
         self._job_completed = completed
+        self._job_cancel = cancel
+        self.cancel_job_button.setEnabled(True)
+        self.cancel_job_button.setVisible(cancel is not None)
         self._show_progress(message)
         self.job_progress.show()
         self.controls_scroll.setEnabled(False)
@@ -327,6 +342,13 @@ class WorkspaceWindow(QMainWindow):
         self._job.failed.connect(self._job_failed, Qt.QueuedConnection)
         self._job.finished.connect(self._finish_job, Qt.QueuedConnection)
         self._job.start()
+
+    def _cancel_job(self) -> None:
+        if self._job is None or self._job_cancel is None:
+            return
+        self._job_cancel()
+        self.cancel_job_button.setEnabled(False)
+        self._show_progress("Cancelling preview after current computation stage...")
 
     @Slot(str)
     def _show_progress(self, message) -> None:
@@ -352,6 +374,8 @@ class WorkspaceWindow(QMainWindow):
     def _finish_job(self) -> None:
         job, self._job = self._job, None
         self._job_completed = None
+        self._job_cancel = None
+        self.cancel_job_button.hide()
         self.job_progress.hide()
         for widget in (self.controls_scroll, self.basket_panel, self.inspector, self.views):
             widget.setEnabled(True)
@@ -377,6 +401,7 @@ class WorkspaceWindow(QMainWindow):
             self.warnings.setText("Scenario computation is running; wait for completion before closing.")
             event.ignore()
             return
+        self.model_panel.clear_preview()
         super().closeEvent(event)
 
     def _switch_view(self, name: str) -> None:
@@ -608,17 +633,26 @@ class WorkspaceWindow(QMainWindow):
             except Exception as exc:
                 self.warnings.setText(str(exc))
 
-    def _apply_selection(self, outcome, constraints, applied=None):
+    def _apply_selection(self, outcome, constraints, applied=None, *, source=None,
+                         reason="automatic selection", model_scores=None):
         self.basket.replace_final(
             list(outcome.selected_ids), origin=SelectionOrigin.AUTOMATIC,
-            source=outcome.strategy.value, reason="automatic selection",
+            source=source or (applied.strategy if applied else outcome.strategy.value), reason=reason,
         )
         action_index = len(self.basket.log.applied) - 1
+        for attached in (
+            self._selection_outcomes, self._applied_selections, self._criteria_snapshots,
+            self._model_scores_by_action, self._scenario_snapshots,
+        ):
+            for obsolete in tuple(attached):
+                if obsolete >= action_index:
+                    attached.pop(obsolete)
         self._selection_outcomes[action_index] = outcome
         if applied is not None:
             self._applied_selections[action_index] = applied
+        if model_scores is not None:
+            self._model_scores_by_action[action_index] = model_scores.copy(deep=True)
         self._record_current_criteria(action_index)
-        self._scenario_snapshots.pop(action_index, None)
         self._pending_map_refresh = bool(
             self._job is not None and len(self.candidates) > 5000
         )
@@ -676,6 +710,86 @@ class WorkspaceWindow(QMainWindow):
             QMessageBox.warning(self, "Docking export unavailable", str(exc))
             return
         QMessageBox.information(self, "Docking export complete", "\n".join(str(p) for p in paths))
+
+    def save_session(self, path):
+        """Persist source-independent workspace state and its undo/redo cursor."""
+        if self.is_busy:
+            raise ValueError("Wait for active computation before saving the workspace")
+        from smiles2select.storage.session_store import save_session
+
+        return save_session(path, self.result, self.basket, workspace_state={
+            "applied_selections": self._applied_selections,
+            "criteria_snapshots": self._criteria_snapshots,
+            "selection_outcomes": self._selection_outcomes,
+            "model_scores_by_action": self._model_scores_by_action,
+            "initial_criteria": self._initial_criteria,
+            "draft_criteria": criteria_state.capture(self),
+            "run_provenance": self._run_provenance,
+            "scenario_snapshots": self._scenario_snapshots,
+            "candidates": self.candidates.copy(deep=True),
+        })
+
+    @classmethod
+    def from_session(cls, path, parent=None):
+        """Open a complete saved workspace without reading the original library."""
+        from smiles2select.storage.session_store import load_session
+
+        result, basket, state = load_session(path)
+        window = cls(result, parent=parent)
+        candidates = state.get("candidates")
+        if candidates is not None:
+            if (not isinstance(candidates, pd.DataFrame)
+                    or not candidates.index.equals(window.candidates.index)
+                    or not candidates.columns.equals(window.candidates.columns)):
+                window.close()
+                raise ValueError("Saved candidates do not match workspace records or columns")
+            window.candidates = candidates.copy(deep=True)
+        window.basket = basket
+        for key, attribute in (
+            ("applied_selections", "_applied_selections"),
+            ("criteria_snapshots", "_criteria_snapshots"),
+            ("selection_outcomes", "_selection_outcomes"),
+            ("model_scores_by_action", "_model_scores_by_action"),
+            ("scenario_snapshots", "_scenario_snapshots"),
+        ):
+            setattr(window, attribute, dict(state.get(key, {})))
+        window._run_provenance = state.get("run_provenance")
+        window._initial_criteria = state.get("initial_criteria", window._initial_criteria)
+        draft = state.get("draft_criteria")
+        if draft is None:
+            criteria_state.restore(window)
+        else:
+            criteria_state.apply(window, draft)
+        window.refresh()
+        return window
+
+    def _save_session_dialog(self) -> None:
+        if self.is_busy:
+            self.warnings.setText("Wait for active computation before saving the workspace.")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save workspace session", "selection.s2s.sqlite",
+            "SMILES2Select session (*.s2s.sqlite *.sqlite)",
+        )
+        if not path:
+            return
+        try:
+            saved = self.save_session(path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Session not saved", str(exc))
+            return
+        QMessageBox.information(self, "Session saved", str(saved))
+
+    def _open_session_dialog(self) -> None:
+        if self.is_busy:
+            self.warnings.setText("Wait for active computation before opening a session.")
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open workspace session", "",
+            "SMILES2Select session (*.s2s.sqlite *.sqlite)",
+        )
+        if path:
+            self.session_open_requested.emit(path)
 
     def _active_snapshot(self):
         for index in range(len(self.basket.log.applied) - 1, -1, -1):

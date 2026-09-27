@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -36,7 +36,7 @@ class ActionType(str, Enum):
 
 def utc_timestamp() -> str:
     """Current instant, ISO 8601 with an explicit UTC offset."""
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 @dataclass(frozen=True)
@@ -86,12 +86,23 @@ class ActionLog:
     expect.
     """
 
-    def __init__(self, actions: Iterable[SelectionAction] = ()) -> None:
+    def __init__(
+        self, actions: Iterable[SelectionAction] = (), *, cursor: int | None = None
+    ) -> None:
         self._actions: list[SelectionAction] = list(actions)
-        self._cursor = len(self._actions)
+        if cursor is None:
+            cursor = len(self._actions)
+        if isinstance(cursor, bool) or not isinstance(cursor, int) or not 0 <= cursor <= len(self._actions):
+            raise ValueError("action cursor must be within the stored history")
+        self._cursor = cursor
 
     def __len__(self) -> int:
         return len(self._actions)
+
+    @property
+    def cursor(self) -> int:
+        """Number of actions currently applied."""
+        return self._cursor
 
     @property
     def applied(self) -> tuple[SelectionAction, ...]:
@@ -137,7 +148,7 @@ class ActionLog:
         return [action.as_row() for action in self._actions]
 
 
-def from_rows(rows: Sequence[dict[str, Any]]) -> ActionLog:
+def from_rows(rows: Sequence[dict[str, Any]], *, cursor: int | None = None) -> ActionLog:
     """Rebuild a log from stored rows (session restore)."""
     actions = []
     for row in rows:
@@ -153,7 +164,7 @@ def from_rows(rows: Sequence[dict[str, Any]]) -> ActionLog:
                 new_state=_ints(json.loads(row.get("new_state_json") or "{}")),
             )
         )
-    return ActionLog(actions)
+    return ActionLog(actions, cursor=cursor)
 
 
 def _ints(payload: dict[str, Any]) -> dict[int, Any]:

@@ -4,14 +4,24 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
-
-from smiles2select.app_metadata import APP_NAME, app_icon_path
-from smiles2select.gui.main_window import MainWindow
+from smiles2select.gui.worker_launch import worker_dispatch
 
 
 def main(argv: list[str] | None = None) -> int:
+    from multiprocessing import freeze_support
+
+    freeze_support()
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    worker_status = worker_dispatch(arguments)
+    if worker_status is not None:
+        return worker_status
+
+    from PySide6.QtGui import QIcon
+    from PySide6.QtWidgets import QApplication
+
+    from smiles2select.app_metadata import APP_NAME, app_icon_path
+    from smiles2select.gui.main_window import MainWindow
+
     application = QApplication(argv if argv is not None else sys.argv)
     application.setApplicationName(APP_NAME)
     application.setWindowIcon(QIcon(str(app_icon_path())))
@@ -22,12 +32,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    # Required before anything else touches multiprocessing: this is the
-    # PyInstaller entrypoint (packaging/smiles2select.spec), and on Windows a
-    # frozen build re-executes this same module in every worker process. Without
-    # freeze_support(), that re-execution would open a second GUI window in
-    # each worker instead of running as a plain worker.
-    from multiprocessing import freeze_support
-
-    freeze_support()
     raise SystemExit(main())

@@ -1,10 +1,30 @@
-# SMILES2Select 3.3.1
+# SMILES2Select
 
 [![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21920596.svg)](https://doi.org/10.5281/zenodo.21920596)
 
 Author: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA)
 
 ## English
+
+### Integration candidate 3.4.0
+
+SMILES2Select now includes S2S-Decision in one install. The usual chemical
+screening remains the default. Three validation-frozen, target-specific ONNX
+packages ship with the product under a separate CC BY-SA 4.0 notice. In the
+Chemical Space Hub, **Prioritize by model** compares a compatible proposal with the current basket;
+adoption is explicit and undoable. Models score the eligible pool before the
+final count is applied. A score is specific to its declared target and endpoint,
+not a guarantee of activity. See the [GUI guide](docs/GUI_GUIDE.md) and
+[model catalog qualification](docs/MODEL_CATALOG_QUALIFICATION.md).
+
+Save the Hub as a `.s2s.sqlite` session and reopen it from the main window.
+The session retains source-independent results, basket, history and model scores
+for inspection and export. Recomputing a model proposal still requires its
+compatible ONNX package. Training and evaluation live under **Advanced model
+tools** and need an optional Python runtime with `.[train]`; the desktop
+bundle does not include PyTorch or training converters. Source installations
+need `.[inference]` for ONNX proposals. The legacy `s2s-decision` command remains
+available; `s2s-decision-gui` opens the unified application.
 
 ### New in 3.3.1
 

@@ -385,6 +385,12 @@ def _config_from_selection_plan(
     args: argparse.Namespace, recipe: recipes.SelectionRecipe
 ) -> RunConfig:
     """Replay the deterministic Hub layer while letting the caller choose new inputs."""
+    if recipe.model or recipe.strategy == "experimental_model":
+        raise ValueError(
+            "Model selection recipes are audit records, not CLI replay plans. "
+            "Open the saved .s2s.sqlite session for historical export; "
+            "new inference requires the compatible ONNX model package."
+        )
     profile_ids = tuple(_split(args.profiles))
     standardization_fields = set(StandardizationConfig.__dataclass_fields__)
     standardization_payload = {

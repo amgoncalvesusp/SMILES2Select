@@ -1,5 +1,36 @@
 # Guided selection and scenario comparison
 
+## Model proposals and saved sessions (3.4 candidate)
+
+After processing, open the Chemical Space Hub and expand **Prioritize by model**.
+Import a compatible ONNX model folder, then choose its target, endpoint and model.
+The panel shows task threshold, estimator, calibration status and training
+reference count. Preview scores the chemically eligible pool using the current
+count, quotas, pins, exclusions and reference rules. The basket stays unchanged
+until **Adopt proposal**. Review retained, added, removed and requested versus
+obtained counts before adopting. Undo and redo include the model decision.
+**Cancel preview** discards the pending result after the current computation
+stage finishes; no partial proposal is adopted.
+
+A model cannot be used for another target or endpoint. A missing or incompatible
+model produces a reason; there is no automatic QED fallback. Model scores are
+task-specific estimates, not confirmed activity or universal probabilities.
+The ordinary chemical strategies stay available. Sessions with zone allocation
+currently block model proposals.
+
+Use **Save session** in the Hub to create a `.s2s.sqlite` file. Use **Open
+session** in the Hub or **Open saved session** on the main window to restore
+the basket, history, criteria and results. Original input and ONNX files may
+have moved: historical inspection and export still work; new inference needs
+the original compatible model package. A recipe JSON records a decision but
+does not replace this complete session file. For very large libraries, session
+saving can take time and disk space proportional to the full run.
+
+**Advanced model tools** in the main window hosts S2S-Decision training and
+evaluation. Choose an external Python with `smiles2select[train]` installed
+when using a frozen desktop build; dependencies are checked before a job starts.
+Training does not alter an adopted basket.
+
 The interface is intended for researchers who know their scientific question but
 may be new to cheminformatics. Start with a local SMILES library, map its columns,
 review the structure preparation and profile roles, and inspect the selection

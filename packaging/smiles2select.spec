@@ -29,6 +29,10 @@ datas = [
     ),
     (str(ASSET_ROOT / "SMILES2Select.png"), "smiles2select/assets"),
     (str(ASSET_ROOT / "SMILES2Select.ico"), "smiles2select/assets"),
+    (
+        str(SOURCE_ROOT / "s2s_decision" / "bundled_models"),
+        "s2s_decision/bundled_models",
+    ),
 ]
 
 # RDKit ships data files (filter catalogues, the SA/NP contrib models) outside
@@ -41,6 +45,7 @@ datas += collect_data_files("rdkit")
 binaries = [
     *collect_dynamic_libs("rdkit"),
     *collect_dynamic_libs("numpy"),
+    *collect_dynamic_libs("onnxruntime"),
 ]
 
 # Python's extension modules may depend on runtime DLLs that PyInstaller does
@@ -74,6 +79,7 @@ if sys.platform == "win32":
 
 hiddenimports = [
     *collect_submodules("rdkit.Chem"),
+    *collect_submodules("onnxruntime.capi"),
     "smiles2select.gui.workspace.workspace_window",
     "pyqtgraph",
 ]
@@ -86,9 +92,37 @@ analysis = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
-    # Excluded on purpose: pulled in transitively but never used at runtime,
-    # and each adds tens of megabytes to the bundle.
-    excludes=["tkinter", "pytest", "IPython", "notebook"],
+    # Keep the standard desktop bundle limited to its declared runtime.
+    # Training, Parquet and unrelated packages in a developer environment
+    # must not leak into the release executable.
+    excludes=[
+        "tkinter",
+        "pytest",
+        "IPython",
+        "notebook",
+        "PyQt5",
+        "PyQt6",
+        "PySide2",
+        "ast_serialize",
+        "bcrypt",
+        "cryptography",
+        "pydantic",
+        "pydantic_core",
+        "psycopg",
+        "psycopg2",
+        "pyarrow",
+        "pythoncom",
+        "pywintypes",
+        "sqlalchemy",
+        "win32com",
+        "win32evtlog",
+        "Pythonwin",
+        "torch",
+        "sklearn",
+        "onnx",
+        "onnxscript",
+        "skl2onnx",
+    ],
     noarchive=False,
 )
 

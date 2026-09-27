@@ -128,15 +128,23 @@ def build_layout(window, objective_candidates):
     window.select_button.clicked.connect(window._auto_select)
     window.compare_button = QPushButton("Compare scenarios A / B...")
     window.compare_button.clicked.connect(window._open_scenarios)
+    from smiles2select.gui.workspace.model_decision import ModelDecisionPanel
+
+    window.model_panel = ModelDecisionPanel(window)
     window.criteria_summary = wrapped()
     window.selection_summary = wrapped()
     window.selection_summary.setStyleSheet("font-weight: 600;")
+    window.save_session_button = QPushButton("Save workspace session...")
+    window.save_session_button.clicked.connect(window._save_session_dialog)
+    window.open_session_button = QPushButton("Open saved session...")
+    window.open_session_button.clicked.connect(window._open_session_dialog)
     for label, widget in (("Number of molecules", window.target_count),
                           ("Selection strategy", window.strategy)):
         form.addRow(label, widget)
     for widget in (window.strategy_help, window.selection_help_button,
-                   window.select_button, window.compare_button,
-                   window.criteria_summary, window.selection_summary):
+                   window.select_button, window.compare_button, window.model_panel,
+                   window.criteria_summary, window.selection_summary,
+                   window.save_session_button, window.open_session_button):
         form.addRow(widget)
 
     window.advanced_toggle = QToolButton()

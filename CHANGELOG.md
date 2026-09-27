@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.4.0 - integration candidate
+
+- Integrated S2S-Decision into the SMILES2Select package and desktop workspace, with target-specific ONNX previews, explicit adoption, undo/redo and model-aware exports.
+- Added complete, integrity-checked `.s2s.sqlite` sessions that restore processed results, basket and history without original source or model files for historical export.
+- Added validated user model import, optional training runtime, source/frozen worker dispatch and ONNX Runtime CPU desktop packaging.
+- Separated model chemistry compatibility from the application version and preserved legacy model verification without changing historical manifests.
+- Raised minimum Python version to 3.11; model selection remains experimental and is not a claim of biological activity.
+
 ## 3.3.1 - 2026-09-16
 
 - Fixed final selection by molecular cores for libraries above 5,000 evaluable molecules: missing Murcko scaffolds are now calculated on demand in the background. Previously the operation failed and left the original, potentially much larger selection unchanged.

@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Sequence
+from datetime import UTC
 from pathlib import Path
 
 from smiles2select.pipeline.chunking import MoleculeChunk
@@ -57,9 +58,9 @@ CREATE TABLE IF NOT EXISTS chunk_results (
 def _now() -> str:
     # Imported lazily: datetime.now() is fine here (this is wall-clock
     # logging, not something a workflow replay needs to be deterministic).
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _require_checkpoint_database(path: Path) -> None:

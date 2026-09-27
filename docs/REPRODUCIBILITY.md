@@ -1,5 +1,26 @@
 # Reproducibility
 
+## Integrated model decisions and complete sessions (3.4 candidate)
+
+The integrated model path takes a copied snapshot of the workspace. Stable
+`record_id` values link original structures, model features, scores and final
+selection; molecule names and SMILES are not unique identifiers. Model chemistry
+is kept separate from the session's standardized structures. Incompatible
+feature contracts or collapsed stereoisomer identities block the proposal.
+Previews seal input, model, reference and output hashes. Adoption rechecks
+session revision and the sealed files; it never silently recalculates a stale
+proposal. Model recipes use schema 4.0, while chemical recipes remain schema
+3.0. Legacy 2.0/3.0 readers remain; unsupported schema 1 stays rejected.
+
+The `.s2s.sqlite` session stores the full processed run, basket, undo/redo
+cursor, applied criteria and model scores in versioned tables with integrity
+hashes. It supports historical export without source CSV or ONNX files. A new
+model calculation requires a compatible model package and chemistry runtime.
+Keep the model package, data source, package hashes and task definition with
+the research record when exact computational replay is required. Model scores
+are never measured activities. Calibration applies only when its model card
+declares valid calibration for that task.
+
 Selection recipes record candidate and reference libraries, standardization,
 fingerprint parameters, projection settings, zones, strategy, final/reserve
 counts and random seed. Exact reference results record the search mode and

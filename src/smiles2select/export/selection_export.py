@@ -4,8 +4,9 @@ Adds the decision sheets to the chemistry report, and writes the recipe JSON
 next to the workbook. Together they answer, for every molecule in the final
 set: what the rules said, what the human decided, and under which settings.
 
-A spreadsheet alone cannot be replayed. The recipe can, which is why it is
-always written alongside rather than only embedded as a sheet.
+A spreadsheet alone does not preserve the full decision state. The adjacent
+recipe records the applied criteria and provenance; model recipes are audit
+records, while complete sessions use the SQLite workspace file.
 """
 
 from __future__ import annotations
@@ -72,6 +73,7 @@ class SessionArtifacts:
     scaffolds: pd.Series | None = None
     unrepresented_clusters: list[int] | None = None
     scenario_snapshot: ScenarioSnapshot | None = None
+    model_scores: pd.DataFrame | None = None
 
 
 def final_selected_sheet(artifacts: SessionArtifacts) -> pd.DataFrame:
@@ -123,6 +125,13 @@ def final_selected_sheet(artifacts: SessionArtifacts) -> pd.DataFrame:
         frame["Cluster_ID"] = artifacts.clusters.reindex(frame.index)
     if artifacts.scaffolds is not None:
         frame["Scaffold_ID"] = artifacts.scaffolds.reindex(frame.index)
+    if artifacts.model_scores is not None:
+        for field, label in (
+            ("priority_score", "Model_Priority_Score"),
+            ("calibration_status", "Model_Calibration_Status"),
+        ):
+            if field in artifacts.model_scores:
+                frame[label] = artifacts.model_scores[field].reindex(frame.index)
 
     return frame.reset_index(names="record_id")
 
@@ -178,6 +187,14 @@ def export(artifacts: SessionArtifacts, path: str | Path) -> tuple[Path, Path]:
         sheets["RESCUE_ANALYSIS"] = artifacts.rescue
     if artifacts.counterfactuals is not None:
         sheets["COUNTERFACTUALS"] = artifacts.counterfactuals
+    if artifacts.model_scores is not None:
+        if not artifacts.model_scores.index.is_unique:
+            raise ValueError("model score record IDs must be unique")
+        if len(artifacts.model_scores) > 1_048_575:
+            raise ValueError("MODEL_SCORES exceeds Excel row limit")
+        scores = artifacts.model_scores.copy(deep=True)
+        scores["Final_Selected"] = scores.index.isin(artifacts.outcome.selected_ids)
+        sheets["MODEL_SCORES"] = scores.reset_index(names="record_id")
     snapshot = artifacts.scenario_snapshot
     if snapshot is not None:
         sheets["SCENARIO_CONTEXT"] = pd.DataFrame(

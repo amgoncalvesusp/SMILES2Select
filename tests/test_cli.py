@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from smiles2select.cli import build_parser, main
+from smiles2select.selection_intelligence import recipes
 from tests.conftest import REFERENCE_SMILES
 
 pytestmark = pytest.mark.integration
@@ -215,3 +216,19 @@ def test_cli_saves_and_replays_a_selection_plan(library, tmp_path, capsys):
     capsys.readouterr()
     assert main([str(library), "--smiles-column", "SMILES", "--id-column", "ID",
                  "--selection-plan", str(plan), "--jobs", "1", "--quiet"]) == 0
+
+
+def test_cli_rejects_model_recipe_as_replay_plan(library, tmp_path, capsys):
+    plan = recipes.save(
+        recipes.SelectionRecipe(
+            strategy="experimental_model",
+            model={"model_sha256": "a" * 64, "model_manifest_sha256": "b" * 64,
+                   "reference_records_sha256": "c" * 64,
+                   "target": "Q72547_WT", "endpoint": "IC50"},
+        ),
+        tmp_path / "model.selection.json",
+    )
+    assert main([str(library), "--selection-plan", str(plan), "--quiet"]) == 2
+    message = capsys.readouterr().err
+    assert "audit records" in message
+    assert ".s2s.sqlite" in message

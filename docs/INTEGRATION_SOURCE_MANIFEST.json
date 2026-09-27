@@ -1,0 +1,225 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-09-26T22:28:11.563709+00:00",
+  "source_root": "C:\\Users\\adria\\OneDrive\\Documents\\Projetos IA\\S2S-Decision",
+  "source_package": "s2s-decision",
+  "source_version": "0.2.0 (working tree; no git repository)",
+  "canonical_repository": "C:\\Users\\adria\\OneDrive\\Documents\\Projetos IA\\SMILES2Select",
+  "canonical_base_commit": "b9f00bd9699f412f7c1cc1e3eaec436f46bc5d4b",
+  "scope": [
+    "src/**/*.py",
+    "tests/**/*.py"
+  ],
+  "files": [
+    {
+      "path": "src/s2s_decision/__init__.py",
+      "sha256": "889ca7bdac9f1d9d5f7c83a1321ca192aafa5ccd3d5b4668a4e846f3d1fca6c9",
+      "bytes": 113
+    },
+    {
+      "path": "src/s2s_decision/__main__.py",
+      "sha256": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "bytes": 48
+    },
+    {
+      "path": "src/s2s_decision/artifacts.py",
+      "sha256": "80ed23408e1fc23a2d0ff09159b98c5e582966c25f2bc95ad2bbf2134a2383c1",
+      "bytes": 3135
+    },
+    {
+      "path": "src/s2s_decision/baseline_training.py",
+      "sha256": "9330f585ed1d14abe79efa42afe781897947b9dc9592a804881368c9d0ae1040",
+      "bytes": 10077
+    },
+    {
+      "path": "src/s2s_decision/benchmark_evaluation.py",
+      "sha256": "c801c1b656e5c7de8e8e2f08748f658621a7548f91e3911801ed3fc5ee88b478",
+      "bytes": 4964
+    },
+    {
+      "path": "src/s2s_decision/cli.py",
+      "sha256": "363d06c78406a855e16710103babc473661836e5af0e0be1ec73a91da001ca45",
+      "bytes": 8143
+    },
+    {
+      "path": "src/s2s_decision/context.py",
+      "sha256": "4b405313a57193440d49ae2d8a2338da21651f599cf90d11e322f2fde000811e",
+      "bytes": 6331
+    },
+    {
+      "path": "src/s2s_decision/data.py",
+      "sha256": "e009e51e89c47dfb2eb4d78a7e0912c2e00693590b028b11570034e852cc41e7",
+      "bytes": 10502
+    },
+    {
+      "path": "src/s2s_decision/decision.py",
+      "sha256": "f48db8bfca96ab88c18bb47d560c8b68388f38b2c785bb1dda386f72fd03d1a7",
+      "bytes": 14904
+    },
+    {
+      "path": "src/s2s_decision/decision_gui.py",
+      "sha256": "bc41320864b4220bac7284ea6aaad56cddc1b4cb697c92ba1d437eaa1c197db3",
+      "bytes": 21053
+    },
+    {
+      "path": "src/s2s_decision/experiment.py",
+      "sha256": "f976f2ed7dd40d3114353ea4d0a6cd329e5200b9f03c13db63919e8c44faa6c4",
+      "bytes": 16818
+    },
+    {
+      "path": "src/s2s_decision/experiment_report.py",
+      "sha256": "c23d5f07ccaa924aa1248041af638e2b5063c5ae9493ccb634ba9ef04934c27e",
+      "bytes": 12912
+    },
+    {
+      "path": "src/s2s_decision/features.py",
+      "sha256": "7375e70f58bfa3ecf9c05028d6a7524fb98bd09581422c646c5dcce31148c55e",
+      "bytes": 7197
+    },
+    {
+      "path": "src/s2s_decision/gui.py",
+      "sha256": "4d35b286a9d0ec27e9749041d68c24daee3d2512005cd41a707fea295ae94808",
+      "bytes": 16279
+    },
+    {
+      "path": "src/s2s_decision/inference.py",
+      "sha256": "8582f4b5b6adb41bb7cf0adf8afcebba4fe767f62dbce1176e60b3badc66caf7",
+      "bytes": 5917
+    },
+    {
+      "path": "src/s2s_decision/metrics.py",
+      "sha256": "8ab625a64ee6cd8b734fd1f8f2b6e04b4242be6298cb856c0b840bedbf724d63",
+      "bytes": 3298
+    },
+    {
+      "path": "src/s2s_decision/model.py",
+      "sha256": "78533b521962a268efbbae345057bb122255379b9365c40aade8361952e0a741",
+      "bytes": 999
+    },
+    {
+      "path": "src/s2s_decision/preprocessing.py",
+      "sha256": "627db6060ac0361b837ca666c082a1415b5a2bdb7d00097d4ddc78d7cf7e940d",
+      "bytes": 3921
+    },
+    {
+      "path": "src/s2s_decision/schema.py",
+      "sha256": "3360ed3f7ff26e2f38b229a0ef9c64f4d592be854a511ff0ced8949797c3c00a",
+      "bytes": 2271
+    },
+    {
+      "path": "src/s2s_decision/selection.py",
+      "sha256": "36c572c61a4f53ed8887f694531e5705cee11eed33b2250a2499a8a2fb5de6f4",
+      "bytes": 6893
+    },
+    {
+      "path": "src/s2s_decision/smiles2select_io.py",
+      "sha256": "ab9932b0f3ec8199f646b054fce7f7997a0a280268c7d7adac005e45ccc00c3f",
+      "bytes": 10234
+    },
+    {
+      "path": "src/s2s_decision/splits.py",
+      "sha256": "4ab9f696924218bfa9058ddfd8d885e151d537863cc32ba513e65867d30730a2",
+      "bytes": 3904
+    },
+    {
+      "path": "src/s2s_decision/training.py",
+      "sha256": "8b0c4384f4ea0484d2bd52a3b2c27416bcd6fd7a3253565b62ed98635fd045bd",
+      "bytes": 15517
+    },
+    {
+      "path": "src/s2s_decision/workflows.py",
+      "sha256": "6d22575ef551b2b1b0f534425757d0c0dcf3687a5b36288a599821241ef448df",
+      "bytes": 14506
+    },
+    {
+      "path": "tests/test_baseline_packages.py",
+      "sha256": "5851e58cf312890b7237493fdc1409393c5e4f70b35625535332745975837aaf",
+      "bytes": 8649
+    },
+    {
+      "path": "tests/test_benchmark_evaluation.py",
+      "sha256": "89b38c481f453626edc530481bbc19a4561bf86b77a202de2af8bea20717569f",
+      "bytes": 4503
+    },
+    {
+      "path": "tests/test_context.py",
+      "sha256": "90b152d07df75bfe20ba27d4828866b465e1368b45b7b81645230062c3f91ca7",
+      "bytes": 4864
+    },
+    {
+      "path": "tests/test_data.py",
+      "sha256": "d78d82c8d886b88198d5608217af67d84d93a7263faa133b98cc0ac48aab9903",
+      "bytes": 5497
+    },
+    {
+      "path": "tests/test_decision_cli.py",
+      "sha256": "5413328fd69f062b9839c027a1e279725983c0267268df76b2bfbc88f69b791a",
+      "bytes": 1668
+    },
+    {
+      "path": "tests/test_decision_flow.py",
+      "sha256": "87f5ecad1f48a57f602cf972362cc6bc2692707adc11efd353bad93c657c9e96",
+      "bytes": 10488
+    },
+    {
+      "path": "tests/test_decision_gui.py",
+      "sha256": "eda8fb91508a7af9fb1f1d804413fa8c98ee33d52a89739736c179a03ec66b65",
+      "bytes": 6679
+    },
+    {
+      "path": "tests/test_end_to_end.py",
+      "sha256": "dcb5e59c1c397a59c6fa16562777e9e2147d4c40710381aa751a6a917e423dde",
+      "bytes": 8372
+    },
+    {
+      "path": "tests/test_experiment.py",
+      "sha256": "b93798f75d49d0be6a4cff97a427a6b87585bbb9648aa1abaedcfe593e3043b3",
+      "bytes": 4797
+    },
+    {
+      "path": "tests/test_experiment_prepare.py",
+      "sha256": "3d79749052df8558c7ac5bb812a4df9adcd5729c287cbd52be556d4f4efa4f5f",
+      "bytes": 10861
+    },
+    {
+      "path": "tests/test_experiment_report.py",
+      "sha256": "344b42af8beec1f463e69babaeada082fdd694d2d153d5e838fb77bb45133ea4",
+      "bytes": 7483
+    },
+    {
+      "path": "tests/test_gui.py",
+      "sha256": "938a64e9df2ffd8af31bb70c72d31967295cd502312d0392978e9bf6e8653e8c",
+      "bytes": 5707
+    },
+    {
+      "path": "tests/test_learning.py",
+      "sha256": "0151412a5c243cc36cb38df5a01526912c2d28fd5d19bce855ce76397df90f1d",
+      "bytes": 7324
+    },
+    {
+      "path": "tests/test_selection.py",
+      "sha256": "a16a77064bdc1778b14aa66f7cd7c833ec230d3ed3d986742677596f02dfb7c1",
+      "bytes": 6206
+    },
+    {
+      "path": "tests/test_smiles2select_bridge.py",
+      "sha256": "6fdc6c0129a8fe6873014e9750ea26f124fb1b243c6e6780dcef26a193e5832a",
+      "bytes": 12787
+    },
+    {
+      "path": "tests/test_splits.py",
+      "sha256": "24a2a54fb052901a93afbf72688a68624da7f561682adbdc2b131ca7ca1f2509",
+      "bytes": 1575
+    },
+    {
+      "path": "tests/test_training_isolation.py",
+      "sha256": "e073225e4aee2996465d0378c459cd193397c36b1bf4b20564f60af50f659d17",
+      "bytes": 3937
+    },
+    {
+      "path": "tests/test_workflow.py",
+      "sha256": "1c7a06c148a5602a43ea552f2938bbf1e6510b60900708213ad47f3c0e830bd0",
+      "bytes": 3425
+    }
+  ]
+}

@@ -76,6 +76,14 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
     objective_values = (tuple(obj.as_dict() for obj in snapshot.spec.objectives)
                         if snapshot else applied.objectives if applied else ())
     metadata = self._provenance()
+    model_scores = None
+    if applied and snapshot is None and applied.strategy == "experimental_model":
+        for index in range(len(self.basket.log.applied) - 1, -1, -1):
+            if self._applied_selections.get(index) is applied:
+                scores = getattr(self, "_model_scores_by_action", {}).get(index)
+                if scores is not None:
+                    model_scores = scores.copy(deep=True)
+                break
     projection = self._projection_results.get((
         str(self.projection_selector.currentData()),
         bool(self.reference_overlay.isChecked() and self.result.reference_libraries),
@@ -93,7 +101,8 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
                                  for rule in profile.rules if not rule.is_substructure},
             applied_thresholds=dict(snapshot.spec.thresholds) if snapshot else {},
             target_count=selected_constraints.target_count,
-            strategy=strategy.value if snapshot or applied else self.result.config.selection_strategy,
+            strategy=(strategy.value if snapshot else applied.strategy if applied
+                      else self.result.config.selection_strategy),
             max_per_scaffold=selected_constraints.max_per_scaffold,
             max_per_cluster=selected_constraints.max_per_cluster,
             pinned_ids=self.basket.pinned_ids(),
@@ -139,9 +148,18 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
                 {**metadata, **dict(snapshot.provenance), "source": "scenario"} if snapshot else
                 applied.provenance if applied else {**metadata, "source": "original_pipeline"}
             ),
+            model=(
+                {key: value for key in (
+                    "model_sha256", "model_manifest_sha256", "reference_records_sha256",
+                    "target", "endpoint", "threshold", "estimator",
+                    "calibration_status", "chemistry_hash", "preview_sha256", "ranking_method",
+                ) if (value := applied.provenance.get(key)) is not None}
+                if applied and snapshot is None and applied.strategy == "experimental_model" else {}
+            ),
         ),
         pareto=applied.pareto if applied and not snapshot else None,
         scenario_snapshot=snapshot,
         clusters=self.candidates.get("cluster_id"),
         scaffolds=scaffolds,
+        model_scores=model_scores,
     )
