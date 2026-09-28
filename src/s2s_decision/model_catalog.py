@@ -16,6 +16,9 @@ _REQUIRED = frozenset(
 )
 _OPTIONAL = frozenset({"MODEL_CARD.md"})
 
+# Names retained from the three baseline choices frozen before test evaluation.
+_VALIDATION_SELECTED = frozenset({"Q72547_WT_IC50", "P0DMS8_WT_Ki", "Q07869_WT_EC50"})
+
 
 def bundled_model_root() -> Path:
     """Read-only model packages distributed with the application."""
@@ -92,7 +95,7 @@ def list_bundled_models(*, target: str | None = None, endpoint: str | None = Non
     if not catalog.is_dir():
         return []
     return [
-        {**item, "origin": "bundled"}
+        {**item, "origin": "bundled", "validation_selected": item["name"] in _VALIDATION_SELECTED}
         for item in list_models(catalog, target=target, endpoint=endpoint)
     ]
 

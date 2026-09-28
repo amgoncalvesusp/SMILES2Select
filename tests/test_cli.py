@@ -232,3 +232,28 @@ def test_cli_rejects_model_recipe_as_replay_plan(library, tmp_path, capsys):
     message = capsys.readouterr().err
     assert "audit records" in message
     assert ".s2s.sqlite" in message
+
+
+@pytest.mark.parametrize("settings", [
+    {"min_scaffolds": 3},
+    {"max_per_scaffold": 1},
+    {"max_per_cluster": 1},
+    {"objectives": ({"field": "qed"},)},
+    {"max_front": 1},
+    {"applied_thresholds": {"mw_limit": 600}},
+    {"pinned_ids": (1,)},
+    {"excluded_ids": (2,)},
+    {"final_selected_ids": (1, 2)},
+    {"provenance": {"source": "workspace"}},
+    {"provenance": {"source": "scenario"}},
+    {"provenance": {"source": "original_pipeline"}},
+])
+def test_cli_rejects_workspace_criteria_it_cannot_replay(library, tmp_path, capsys, settings):
+    plan = recipes.save(
+        recipes.SelectionRecipe(strategy="balanced", target_count=5, **settings),
+        tmp_path / "workspace.selection.json",
+    )
+    assert main([str(library), "--selection-plan", str(plan), "--quiet"]) == 2
+    message = capsys.readouterr().err
+    assert "audit records" in message
+    assert ".s2s.sqlite" in message

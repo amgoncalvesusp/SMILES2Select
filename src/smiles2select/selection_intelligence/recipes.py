@@ -59,6 +59,7 @@ class SelectionRecipe:
     target_count: int | None = None
     strategy: str = "balanced"
     max_per_scaffold: int | None = None
+    min_scaffolds: int | None = None
     max_per_cluster: int | None = None
     manual_overrides: tuple[ManualOverride, ...] = ()
     pinned_ids: tuple[int, ...] = ()
@@ -117,6 +118,7 @@ class SelectionRecipe:
                 "strategy": self.strategy,
                 "selection_strategy": self.strategy,
                 "max_per_scaffold": self.max_per_scaffold,
+                "min_scaffolds": self.min_scaffolds,
                 "max_per_cluster": self.max_per_cluster,
                 "selected_ids": list(self.final_selected_ids),
             },
@@ -157,6 +159,7 @@ class SelectionRecipe:
             ("selection_source", self.provenance.get("source", "-")),
             ("selection_data_hash", self.provenance.get("selection_data_hash", "-")),
             ("max_per_scaffold", self.max_per_scaffold or "-"),
+            ("min_scaffolds", self.min_scaffolds or "-"),
             ("max_per_cluster", self.max_per_cluster or "-"),
             ("changed thresholds", len(self.changed_thresholds)),
             ("manual_overrides", len(self.manual_overrides)),
@@ -214,6 +217,7 @@ def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRe
         reserve_count=final.get("reserve_count"),
         strategy=final.get("strategy", "balanced"),
         max_per_scaffold=final.get("max_per_scaffold"),
+        min_scaffolds=final.get("min_scaffolds"),
         max_per_cluster=final.get("max_per_cluster"),
         manual_overrides=tuple(
             ManualOverride(**override) for override in payload.get("manual_overrides", ())

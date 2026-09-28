@@ -6,6 +6,7 @@ import json
 import time
 
 import pandas as pd
+import pytest
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from s2s_decision.artifacts import read_bundle
@@ -19,13 +20,23 @@ result = test_workspace.result
 window = test_workspace.window
 
 
-def test_real_model_workspace_preview_adopt_save_reopen_export(window, tmp_path, monkeypatch):
+@pytest.mark.parametrize("estimator,layout", [
+    ("tiny", "tiny_branches"),
+    ("logistic", "scalar_fingerprint"),
+    ("gradient_boosting", "scalar"),
+    ("gradient_boosting", "scalar_fingerprint"),
+])
+def test_real_model_workspace_preview_adopt_save_reopen_export(
+    window, tmp_path, monkeypatch, estimator, layout,
+):
     panel = window.model_panel
     panel.target.setCurrentIndex(panel.target.findData("Q72547_WT"))
     panel.endpoint.setCurrentIndex(panel.endpoint.findData("IC50"))
     model_index = next(
         index for index in range(1, panel.models.count())
         if panel.models.itemData(index)["origin"] == "bundled"
+        and panel.models.itemData(index)["estimator"] == estimator
+        and panel.models.itemData(index)["input_layout"] == layout
     )
     panel.models.setCurrentIndex(model_index)
     model = panel.models.currentData()

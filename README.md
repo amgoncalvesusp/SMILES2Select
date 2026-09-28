@@ -6,7 +6,7 @@ Author: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA)
 
 ## English
 
-### New in 3.4.0: one application, two selection methods
+### New in 3.4.1: complete model choices and selection controls
 
 SMILES2Select now includes S2S-Decision in one installation and workspace.
 Chemical screening remains the default. After processing a SMILES library,
@@ -17,20 +17,41 @@ exclusions and reference rules. Compare retained, added and removed molecules
 before **Adopt proposal**. Adoption is explicit and undoable; preview or
 cancellation never changes the basket.
 
-Three validation-frozen ONNX packages ship with this release:
+Twelve trained ONNX packages ship with this release: four alternatives for each
+of the three tasks below. Version 3.4.0 included only the three baseline choices;
+3.4.1 also includes the nine trained comparators, including Tiny.
 
-| Target | Endpoint | Model |
+| Target | Endpoint | Original validation-selected baseline |
 | --- | --- | --- |
 | Q72547_WT | IC50 | gradient boosting, scalar descriptors |
 | P0DMS8_WT | Ki | logistic regression, scalar descriptors + Morgan fingerprint |
 | Q07869_WT | EC50 | logistic regression, scalar descriptors + Morgan fingerprint |
 
+Each task offers these four alternatives:
+
+| Model | When to compare it |
+| --- | --- |
+| Logistic regression + Morgan | A simple supervised baseline using properties, reference context and fingerprint bits. |
+| Gradient boosting, scalar inputs | Nonlinear property/context effects without direct fingerprint-bit inputs. |
+| Gradient boosting + Morgan | Tests whether direct structural fingerprints add useful information over scalar inputs. |
+| Tiny | Experimental neural model combining properties, reference context and Morgan fingerprints; compare against simpler models under the same quotas. |
+
+Choose **Model guide and selection tips...** for each model's inputs, scope,
+limitations and practical comparison advice. Labels distinguish the original
+validation-selected baseline from experimental comparators. Keep target,
+endpoint, candidate pool and quotas fixed when comparing alternatives.
 These models are specific to their declared tasks. Their scores do not
 guarantee activity, and no universal activity model is included. Tiny remains
-an experimental option for separately trained packages. Bundled model data
+experimental and is not the default. Bundled model data
 carry a separate CC BY-SA 4.0 notice; application code remains MIT-licensed.
 See [model qualification](docs/MODEL_CATALOG_QUALIFICATION.md) for source,
 validation choices, hashes and limits.
+
+The native **Selection strategy** menu also restores **Rank by QED only**;
+it ranks chemical desirability, not activity. Advanced criteria now include
+**Minimum molecular cores**, alongside maximum-per-core and cluster quotas.
+Review warnings when a requested minimum is not reached. **Create selection**
+applies the chemical strategy; **Adopt proposal** applies a model preview.
 
 Use **Save session** in the Hub to store a `.s2s.sqlite` file. **Open saved
 session** in the main window restores processed results, final basket,
@@ -120,7 +141,17 @@ The Setup package installs the complete PyInstaller bundle, including Qt,
 RDKit, NumPy and all bundled DLL/PYD files. The published dependency manifest
 records the native import verification performed during the build.
 Linux releases provide a portable bundle. Both desktop bundles include the
-three ONNX packages and work without a separate training installation.
+twelve ONNX packages and work without a separate training installation.
+
+Linux also has a per-user installer. Download the `.run` asset and execute:
+
+```bash
+bash SMILES2Select-Setup-3.4.1-linux-x86_64.run
+```
+
+It installs the application, command launcher and desktop entry without root.
+By default, uninstall with `bash ~/.local/share/smiles2select/uninstall.sh`.
+See the [GUI guide](docs/GUI_GUIDE.md) for installation paths and model selection.
 
 ### Quick start
 
@@ -268,7 +299,7 @@ recipes, persistence, GUI interaction, cancellation and CLI integration.
 
 ## Português
 
-### Novidades da versão 3.4.0
+### Novidades da versão 3.4.1
 
 SMILES2Select e S2S-Decision agora formam um único aplicativo. A seleção
 química continua como padrão. Após processar a biblioteca, abra **Chemical
@@ -279,11 +310,20 @@ exclusões e regras de referência. Compare moléculas mantidas, adicionadas e
 removidas antes de **Adopt proposal**. A adoção altera a cesta em uma ação
 reversível; a prévia sozinha não altera a seleção.
 
-Esta versão inclui três modelos ONNX escolhidos por validação para tarefas
-específicas: Q72547_WT/IC50, P0DMS8_WT/Ki e Q07869_WT/EC50. Nenhum deles
-prediz atividade universal ou garante atividade experimental. Tiny permanece
-opcional e experimental. Os dados dos modelos têm aviso CC BY-SA 4.0 separado
+Esta versão inclui 12 modelos ONNX: logística + Morgan, gradient boosting
+escalar, gradient boosting + Morgan e Tiny para cada tarefa Q72547_WT/IC50,
+P0DMS8_WT/Ki e Q07869_WT/EC50. A versão 3.4.0 distribuía apenas três baselines;
+os nove comparadores restantes agora acompanham o aplicativo. Rótulos identificam
+os baselines originalmente escolhidos por validação. **Model guide and selection
+tips...** explica entradas, limites e quando comparar cada alternativa.
+Nenhum modelo prediz atividade universal ou garante atividade experimental.
+Tiny permanece opcional e experimental. Os dados dos modelos têm aviso CC BY-SA 4.0 separado
 da licença MIT do código. Consulte a [qualificação dos modelos](docs/MODEL_CATALOG_QUALIFICATION.md).
+
+A seleção química recupera **Rank by QED only** e os controles avançados incluem
+**Minimum molecular cores**. **Create selection** aplica a estratégia química;
+**Adopt proposal** aplica a proposta do modelo. Ambas respeitam as restrições
+compartilhadas; verifique avisos e a quantidade final antes de exportar.
 
 Use **Save session** para guardar um arquivo `.s2s.sqlite` e **Open saved
 session** para recuperar resultados, cesta, critérios, histórico de desfazer/
@@ -335,7 +375,11 @@ pacote Setup instala o bundle completo do PyInstaller, incluindo Qt, RDKit,
 NumPy e todas as DLL/PYD incluídas. O manifesto de dependências publicado
 registra a verificação dos imports nativos realizada durante a compilação.
 O release Linux fornece um bundle portátil. Os dois bundles desktop incluem
-os três modelos ONNX e não exigem instalação de bibliotecas de treinamento.
+os 12 modelos ONNX e não exigem instalação de bibliotecas de treinamento.
+Linux também tem instalador por usuário: execute
+`bash SMILES2Select-Setup-3.4.1-linux-x86_64.run`. Ele cria lançador e entrada no
+menu de aplicativos, sem root. A desinstalação padrão usa
+`bash ~/.local/share/smiles2select/uninstall.sh`.
 
 ### Início rápido
 

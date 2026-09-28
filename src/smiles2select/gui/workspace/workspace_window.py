@@ -179,7 +179,8 @@ class WorkspaceWindow(QMainWindow):
         self.color_selector.currentIndexChanged.connect(lambda _index: self.refresh())
         self.reference_overlay.stateChanged.connect(self._request_map)
         self.strategy.currentTextChanged.connect(self._update_method_card)
-        for widget in (self.target_count, self.per_scaffold, self.per_cluster):
+        self.strategy.currentTextChanged.connect(self._recompute_pareto)
+        for widget in (self.target_count, self.per_scaffold, self.per_cluster, self.min_scaffolds):
             widget.valueChanged.connect(self._update_summary)
         for editor in self.objective_editors:
             editor.direction.currentIndexChanged.connect(self._recompute_pareto)
@@ -217,10 +218,13 @@ class WorkspaceWindow(QMainWindow):
             )
         except (AttributeError, ValueError):
             objectives = f"{self.first_objective.currentText()} / {self.second_objective.currentText()}"
+        if self.strategy.currentData() == "qed_only":
+            objectives = "Descending QED; property objectives are ignored"
         self.criteria_summary.setText(
             f"Current criteria: {self.target_count.value():,} molecules; "
             f"{self.strategy.currentText()}. {objectives}. "
             f"Scaffold limit: {self.per_scaffold.value() or 'none'}; "
+            f"Minimum molecular cores: {self.min_scaffolds.value() or 'none'}; "
             f"cluster limit: {self.per_cluster.value() or 'none'}. "
             "Chemical screening rules remain in effect."
         )
@@ -411,6 +415,8 @@ class WorkspaceWindow(QMainWindow):
     def _update_method_card(self, strategy: str) -> None:
         """Keep method bias and consequence visible while changing controls."""
         strategy = self.strategy.currentData()
+        for editor in self.objective_editors:
+            editor.setEnabled(strategy != "qed_only")
         try:
             card = get_method_card(strategy)
         except KeyError:
@@ -434,6 +440,15 @@ class WorkspaceWindow(QMainWindow):
 
     def _recompute_pareto(self) -> None:
         self._update_summary()
+        if self.strategy.currentData() == "qed_only":
+            self.pareto = None
+            self.performance_notice.setText(
+                "QED-only: descending QED and record_id ties at every library size; "
+                "property objectives and Pareto ranking are inactive."
+            )
+            self.warnings.clear()
+            self.refresh()
+            return
         if len(self.candidates) > EXACT_PARETO_LIMIT:
             self.pareto = None
             self.performance_notice.setText(
@@ -443,6 +458,7 @@ class WorkspaceWindow(QMainWindow):
             self.refresh()
             return
         first = self.first_objective.currentText()
+        self.performance_notice.clear()
         second = self.second_objective.currentText()
         if not first or not second or first == second:
             self.pareto = None
@@ -543,6 +559,7 @@ class WorkspaceWindow(QMainWindow):
         return SelectionConstraints(
             target_count=self.target_count.value(),
             max_per_scaffold=self.per_scaffold.value() or None,
+            min_scaffolds=self.min_scaffolds.value() or None,
             max_per_cluster=self.per_cluster.value() or None,
         )
 
@@ -556,11 +573,13 @@ class WorkspaceWindow(QMainWindow):
         source, pareto = self.candidates, self.pareto
         result = self.result
         try:
-            objectives = self.objectives()
+            objectives = ObjectiveSet() if strategy is Strategy.QED_ONLY else self.objectives()
         except ValueError as exc:
             self.warnings.setText(str(exc))
             return
-        if len(source) <= EXACT_PARETO_LIMIT and pareto is None:
+        if strategy is Strategy.QED_ONLY:
+            pareto = None
+        elif len(source) <= EXACT_PARETO_LIMIT and pareto is None:
             self.warnings.setText("Valid objective ranking is required before selecting.")
             return
 
@@ -586,7 +605,12 @@ class WorkspaceWindow(QMainWindow):
                 candidates = candidates.join(pareto.table, how="left")
             ranking_method = "exact_pareto" if pareto is not None else "strategy_order"
             ranking_warnings = ()
-            if len(source) > EXACT_PARETO_LIMIT:
+            if strategy is Strategy.QED_ONLY:
+                candidates = candidates.loc[~candidates.index.isin(excluded_ids)]
+                candidates, ranking_method, ranking_warnings = _rank(candidates, ScenarioSpec(
+                    name="workspace", constraints=constraints, strategy=strategy,
+                ))
+            elif len(source) > EXACT_PARETO_LIMIT:
                 ranked, ranking_method, ranking_warnings = _rank(prepared, ScenarioSpec(
                     name="workspace", objectives=tuple(objectives.active),
                     constraints=constraints, strategy=strategy,

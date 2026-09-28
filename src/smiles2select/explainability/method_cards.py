@@ -39,6 +39,19 @@ class MethodCard:
 
 _CARDS = (
     MethodCard(
+        "qed_only",
+        "QED-only (drug-likeness)",
+        "Ranks eligible molecules by their cached QED score.",
+        "Orders finite QED values in [0, 1] descending, then record_id ascending; applies pins and quotas.",
+        "The drug-like property profile summarized by QED.",
+        "Useful chemistry outside that profile, including some natural products and unusual inhibitors.",
+        "A high QED score does not establish activity, safety or experimental success.",
+        "A transparent property baseline when comparing selection policies and trained models.",
+        "When target-specific activity or structural diversity is the primary ranking criterion.",
+        "Record QED calculation/version, eligibility, quotas and pins. Property objectives are ignored; invalid scores stop selection.",
+        "https://www.rdkit.org/docs/source/rdkit.Chem.QED.html",
+    ),
+    MethodCard(
         "balanced",
         "Balanced",
         "Combines several configured objectives without letting one criterion dominate.",

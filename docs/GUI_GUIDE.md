@@ -1,9 +1,9 @@
 # Guided selection and scenario comparison
 
-## Model proposals and saved sessions (3.4.0)
+## Model proposals and saved sessions (3.4.1)
 
 After processing, open the Chemical Space Hub and expand **Prioritize by model**.
-Choose one of the three bundled task-specific models, or import a compatible
+Choose one of the twelve bundled task-specific models, or import a compatible
 ONNX model folder, then choose its target, endpoint and model.
 The panel shows task threshold, estimator, calibration status and training
 reference count. Preview scores the chemically eligible pool using the current
@@ -12,6 +12,22 @@ until **Adopt proposal**. Review retained, added, removed and requested versus
 obtained counts before adopting. Undo and redo include the model decision.
 **Cancel preview** discards the pending result after the current computation
 stage finishes; no partial proposal is adopted.
+
+Each of Q72547_WT/IC50, P0DMS8_WT/Ki and Q07869_WT/EC50 offers logistic
+regression + Morgan, gradient boosting with scalar inputs, gradient boosting +
+Morgan, and Tiny. All use a pActivity threshold of 6. The original three
+validation-selected baselines retain that label; other packages are experimental
+comparators. Choose **Model guide and selection tips...** to read how the chosen
+estimator works and when its comparison is useful. Start with logistic regression
+as a simple baseline, compare scalar versus Morgan boosting to examine the effect
+of direct fingerprint inputs, and compare Tiny with these simpler alternatives.
+Keep the candidate pool, task, count and quotas fixed. Compare basket changes and
+reference similarity rather than assuming the more complex model is better.
+
+**Create selection** applies the native chemical strategy. **Adopt proposal**
+applies model-score ranking; changing the native property strategy does not alter
+model predictions. **Rank by QED only** is available in the native strategy menu
+for the original chemical-only ranking, without target-specific inference.
 
 A model cannot be used for another target or endpoint. A missing or incompatible
 model produces a reason; there is no automatic QED fallback. Model scores are
@@ -52,6 +68,24 @@ Changing a descriptor preserves the chosen direction, so review the pair togethe
 Expand advanced controls for objective directions, target intervals, scaffold or
 cluster quotas and map settings. Inspect a point to see its structure, properties
 and decision. Molecular drawings are generated only for the inspected molecule.
+
+**Minimum molecular cores** reserves representatives before filling the remaining
+count. Zero means no minimum. It uses Murcko scaffolds, so acyclic molecules share
+an empty core. Pins remain preserved; crossed quotas or too few eligible cores
+can prevent reaching the minimum. The warning reports unmet coverage, not a proof
+that no feasible alternative exists. The value is saved in sessions and recipes
+and is shared by chemical and model selections.
+
+## Desktop installation
+
+Windows: run `SMILES2Select-Setup-3.4.1.exe`, or extract the portable ZIP.
+Linux x86_64: run `bash SMILES2Select-Setup-3.4.1-linux-x86_64.run` as your normal
+user. The Linux installer places the bundle under
+`${XDG_DATA_HOME:-$HOME/.local/share}/smiles2select`, adds a desktop entry and a
+launcher under `${XDG_BIN_HOME:-$HOME/.local/bin}`. Use the applications menu, or
+ensure that launcher directory is on PATH before running `smiles2select`.
+Run the installed `uninstall.sh` to remove the application and its launchers.
+Imported models and saved sessions outside the installation directory are retained.
 
 No universal prices, exchange rates or regional purchasing assumptions are used.
 The budget in this version is a **molecule count**.

@@ -1,7 +1,27 @@
-# P0DMS8_WT · Ki
+# P0DMS8_WT_Ki / logistic_scalar_morgan
 
-Modelo `logistic_scalar_morgan` para ordenar candidatos apenas na tarefa P0DMS8_WT/Ki, com rótulo de treinamento pActivity ≥ 6. Usa descritores escalares e fingerprint Morgan do contrato químico registrado no manifest. Escore calibrado em partição própria; não representa probabilidade universal de atividade, confirmação experimental nem chance de avanço de projeto.
+## Task and selection status
 
-Treinado com 1.000 registros de treino de Papyrus++ 05.7. O pacote contém somente referências dessa partição. Escolha congelada pela AP de validação (0,9511) entre três baselines antes da análise de teste. Na avaliação retrospectiva posterior, AP do teste filtrado pelo SMILES2Select foi 0,9626; 20/20 ativos na cesta com máximo de três por scaffold. O pool filtrado tinha 94 ativos em 113 candidatos (83,19%). Essa prevalência alta limita interpretação de ganho; não há validação externa ou prospectiva.
+Logistic regression with scalar descriptors, reference context and Morgan fingerprints. Scope: **P0DMS8_WT / Ki / pActivity >= 6**.
 
-Manifest e ONNX originais permanecem intactos. O card histórico foi substituído nesta cópia de lançamento porque dizia, antes da avaliação posterior, que o teste retido não havia sido avaliado. Consulte `S2S-Decision/artifacts/product-validation-v1/REPORT.md` e `validation-choice-freeze.json` para protocolo e escolha. Fonte, alterações e licença dos recursos: `../LICENSE_CC_BY_SA_4.0.md`.
+Validation-selected baseline. This historical choice was frozen among the three baseline candidates before inspecting test predictions. Validation average precision (AP): 0.951147. This number describes one retrospective partition; it is not evidence of universal superiority. No test-set result was used to revise the frozen baseline choice.
+
+## When to choose this model
+
+Use as a compact baseline when you want a linear combination of molecular properties, similarities to training references and structural bits. Compare its selected basket with the nonlinear alternatives using the same eligible pool and scaffold limit. Correlated inputs and unfamiliar scaffolds can still produce misleading scores.
+
+Choose only when the target, endpoint and threshold match your question. Run a preview before adopting the basket. Keep input filters, requested count and per-scaffold cap equal when comparing models; inspect selected structures, applicability warnings and remaining scaffold diversity. A model cannot rank molecules removed by upstream eligibility filters. If no bundled task matches, use a compatible task-specific imported model or the general selection strategies.
+
+## Data and interpretation
+
+Trained on Papyrus++ 05.7, with **1,000 training reference records**. The references in this package belong only to the training partition. Scaffold-based train, validation, calibration and test partitions were prepared under seed 42. The separate calibration partition fitted the probability transform. Activity probability is conditional on this task and its historical labels; it is not a universal probability of biological activity, experimental confirmation or probability of project advancement. Predictions on unfamiliar chemistry require particular caution.
+
+The downstream internal retrospective evaluation used held-out records from the same data source. It does not establish independent-source or prospective validity. Tiny's optional predicted pActivity is a model estimate; it does not replace an assay.
+
+## Provenance and license
+
+Manifest, ONNX and reference bytes are unchanged from `S2S-Decision/artifacts/product-validation-v1/models/P0DMS8_WT_Ki/logistic_scalar_morgan`. The historical manifest predates subsequent held-out evaluation and is preserved rather than rewritten. This release card adds task-specific usage guidance and current evaluation context.
+
+Frozen manifest SHA-256: `494d4203fdc6103b60fe177aeaa9f5e9185e8c6570c5c4e0450bdf610a215227`. ONNX SHA-256: `f1334c10f3dbed984784ec7b3e1490c8c7d2fa46d48f9ba5fb1bab250e3bedee`.
+
+Protocol and frozen choices: `S2S-Decision/artifacts/product-validation-v1/{plan.json,source-extraction.json,validation-choice-freeze.json,REPORT.md}`. Chemical contract: SMILES2Select 3.3.1 / RDKit 2026.03.5, verified by the compatible integrated runtime. Attribution and resource license: [CC BY-SA 4.0](../LICENSE_CC_BY_SA_4.0.md), with [full license](../LICENSE_CC_BY_SA_4.0.txt). Application code has a separate MIT license.

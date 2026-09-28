@@ -338,9 +338,13 @@ def _decode(value: Any, frame_source: sqlite3.Connection | None = None) -> Any:
         if cls is None:
             raise ValueError(f"unknown session object {value['name']}")
         expected = {field.name for field in fields(cls)}
-        if set(value["fields"]) != expected:
+        saved_fields = value["fields"]
+        # Version 3.4.0 saved criteria before the minimum-core control existed.
+        if cls is CriteriaState and set(saved_fields) == expected - {"minimum_scaffolds"}:
+            saved_fields = {**saved_fields, "minimum_scaffolds": 0}
+        if set(saved_fields) != expected:
             raise ValueError(f"session object fields changed for {value['name']}")
-        return cls(**{name: _decode(item, frame_source) for name, item in value["fields"].items()})
+        return cls(**{name: _decode(item, frame_source) for name, item in saved_fields.items()})
     if kind == "frame_ref":
         if frame_source is None:
             raise ValueError("session frame source is unavailable")

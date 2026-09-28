@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.4.1 - 2026-09-28
+
+- Restore all twelve trained task-specific ONNX alternatives, including three Tiny packages; preserve the original validation-selected baselines and historical model hashes.
+- Add estimator/input labels and per-model explanations and selection tips in the workspace.
+- Restore explicit QED-only ranking and minimum-scaffold controls, including shared model constraints, scenarios, recipes and saved-session compatibility.
+- Add a Linux x86_64 per-user installer with desktop integration and uninstall, alongside the Windows installer and portable bundles.
+- Expand real-model workspace and frozen-bundle tests to cover all estimator families; automate installer checks, wheel upload and release checksums.
+
 ## 3.4.0 - 2026-09-26
 
 - Integrated S2S-Decision into the SMILES2Select package and desktop workspace, with target-specific ONNX previews, explicit adoption, undo/redo and model-aware exports.

@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -30,10 +30,12 @@ jobs:
           sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libdbus-1-3
       - name: Install
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip "setuptools>=83"
           pip install -e ".[dev,train,parquet]"
       - name: Lint
         run: python -m ruff check src tests
+      - name: Test Linux installer lifecycle
+        run: bash tests/test_linux_installer.sh
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
@@ -58,7 +60,7 @@ jobs:
 
       - name: Install project and build tooling
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip "setuptools>=83"
           pip install -e ".[build,inference]" pytest "scikit-learn>=1.4" "skl2onnx>=1.17" "protobuf<7"
 
       - name: Install Inno Setup
@@ -98,50 +100,81 @@ jobs:
           & $iscc "/DAppVersion=$version" "/DSourceDir=$PWD\dist\SMILES2Select" "/DOutputDir=$PWD\dist" packaging\smiles2select.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Test Windows installer lifecycle and installed inference
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = @(Get-ChildItem dist/SMILES2Select-Setup-*.exe)
+          if ($installer.Count -ne 1) { throw "Expected exactly one Windows installer." }
+          ./packaging/test_windows_installer.ps1 -Installer $installer[0].FullName
+
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path dist/SMILES2Select/* -DestinationPath ${{ matrix.artifact }}.zip
+        run: Compress-Archive -Path dist/SMILES2Select/* -DestinationPath dist/${{ matrix.artifact }}.zip
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
-        run: tar -czf ${{ matrix.artifact }}.tar.gz -C dist SMILES2Select
+        run: |
+          tar -czf dist/${{ matrix.artifact }}.tar.gz -C dist SMILES2Select
+          version=$(python -c "import importlib.metadata as m; print(m.version('smiles2select'))")
+          bash packaging/build_linux.sh dist/SMILES2Select "$version" dist
+          python -m pip wheel . --no-deps --wheel-dir dist
+
+      - name: Test installed Linux bundle
+        if: runner.os == 'Linux'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          export XDG_DATA_HOME="$RUNNER_TEMP/s2s-install-test/data"
+          export XDG_BIN_HOME="$RUNNER_TEMP/s2s-install-test/bin"
+          bash dist/SMILES2Select-Setup-*-linux-x86_64.run
+          printf 'User-owned session sentinel' > "$RUNNER_TEMP/s2s-install-test/example.s2s.sqlite"
+          bash dist/SMILES2Select-Setup-*-linux-x86_64.run
+          export S2S_FROZEN_BUNDLE="$XDG_DATA_HOME/smiles2select"
+          python -m pytest -q tests/test_frozen_inference.py
+          bash "$XDG_DATA_HOME/smiles2select/uninstall.sh"
+          test ! -e "$XDG_DATA_HOME/smiles2select"
+          test ! -e "$XDG_BIN_HOME/smiles2select"
+          test "$(cat "$RUNNER_TEMP/s2s-install-test/example.s2s.sqlite")" = 'User-owned session sentinel'
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: |
-            ${{ matrix.artifact }}.zip
-            ${{ matrix.artifact }}.tar.gz
+            dist/${{ matrix.artifact }}.zip
+            dist/${{ matrix.artifact }}.tar.gz
             dist/SMILES2Select-Setup-*.exe
+            dist/SMILES2Select-Setup-*-linux-x86_64.run
             dist/SMILES2Select-manifest.json
+            dist/*.whl
           if-no-files-found: error
 
   publish:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
+      - name: Prepare release notes and checksums
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes="docs/RELEASE_NOTES_${version}.md"
+          if [[ -f "$notes" ]]; then
+            cp "$notes" release-notes.md
+          else
+            printf 'See CHANGELOG.md for changes in %s.\n' "$GITHUB_REF_NAME" > release-notes.md
+          fi
+          (cd artifacts && sha256sum -- * > "../SHA256SUMS-${GITHUB_REF_NAME}.txt")
+          mv "SHA256SUMS-${GITHUB_REF_NAME}.txt" artifacts/
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
-          generate_release_notes: true
-          body: |
-            See the repository CHANGELOG for the complete release notes.
-
-            For citation, see CITATION.cff and the repository's Zenodo link.
-            Authorship: Adriano Marques Gonçalves, Universidade de Araraquara
-            (UNIARA).
-
-            **Downloads**
-            - Windows portable bundle: `SMILES2Select-windows.zip`.
-            - Windows installer: `SMILES2Select-Setup-*.exe`.
-            - Linux portable bundle: `SMILES2Select-linux.tar.gz`.
-
-            The Windows dependency manifest is published with the release and
-            verifies that all non-system imports from the EXE, DLL and PYD files
-            are included in the bundle.
+          files: artifacts/*
+          body_path: release-notes.md

@@ -17,6 +17,7 @@ class CriteriaState:
     scaffold_limit: int
     cluster_limit: int
     objectives: tuple[tuple[str, int, float, float], ...]
+    minimum_scaffolds: int = 0
 
 
 def capture(window) -> CriteriaState:
@@ -25,6 +26,7 @@ def capture(window) -> CriteriaState:
         window.per_scaffold.value(), window.per_cluster.value(),
         tuple((editor.field.currentText(), editor.direction.currentIndex(),
                editor.low.value(), editor.high.value()) for editor in window.objective_editors),
+        window.min_scaffolds.value(),
     )
 
 
@@ -41,7 +43,8 @@ def restore(window) -> None:
 
 def apply(window, saved: CriteriaState) -> None:
     """Restore all visible criteria atomically, then refresh their explanations."""
-    widgets = [window.target_count, window.strategy, window.per_scaffold, window.per_cluster]
+    widgets = [window.target_count, window.strategy, window.per_scaffold, window.per_cluster,
+               window.min_scaffolds]
     widgets += [widget for editor in window.objective_editors
                 for widget in (editor.field, editor.direction, editor.low, editor.high)]
     blockers = [QSignalBlocker(widget) for widget in widgets]
@@ -49,6 +52,7 @@ def apply(window, saved: CriteriaState) -> None:
     window.strategy.setCurrentText(saved.strategy)
     window.per_scaffold.setValue(saved.scaffold_limit)
     window.per_cluster.setValue(saved.cluster_limit)
+    window.min_scaffolds.setValue(saved.minimum_scaffolds)
     for editor, (field, direction, low, high) in zip(window.objective_editors, saved.objectives):
         editor.field.setCurrentText(field)
         editor.direction.setCurrentIndex(direction)
@@ -72,11 +76,12 @@ def _spin_value(widget, value):
 def from_scenario(window, spec) -> CriteriaState:
     """Reject unrepresentable studies before changing their selection or UI state."""
     constraints = spec.constraints
-    if constraints.min_scaffolds is not None or not constraints.preserve_pinned:
-        raise ValueError("minimum-scaffold and altered pin policies are not editable here")
-    if len(spec.objectives) != len(window.objective_editors):
+    if not constraints.preserve_pinned:
+        raise ValueError("altered pin policies are not editable here")
+    qed_only = spec.strategy.value == "qed_only"
+    if not qed_only and len(spec.objectives) != len(window.objective_editors):
         raise ValueError(f"the workspace requires {len(window.objective_editors)} objectives")
-    objectives = []
+    objectives = list(capture(window).objectives) if qed_only else []
     for editor, objective in zip(window.objective_editors, spec.objectives):
         direction = editor.direction.findData(objective.direction)
         if (editor.field.findText(objective.field) < 0 or direction < 0
@@ -95,6 +100,7 @@ def from_scenario(window, spec) -> CriteriaState:
         _spin_value(window.target_count, constraints.target_count), spec.strategy.value,
         _spin_value(window.per_scaffold, constraints.max_per_scaffold or 0),
         _spin_value(window.per_cluster, constraints.max_per_cluster or 0), tuple(objectives),
+        _spin_value(window.min_scaffolds, constraints.min_scaffolds or 0),
     )
 
 

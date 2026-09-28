@@ -29,6 +29,7 @@ class Strategy(str, Enum):
     DIVERSITY_FIRST = "diversity_first"
     SCAFFOLD_COVERAGE = "scaffold_coverage"
     MANUAL_ASSISTED = "manual_assisted"
+    QED_ONLY = "qed_only"
 
 
 #: Sort keys per strategy: (column, ascending). Missing columns are skipped, so
@@ -52,6 +53,7 @@ _STRATEGY_KEYS: dict[Strategy, tuple[tuple[str, bool], ...]] = {
         ("robustness_score", False),
     ),
     Strategy.MANUAL_ASSISTED: (("pareto_rank", True), ("qed", False)),
+    Strategy.QED_ONLY: (("qed", False),),
 }
 
 LIMIT_REACHED = "final count reached"
@@ -150,12 +152,19 @@ def order_candidates(
 ) -> pd.DataFrame:
     """Lexicographic strategy ranking; ties use ascending record_id, NaNs last."""
     candidates = candidates.sort_index(kind="stable")
+    if strategy is Strategy.QED_ONLY:
+        if "qed" not in candidates:
+            raise ValueError("QED-only requires cached QED values; rerun with QED enabled.")
+        qed = pd.to_numeric(candidates["qed"], errors="coerce")
+        if not qed.notna().all() or not qed.between(0, 1).all():
+            raise ValueError("QED-only requires finite numeric QED values in [0, 1].")
+        candidates = candidates.assign(qed=qed)
     keys = [
         (column, ascending)
         for column, ascending in _STRATEGY_KEYS[strategy]
         if column in candidates.columns
     ]
-    if "selection_priority" in candidates:
+    if "selection_priority" in candidates and strategy is not Strategy.QED_ONLY:
         keys = [("selection_priority", True)]
         if (
             strategy is Strategy.SCAFFOLD_COVERAGE
@@ -376,7 +385,8 @@ def select(
 
     Strategy keys are compared lexicographically, with missing values last;
     ascending record_id breaks ties. An upstream ``selection_priority`` column
-    replaces property-ranking keys (smaller is better). Scaffold coverage prioritizes
+    replaces property-ranking keys (smaller is better), except for QED-only, which
+    requires finite QED values in [0, 1] and ranks those descending. Scaffold coverage prioritizes
     rare cores, then property ranking, reserving one member of each feasible core
     before ranked filling. Exclusions precede sorted fixed pins and greedy scaffold
     reservation. Empty Murcko SMILES form one acyclic group. When crossed upper
@@ -408,6 +418,8 @@ def select(
         "selection_priority",
     }
     needed.update(column for column, _ in _STRATEGY_KEYS[strategy])
+    if strategy is Strategy.QED_ONLY:
+        needed = {"murcko_scaffold", "cluster_id", "qed"}
     pool = candidates.loc[:, [column for column in candidates.columns if column in needed]]
     if len(excluded_ids):
         pool = pool.loc[~pool.index.isin(set(excluded_ids))]

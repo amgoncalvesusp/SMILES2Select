@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -67,9 +68,23 @@ def test_frozen_worker_scores_real_onnx_model(tmp_path: Path) -> None:
     assert scores.activity_probability.iloc[:2].between(0, 1).all()
 
 
-@pytest.mark.parametrize("model_name", (
-    "Q72547_WT_IC50", "P0DMS8_WT_Ki", "Q07869_WT_EC50",
-))
+@pytest.mark.parametrize(
+    "model_name",
+    (
+        "Q72547_WT_IC50__logistic_scalar_morgan",
+        "Q72547_WT_IC50",
+        "Q72547_WT_IC50__gradient_boosting_scalar_morgan",
+        "Q72547_WT_IC50__tiny_scalar_morgan",
+        "P0DMS8_WT_Ki",
+        "P0DMS8_WT_Ki__gradient_boosting_scalar",
+        "P0DMS8_WT_Ki__gradient_boosting_scalar_morgan",
+        "P0DMS8_WT_Ki__tiny_scalar_morgan",
+        "Q07869_WT_EC50",
+        "Q07869_WT_EC50__gradient_boosting_scalar",
+        "Q07869_WT_EC50__gradient_boosting_scalar_morgan",
+        "Q07869_WT_EC50__tiny_scalar_morgan",
+    ),
+)
 def test_frozen_bundle_scores_its_distributed_model(tmp_path: Path, model_name: str) -> None:
     bundle_root = os.environ.get("S2S_FROZEN_BUNDLE")
     if not bundle_root:
@@ -77,26 +92,58 @@ def test_frozen_bundle_scores_its_distributed_model(tmp_path: Path, model_name: 
     bundle = Path(bundle_root).resolve()
     executable = bundle / ("SMILES2Select.exe" if sys.platform == "win32" else "SMILES2Select")
     model = bundle / "_internal" / "s2s_decision" / "bundled_models" / model_name
-    assert all((model / name).is_file() for name in (
-        "manifest.json", "model.onnx", "MODEL_CARD.md",
-        "references/manifest.json", "references/records.jsonl",
-    ))
+    assert all(
+        (model / name).is_file()
+        for name in (
+            "manifest.json",
+            "model.onnx",
+            "MODEL_CARD.md",
+            "references/manifest.json",
+            "references/records.jsonl",
+        )
+    )
     candidates = tmp_path / "candidates"
     write_bundle(
-        featurize(pd.DataFrame({
-            "record_id": [1, 2, 3],
-            "original_smiles": ["CCO", "CCN", "CC(=O)O"],
-            "eligible": [True, True, False],
-        })),
+        featurize(
+            pd.DataFrame(
+                {
+                    "record_id": [1, 2, 3],
+                    "original_smiles": ["CCO", "CCN", "CC(=O)O"],
+                    "eligible": [True, True, False],
+                }
+            )
+        ),
         candidates,
     )
     output = tmp_path / "scored"
     result = subprocess.run(
-        [str(executable), "--s2s-worker", "-m", "s2s_decision", "predict",
-         "--input", str(candidates), "--output", str(output), "--model", str(model)],
-        cwd=tmp_path, capture_output=True, text=True, timeout=120, check=False,
+        [
+            str(executable),
+            "--s2s-worker",
+            "-m",
+            "s2s_decision",
+            "predict",
+            "--input",
+            str(candidates),
+            "--output",
+            str(output),
+            "--model",
+            str(model),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
     )
     assert result.returncode == 0, result.stderr or result.stdout
     scores = read_bundle(output).records
     assert scores.priority_score.notna().sum() == 2
     assert scores.activity_probability.iloc[:2].between(0, 1).all()
+    assert scores.record_id.tolist() == [1, 2, 3]
+    assert scores.activity_probability.iloc[2:].isna().all()
+    manifest = json.loads((model / "manifest.json").read_text(encoding="utf-8"))
+    if manifest["regression_supported"]:
+        assert scores.predicted_pactivity.iloc[:2].notna().all()
+    else:
+        assert scores.predicted_pactivity.isna().all()

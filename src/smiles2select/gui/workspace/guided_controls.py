@@ -29,6 +29,7 @@ from smiles2select.selection_intelligence.constrained_selection import Strategy
 from smiles2select.selection_intelligence.objectives import Direction, Objective
 
 STRATEGY_LABELS = {
+    "qed_only": "Rank by QED only (drug-likeness)",
     "balanced": "Balance properties and representation",
     "pareto_first": "Prioritize favorable property trade-offs",
     "diversity_first": "Spread across property values",
@@ -183,6 +184,16 @@ def build_layout(window, objective_candidates):
         window.per_cluster.setToolTip("Unavailable: complete clustering is not cached; large exact "
                                      "clustering is intentionally skipped to protect memory.")
     advanced.addRow("Maximum per molecular core (scaffold)", window.per_scaffold)
+    window.min_scaffolds = QSpinBox()
+    window.min_scaffolds.setRange(0, 10_000_000)
+    window.min_scaffolds.setSpecialValueText("No minimum")
+    window.min_scaffolds.setToolTip(
+        "Request at least this many distinct Murcko molecular cores before filling by rank. "
+        "Acyclic molecules count as one core group. Missing cores are computed automatically. "
+        "If the library, requested count, pins or quotas make this impossible, selection "
+        "reports the shortfall; it does not guarantee the requested diversity."
+    )
+    advanced.addRow("Minimum molecular cores (scaffolds)", window.min_scaffolds)
     advanced.addRow("Maximum per structural cluster", window.per_cluster)
     window.view_selector = QComboBox()
     window.view_selector.addItems(["Chemical space", "Pareto"])

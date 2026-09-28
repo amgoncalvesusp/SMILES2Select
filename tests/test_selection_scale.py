@@ -40,6 +40,9 @@ def library():
     ],
 )
 def test_light_selection_preserves_full_selection(library, strategy, constraints, pins, exclusions):
+    if strategy is Strategy.QED_ONLY:
+        # QED-only requires complete scores; retain the missing-score case for other strategies.
+        library = library.assign(qed=library.qed.fillna(0.4))
     before = library.copy(deep=True)
     full = select(library, constraints, strategy, pins, exclusions)
     light = select(library, constraints, strategy, pins, exclusions, explain_rejections=False)

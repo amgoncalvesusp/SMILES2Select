@@ -5,6 +5,10 @@ from html import escape
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTextBrowser, QVBoxLayout
 
 STRATEGY_HELP = {
+    "qed_only": "Rank eligible molecules by QED only, highest first. Use this transparent "
+                "drug-likeness baseline to compare with trained models. Property objectives "
+                "are ignored; pins and scaffold/cluster quotas still apply. QED is not a "
+                "prediction of target activity. Missing or invalid QED stops selection.",
     "balanced": "Start with favorable property trade-offs, then prefer spread in property "
                 "values and available rule margins. This does not estimate biological activity.",
     "pareto_first": "Prefer molecules on better Pareto fronts, then nearer the ideal property "
@@ -43,7 +47,7 @@ DIRECTION_HELP = (
 def strategy_help_text(strategy, *, large_pool=False, scaffold_ready=True):
     """Describe available behavior without promising a different large-pool algorithm."""
     text = STRATEGY_HELP.get(strategy, strategy)
-    if large_pool:
+    if large_pool and strategy != "qed_only":
         text += " Above 2,000 ranked candidates (not final molecules), weighted property percentiles replace exact Pareto ranking."
         if strategy == "scaffold_coverage":
             text += " Core coverage remains active; percentiles rank alternatives within that policy."
@@ -58,6 +62,7 @@ def selection_help_html():
     strategies = "".join(
         f"<li><b>{escape(label)}:</b> {escape(STRATEGY_HELP[key])}</li>"
         for key, label in (
+            ("qed_only", "Rank by QED only (drug-likeness)"),
             ("balanced", "Balance properties and representation"),
             ("pareto_first", "Prioritize favorable property trade-offs"),
             ("diversity_first", "Spread across property values"),
@@ -89,7 +94,8 @@ def selection_help_html():
     same selection. Core coverage still takes one eligible molecule per core first,
     preferring rarer cores; property percentiles rank alternatives within that policy.
     This approximation is not an exact Pareto front or a fingerprint
-    diversity optimization. Review the recorded ranking method.</p>
+    diversity optimization. QED-only always uses descending QED, regardless of
+    library size. Review the recorded ranking method.</p>
     <p>For exact Pareto ranking, a molecule is dominated if another is at least as
     good in every active objective and better in at least one. Crowding measures
     separation in these property values. Rule margin describes distance from

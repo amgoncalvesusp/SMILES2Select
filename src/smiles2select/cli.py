@@ -244,7 +244,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--selection-plan",
         type=Path,
         default=None,
-        help="replay strategy, fingerprint, final/reserve counts and seed from a selection recipe",
+        help="replay strategy, fingerprint, final/reserve counts and seed from a CLI selection plan; "
+             "workspace/model audit recipes require the saved session",
     )
     parser.add_argument(
         "--save-selection-plan",
@@ -384,12 +385,30 @@ def _build_config(args: argparse.Namespace) -> RunConfig:
 def _config_from_selection_plan(
     args: argparse.Namespace, recipe: recipes.SelectionRecipe
 ) -> RunConfig:
-    """Replay the deterministic Hub layer while letting the caller choose new inputs."""
+    """Replay run-level plans; reject workspace decisions whose criteria would be lost."""
     if recipe.model or recipe.strategy == "experimental_model":
         raise ValueError(
             "Model selection recipes are audit records, not CLI replay plans. "
             "Open the saved .s2s.sqlite session for historical export; "
             "new inference requires the compatible ONNX model package."
+        )
+    workspace_source = recipe.provenance.get("source") in {
+        "workspace", "scenario", "original_pipeline",
+    }
+    unsupported_limits = any(value is not None for value in (
+        recipe.max_front, recipe.max_per_scaffold, recipe.min_scaffolds, recipe.max_per_cluster,
+    ))
+    unsupported_criteria = any((
+        recipe.objectives, recipe.applied_thresholds, recipe.manual_overrides,
+        recipe.pinned_ids, recipe.excluded_ids, recipe.final_selected_ids,
+    ))
+    if workspace_source or unsupported_limits or unsupported_criteria:
+        raise ValueError(
+            "Workspace/scenario selection recipes are audit records, not CLI replay plans. "
+            "Their objectives, thresholds, quotas and manual decisions cannot be replayed "
+            "by --selection-plan. Open the saved .s2s.sqlite session for historical export "
+            "or replay the scenario study in the workspace. Use --save-selection-plan "
+            "to generate a supported CLI plan."
         )
     profile_ids = tuple(_split(args.profiles))
     standardization_fields = set(StandardizationConfig.__dataclass_fields__)

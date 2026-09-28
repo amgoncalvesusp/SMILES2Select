@@ -118,7 +118,7 @@ def test_adoption_restores_all_previewed_criteria_and_undo(dialog, window):
     assert not window.has_pending_criteria()
 
 
-@pytest.mark.parametrize("variant", ["weight", "extra_objective", "precision", "minimum_scaffolds"])
+@pytest.mark.parametrize("variant", ["weight", "extra_objective", "precision", "pin_policy"])
 def test_unrepresentable_scenario_does_not_acknowledge_false_criteria(dialog, window, variant):
     from smiles2select.gui.workspace import criteria_state
     from smiles2select.selection_intelligence.objectives import Direction, Objective
@@ -133,7 +133,7 @@ def test_unrepresentable_scenario_does_not_acknowledge_false_criteria(dialog, wi
         spec = replace(spec, objectives=(
             Objective("qed", Direction.TARGET_VALUE, target_value=.12345), spec.objectives[1]))
     else:
-        spec = replace(spec, constraints=replace(spec.constraints, min_scaffolds=1))
+        spec = replace(spec, constraints=replace(spec.constraints, preserve_pinned=False))
     snapshot = evaluate_scenario(window.result, window.candidates, spec)
     dialog.accept_snapshot(snapshot)
     dialog._load_slot()

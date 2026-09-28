@@ -23,6 +23,7 @@ from smiles2select.selection_intelligence.constrained_selection import (
     SelectionConstraints,
     SelectionOutcome,
     Strategy,
+    order_candidates,
     select,
 )
 from smiles2select.selection_intelligence.objectives import Direction, Objective, ObjectiveSet
@@ -65,7 +66,9 @@ class ScenarioSpec:
                 raise ValueError(f"{name} must be a positive integer")
         if type(self.constraints.preserve_pinned) is not bool:
             raise ValueError("preserve_pinned must be boolean")
-        for objective in self.objectives:
+        strategy = Strategy(self.strategy)
+        objectives = () if strategy is Strategy.QED_ONLY else tuple(self.objectives)
+        for objective in objectives:
             if (
                 not isinstance(objective.field, str)
                 or type(objective.enabled) is not bool
@@ -83,10 +86,10 @@ class ScenarioSpec:
                     or not math.isfinite(value)
                 ):
                     raise ValueError(f"objective {key} must be finite numeric")
-        ObjectiveSet(self.objectives)
+        ObjectiveSet(objectives)
         object.__setattr__(self, "thresholds", MappingProxyType(clean))
-        object.__setattr__(self, "objectives", tuple(self.objectives))
-        object.__setattr__(self, "strategy", Strategy(self.strategy))
+        object.__setattr__(self, "objectives", objectives)
+        object.__setattr__(self, "strategy", strategy)
 
 
 @dataclass(frozen=True)
@@ -264,6 +267,8 @@ def _rank(pool: pd.DataFrame, spec: ScenarioSpec) -> tuple[pd.DataFrame, str, tu
             if c in pool
         ]
     )
+    if spec.strategy is Strategy.QED_ONLY:
+        return order_candidates(clean, spec.strategy), "qed_descending", ()
     if spec.strategy is Strategy.SCAFFOLD_COVERAGE and "murcko_scaffold" in clean:
         clean = clean.assign(
             scaffold_size=clean.murcko_scaffold.map(clean.murcko_scaffold.value_counts(dropna=True))

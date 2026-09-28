@@ -168,7 +168,7 @@ def test_unsatisfied_scaffold_minimum_discloses_greedy_coverage_limit():
 
 
 @pytest.mark.parametrize("strategy", list(Strategy))
-def test_explicit_priority_preserves_upstream_objective_order(strategy):
+def test_explicit_priority_preserves_upstream_order_except_qed_only(strategy):
     candidates = pd.DataFrame(
         {
             "qed": [0.9, 0.8, 0.7],
@@ -177,4 +177,5 @@ def test_explicit_priority_preserves_upstream_objective_order(strategy):
         },
         index=[1, 3, 2],
     )
-    assert select(candidates, SelectionConstraints(target_count=2), strategy).selected_ids == (2, 3)
+    expected = (1, 3) if strategy is Strategy.QED_ONLY else (2, 3)
+    assert select(candidates, SelectionConstraints(target_count=2), strategy).selected_ids == expected

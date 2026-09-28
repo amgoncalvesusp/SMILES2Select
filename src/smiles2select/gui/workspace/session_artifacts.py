@@ -104,6 +104,7 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
             strategy=(strategy.value if snapshot else applied.strategy if applied
                       else self.result.config.selection_strategy),
             max_per_scaffold=selected_constraints.max_per_scaffold,
+            min_scaffolds=selected_constraints.min_scaffolds,
             max_per_cluster=selected_constraints.max_per_cluster,
             pinned_ids=self.basket.pinned_ids(),
             excluded_ids=self.basket.excluded_ids(),

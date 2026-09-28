@@ -25,6 +25,11 @@ from s2s_decision.decision import preview_session_decision, verify_preview
 from s2s_decision.model_catalog import import_model_package, list_catalog_models
 from s2s_decision.session_adapter import SessionSnapshot, snapshot_from_workspace
 from smiles2select.gui.workspace import criteria_state
+from smiles2select.gui.workspace.model_guidance import (
+    ModelGuideDialog,
+    model_guidance_text,
+    model_label,
+)
 from smiles2select.gui.workspace.selection_provenance import AppliedSelection
 from smiles2select.selection_intelligence.basket import SelectionBasket
 from smiles2select.selection_intelligence.constrained_selection import (
@@ -69,12 +74,14 @@ class ModelDecisionPanel(QGroupBox):
         self.models = QComboBox()
         self.info = QPlainTextEdit()
         self.info.setReadOnly(True)
-        self.info.setMaximumHeight(150)
+        self.info.setMaximumHeight(210)
         self.report = QPlainTextEdit()
         self.report.setReadOnly(True)
         self.report.setMaximumHeight(150)
         self.refresh_button = QPushButton("Refresh models")
         self.import_button = QPushButton("Import model folder...")
+        self.guide_button = QPushButton("Model guide and selection tips...")
+        self._guide_dialog = None
         self.preview_button = QPushButton("Preview model selection")
         self.adopt_button = QPushButton("Adopt proposal")
         self.adopt_button.setEnabled(False)
@@ -92,6 +99,7 @@ class ModelDecisionPanel(QGroupBox):
         row.addWidget(self.import_button)
         form.addRow(buttons)
         form.addRow(self.info)
+        form.addRow(self.guide_button)
         form.addRow(self.preview_button)
         form.addRow(self.adopt_button)
         form.addRow(self.report)
@@ -101,6 +109,7 @@ class ModelDecisionPanel(QGroupBox):
         self.models.currentIndexChanged.connect(self._model_changed)
         self.refresh_button.clicked.connect(self.refresh_catalog)
         self.import_button.clicked.connect(self.import_model)
+        self.guide_button.clicked.connect(self.show_guide)
         self.preview_button.clicked.connect(self.preview)
         self.adopt_button.clicked.connect(self.adopt)
         self.refresh_catalog()
@@ -142,7 +151,9 @@ class ModelDecisionPanel(QGroupBox):
         if target and endpoint:
             for item in self._catalog:
                 if item.get("target_id") == target and item.get("endpoint") == endpoint:
-                    label = item["name"] if item["compatible"] else f"{item['name']} (unavailable)"
+                    label = model_label(item)
+                    if not item["compatible"]:
+                        label += " (unavailable)"
                     self.models.addItem(label, item)
                     self.models.setItemData(self.models.count() - 1,
                                             item.get("reason") or item["path"], 3)
@@ -155,24 +166,26 @@ class ModelDecisionPanel(QGroupBox):
             self.report.setPlainText("Model, target or endpoint changed. Preview again.")
         item = self.models.currentData()
         self._chosen_model_path = item.get("path") if isinstance(item, dict) else None
+        self.guide_button.setEnabled(isinstance(item, dict))
+        self.preview_button.setEnabled(isinstance(item, dict) and bool(item.get("compatible")))
         if not item:
-            self.info.setPlainText("Choose target, endpoint and model.")
+            self.info.setPlainText(
+                "Choose target, endpoint and model. Bundled tasks offer logistic regression, "
+                "two gradient-boosting variants and Tiny. All are task-specific. "
+                "Chemical strategies are available under Selection strategy above."
+            )
             return
-        status = "Compatible" if item["compatible"] else f"Unavailable: {item['reason']}"
-        source = (
-            "Papyrus++ 05.7"
-            if item.get("origin") == "bundled" else "See imported model card or source hash"
-        )
-        self.info.setPlainText(
-            f"{status}\nTarget: {item['target_id']} | endpoint: {item['endpoint']} | "
-            f"threshold: {item['threshold']}\nEstimator: {item['estimator']} | "
-            f"calibration: {item['calibration_status']} | "
-            f"training references: {item['train_reference_count']}\n"
-            f"Origin: {item.get('origin', 'external')} | source: {source} | "
-            f"SHA-256: {item.get('source_sha256') or 'not declared'}\n"
-            f"Quality: {item.get('quality_policy') or 'not declared'} | "
-            f"split: {item.get('split_method') or 'not declared'}"
-        )
+        self.info.setPlainText(model_guidance_text(item))
+
+    def show_guide(self) -> None:
+        item = self.models.currentData()
+        if not isinstance(item, dict):
+            return
+        if self._guide_dialog is not None:
+            self._guide_dialog.close()
+            self._guide_dialog.deleteLater()
+        self._guide_dialog = ModelGuideDialog(item, self)
+        self._guide_dialog.show()
 
     def import_model(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Choose ONNX model package")

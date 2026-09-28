@@ -1,0 +1,651 @@
+{
+  "config": {
+    "batch_size": 256,
+    "learning_rate": 0.001,
+    "patience": 15,
+    "seed": 42,
+    "weight_decay": 0.0001
+  },
+  "data_hash": "8ce84057b6a5f6c2a2a67e084e5d6d34572a3dee00e435189c7b1f833347213c",
+  "fingerprint_bits": 2048,
+  "provenance": {
+    "bundle_version": 1,
+    "catalogs": [
+      "pains",
+      "brenk"
+    ],
+    "chemistry_hash": "a2a3bbe752d2485920b99afd4b3338ab1d0654b8c39894898b1fd04725776923",
+    "chemistry_policy": "shared_smiles2select_model_view; upstream evidence preserved",
+    "context_method": "exact_tanimoto_scaffold_oof_v1",
+    "contrib_resources": {
+      "NP_Score/publicnp.model.gz": "34db5b02d762e05a0243e640aee24202a5303b7ec810ced7ff929a233e082ab6",
+      "SA_Score/fpscores.pkl.gz": "10dcef9340c873e7b987924461b0af5365eb8dd96be607203debe8ddf80c1e73"
+    },
+    "curated_count": 2565,
+    "descriptors": [
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "float",
+        "function": "Descriptors.MolWt",
+        "id": "mol_wt",
+        "label": "Molecular weight",
+        "precision": 2,
+        "provider": "rdkit",
+        "unit": "Da",
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "WLOGP as used by SwissADME; not XLOGP3, not MLOGP, not ClogP",
+        "dependencies": [],
+        "dtype": "float",
+        "function": "Crippen.MolLogP",
+        "id": "rdkit_wlogp",
+        "label": "LogP (Wildman-Crippen)",
+        "precision": 3,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "float",
+        "function": "Crippen.MolMR",
+        "id": "mol_mr",
+        "label": "Molar refractivity",
+        "precision": 2,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "float",
+        "function": "rdMolDescriptors.CalcTPSA",
+        "id": "tpsa",
+        "label": "Topological polar surface area",
+        "precision": 2,
+        "provider": "rdkit",
+        "unit": "A^2",
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "Lipinski definition (N-H + O-H)",
+        "dependencies": [],
+        "dtype": "int",
+        "function": "rdMolDescriptors.CalcNumLipinskiHBD",
+        "id": "hbd_lipinski",
+        "label": "H-bond donors",
+        "precision": 0,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "Lipinski definition (N + O)",
+        "dependencies": [],
+        "dtype": "int",
+        "function": "rdMolDescriptors.CalcNumLipinskiHBA",
+        "id": "hba_lipinski",
+        "label": "H-bond acceptors",
+        "precision": 0,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "int",
+        "function": "rdMolDescriptors.CalcNumRotatableBonds",
+        "id": "rotatable_bonds",
+        "label": "Rotatable bonds",
+        "precision": 0,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "int",
+        "function": "Mol.GetNumHeavyAtoms",
+        "id": "heavy_atom_count",
+        "label": "Heavy atoms",
+        "precision": 0,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "int",
+        "function": "rdMolDescriptors.CalcNumHeteroatoms",
+        "id": "heteroatom_count",
+        "label": "Heteroatoms",
+        "precision": 0,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "int",
+        "function": "rdMolDescriptors.CalcNumRings",
+        "id": "ring_count",
+        "label": "Rings",
+        "precision": 0,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "int",
+        "function": "rdMolDescriptors.CalcNumAromaticRings",
+        "id": "aromatic_ring_count",
+        "label": "Aromatic rings",
+        "precision": 0,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "int",
+        "function": "Chem.GetFormalCharge",
+        "id": "formal_charge",
+        "label": "Formal charge",
+        "precision": 0,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "",
+        "dependencies": [],
+        "dtype": "float",
+        "function": "rdMolDescriptors.CalcFractionCSP3",
+        "id": "fraction_csp3",
+        "label": "Fraction Csp3",
+        "precision": 3,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "continuous score in [0, 1]; not a pass/fail rule",
+        "dependencies": [],
+        "dtype": "float",
+        "function": "QED.qed",
+        "id": "qed",
+        "label": "QED",
+        "precision": 3,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "Ertl-Schuffenhauer, 1 (easy) to 10 (hard); ranking score, not a rule",
+        "dependencies": [],
+        "dtype": "float",
+        "function": "Contrib/SA_Score/sascorer.calculateScore",
+        "id": "sa_score",
+        "label": "Synthetic accessibility",
+        "precision": 2,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      },
+      {
+        "compatibility": "Ertl-Roggo-Schuffenhauer, about -5 (synthetic) to +5 (natural-like); ranking score, neither a rule nor a classification",
+        "dependencies": [],
+        "dtype": "float",
+        "function": "Contrib/NP_Score/npscorer.scoreMol",
+        "id": "np_score",
+        "label": "Natural-product likeness",
+        "precision": 3,
+        "provider": "rdkit",
+        "unit": null,
+        "version": "2026.03.5"
+      }
+    ],
+    "eligible_count": 2565,
+    "endpoint": "IC50",
+    "experiment_plan_sha256": "b0315168405bb464c0e2048ae0d79f5492bb8a6639856a98b184bf7381d92ad8",
+    "feature_schema": "s2s-tiny-features/1",
+    "fingerprint": {
+      "radius": 2,
+      "size": 2048,
+      "use_chirality": false
+    },
+    "fingerprint_bits": 2048,
+    "full_source_sha256": "8004e0d1027a760f205b45264386f792e7d49658da39f77f52e660a6f19760dd",
+    "missing_property_counts": {
+      "aromatic_ring_count": 0,
+      "brenk_count": 0,
+      "formal_charge": 0,
+      "fraction_csp3": 0,
+      "hba_lipinski": 0,
+      "hbd_lipinski": 0,
+      "heavy_atom_count": 0,
+      "heteroatom_count": 0,
+      "lipinski_violations": 0,
+      "mol_mr": 0,
+      "mol_wt": 0,
+      "np_score": 0,
+      "pains_count": 0,
+      "qed": 0,
+      "rdkit_wlogp": 0,
+      "ring_count": 0,
+      "rotatable_bonds": 0,
+      "sa_score": 0,
+      "tpsa": 0,
+      "veber_violations": 0
+    },
+    "profiles": [
+      {
+        "atom_count_definition": "",
+        "category": "oral_druglikeness",
+        "id": "lipinski",
+        "logp_method": "rdkit_wlogp (Wildman-Crippen)",
+        "name": "Lipinski",
+        "notes": "Rule of Five. Ships with the classical policy (one violation tolerated); switch pass_policy to {\"type\": \"all_rules\"} for the strict reading. The rule indicates a higher chance of absorption or permeation problems beyond these limits; it does not assert that every molecule inside them is an oral drug. LogP here is the Wildman-Crippen estimate, not ClogP or MLOGP.",
+        "pass_policy": {
+          "type": "max_violations",
+          "value": 1
+        },
+        "reference": "10.1016/S0169-409X(96)00423-1",
+        "rules": [
+          {
+            "descriptor": "mol_wt",
+            "failure_code": "LIP_MW_HIGH",
+            "id": "lip_mw_max",
+            "label": "Molecular weight",
+            "operator": "<=",
+            "profile_id": "lipinski",
+            "reference": "10.1016/S0169-409X(96)00423-1",
+            "severity": "hard",
+            "smarts": null,
+            "threshold": 500
+          },
+          {
+            "descriptor": "rdkit_wlogp",
+            "failure_code": "LIP_LOGP_HIGH",
+            "id": "lip_logp_max",
+            "label": "LogP (WLOGP)",
+            "operator": "<=",
+            "profile_id": "lipinski",
+            "reference": "10.1016/S0169-409X(96)00423-1",
+            "severity": "hard",
+            "smarts": null,
+            "threshold": 5
+          },
+          {
+            "descriptor": "hbd_lipinski",
+            "failure_code": "LIP_HBD_HIGH",
+            "id": "lip_hbd_max",
+            "label": "H-bond donors",
+            "operator": "<=",
+            "profile_id": "lipinski",
+            "reference": "10.1016/S0169-409X(96)00423-1",
+            "severity": "hard",
+            "smarts": null,
+            "threshold": 5
+          },
+          {
+            "descriptor": "hba_lipinski",
+            "failure_code": "LIP_HBA_HIGH",
+            "id": "lip_hba_max",
+            "label": "H-bond acceptors",
+            "operator": "<=",
+            "profile_id": "lipinski",
+            "reference": "10.1016/S0169-409X(96)00423-1",
+            "severity": "hard",
+            "smarts": null,
+            "threshold": 10
+          }
+        ],
+        "short_name": "Lipinski",
+        "version": "1.0.0"
+      },
+      {
+        "atom_count_definition": "",
+        "category": "oral_druglikeness",
+        "id": "veber",
+        "logp_method": "",
+        "name": "Veber",
+        "notes": "Complements Lipinski with molecular flexibility and polar surface area. The original study associated these two criteria with a higher probability of good oral bioavailability in its own experimental set.",
+        "pass_policy": {
+          "type": "all_rules"
+        },
+        "reference": "10.1021/jm020017n",
+        "rules": [
+          {
+            "descriptor": "rotatable_bonds",
+            "failure_code": "VEB_ROTB_HIGH",
+            "id": "veber_rotb_max",
+            "label": "Rotatable bonds",
+            "operator": "<=",
+            "profile_id": "veber",
+            "reference": "10.1021/jm020017n",
+            "severity": "hard",
+            "smarts": null,
+            "threshold": 10
+          },
+          {
+            "descriptor": "tpsa",
+            "failure_code": "VEB_TPSA_HIGH",
+            "id": "veber_tpsa_max",
+            "label": "TPSA",
+            "operator": "<=",
+            "profile_id": "veber",
+            "reference": "10.1021/jm020017n",
+            "severity": "hard",
+            "smarts": null,
+            "threshold": 140
+          }
+        ],
+        "short_name": "Veber",
+        "version": "1.0.0"
+      }
+    ],
+    "property_names": [
+      "mol_wt",
+      "rdkit_wlogp",
+      "mol_mr",
+      "tpsa",
+      "hbd_lipinski",
+      "hba_lipinski",
+      "rotatable_bonds",
+      "heavy_atom_count",
+      "heteroatom_count",
+      "ring_count",
+      "aromatic_ring_count",
+      "formal_charge",
+      "fraction_csp3",
+      "qed",
+      "sa_score",
+      "np_score",
+      "lipinski_violations",
+      "veber_violations",
+      "pains_count",
+      "brenk_count"
+    ],
+    "quality_policy": "Papyrus high only; custom quality preserved",
+    "rdkit_version": "2026.03.5",
+    "records_sha256": "cca2e1649208964328b35db666895c03799b3a4b764bd33d71600a93dc8a8e2e",
+    "row_count": 2560,
+    "smiles2select_version": "3.3.1",
+    "source_sha256": "44b2848a45404c959fa7ca10f47f608ad3bfd49ad95475b4f850c9d1839a0efd",
+    "split_method": "scaffold",
+    "split_seed": 42,
+    "standardization": {
+      "canonical_tautomer": false,
+      "cleanup": true,
+      "neutralize": false,
+      "remove_salts": true,
+      "remove_stereo": true
+    },
+    "target_id": "Q72547_WT",
+    "threshold": 6.0,
+    "valid_count": 2565
+  },
+  "schema": "s2s-tiny-features/1",
+  "format_version": 1,
+  "parameter_count": 281730,
+  "preprocessing": {
+    "median": [
+      369.896,
+      3.7670000000000012,
+      98.49200000000005,
+      74.07,
+      0.6931471805599453,
+      1.791759469228055,
+      1.791759469228055,
+      3.258096538021482,
+      2.0794415416798357,
+      1.3862943611198906,
+      1.3862943611198906,
+      0.0,
+      0.21428571428571402,
+      0.599349827290771,
+      2.659302566386739,
+      -1.093167597315485,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.557377049180328,
+      0.46587112580835804,
+      0.5172413793103451,
+      0.410491799965067,
+      0.38095238095238104,
+      0.0,
+      0.5245809168637321
+    ],
+    "mean": [
+      388.26890682196347,
+      3.8400787354409336,
+      103.27634997226845,
+      79.13145867997783,
+      0.8178486967530809,
+      1.8566218640672176,
+      1.6451443012254416,
+      3.3043725473175782,
+      2.0676289096866363,
+      1.415297008882847,
+      1.285378679743637,
+      0.009983361064891847,
+      0.0,
+      0.0,
+      2.7827889124758864,
+      -1.0353550645806926,
+      0.20527243800110867,
+      0.03280813999939441,
+      0.02114425675584969,
+      0.36999852780339804,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": [
+      88.98075097967863,
+      1.3339727635248542,
+      22.969158125909047,
+      32.924143265950335,
+      0.4436931972487289,
+      0.3173932506367408,
+      0.5039275903711714,
+      0.22045681573036477,
+      0.29342325318148005,
+      0.21650979986545013,
+      0.2615721185492775,
+      0.09941676703021403,
+      1.0,
+      1.0,
+      0.5395970361176406,
+      0.6925102821821815,
+      0.3671500914591793,
+      0.1505082561867928,
+      0.11920151996344464,
+      0.46097616935736424,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "context_all_missing": [],
+    "property_names": [
+      "mol_wt",
+      "rdkit_wlogp",
+      "mol_mr",
+      "tpsa",
+      "hbd_lipinski",
+      "hba_lipinski",
+      "rotatable_bonds",
+      "heavy_atom_count",
+      "heteroatom_count",
+      "ring_count",
+      "aromatic_ring_count",
+      "formal_charge",
+      "fraction_csp3",
+      "qed",
+      "sa_score",
+      "np_score",
+      "lipinski_violations",
+      "veber_violations",
+      "pains_count",
+      "brenk_count"
+    ],
+    "context_names": [
+      "similarity_active_max",
+      "similarity_active_mean_top5",
+      "similarity_inactive_max",
+      "similarity_inactive_mean_top5",
+      "novelty",
+      "reference_scaffold_fraction",
+      "reference_density_top5"
+    ],
+    "log_names": [
+      "aromatic_ring_count",
+      "brenk_count",
+      "hba_lipinski",
+      "hbd_lipinski",
+      "heavy_atom_count",
+      "heteroatom_count",
+      "lipinski_violations",
+      "pains_count",
+      "ring_count",
+      "rotatable_bonds",
+      "veber_violations"
+    ]
+  },
+  "regression_mean": 6.193393872966252,
+  "regression_scale": 1.1610026853229738,
+  "regression_supported": true,
+  "calibrator": {
+    "slope": 1.8308890478034596,
+    "intercept": -1.2574755905680206,
+    "status": "fitted_held_out_not_prospectively_validated",
+    "count": 289
+  },
+  "onnx_sha256": "3f204aee8559744f468257580144f361761331ae45b4b1c407dfcb4827a241ac",
+  "onnx_parity_max_abs": 2.384185791015625e-07,
+  "history": [
+    {
+      "epoch": 1,
+      "loss": 0.7868745625019073,
+      "validation_pr_auc": 0.8815066400190457
+    },
+    {
+      "epoch": 2,
+      "loss": 0.7531569674611092,
+      "validation_pr_auc": 0.8869992639752089
+    },
+    {
+      "epoch": 3,
+      "loss": 0.6229308880865574,
+      "validation_pr_auc": 0.8961449786736346
+    },
+    {
+      "epoch": 4,
+      "loss": 0.49828527495265007,
+      "validation_pr_auc": 0.8592921650289054
+    },
+    {
+      "epoch": 5,
+      "loss": 0.39766004495322704,
+      "validation_pr_auc": 0.8365916256520878
+    },
+    {
+      "epoch": 6,
+      "loss": 0.3861062154173851,
+      "validation_pr_auc": 0.8633654408158478
+    },
+    {
+      "epoch": 7,
+      "loss": 0.331149585545063,
+      "validation_pr_auc": 0.8748860156203696
+    },
+    {
+      "epoch": 8,
+      "loss": 0.2809736281633377,
+      "validation_pr_auc": 0.8655488436843706
+    },
+    {
+      "epoch": 9,
+      "loss": 0.23714698757976294,
+      "validation_pr_auc": 0.8191229848158256
+    },
+    {
+      "epoch": 10,
+      "loss": 0.2372998259961605,
+      "validation_pr_auc": 0.8124720291933487
+    },
+    {
+      "epoch": 11,
+      "loss": 0.19747773185372353,
+      "validation_pr_auc": 0.8079769921803994
+    },
+    {
+      "epoch": 12,
+      "loss": 0.2203862126916647,
+      "validation_pr_auc": 0.8061975083651338
+    },
+    {
+      "epoch": 13,
+      "loss": 0.17526983097195625,
+      "validation_pr_auc": 0.793529714949322
+    },
+    {
+      "epoch": 14,
+      "loss": 0.1668162913993001,
+      "validation_pr_auc": 0.7928531085489441
+    },
+    {
+      "epoch": 15,
+      "loss": 0.17349104955792427,
+      "validation_pr_auc": 0.7848791411548723
+    },
+    {
+      "epoch": 16,
+      "loss": 0.15143734496086836,
+      "validation_pr_auc": 0.7826575785578685
+    },
+    {
+      "epoch": 17,
+      "loss": 0.1638412270694971,
+      "validation_pr_auc": 0.7768376085601147
+    },
+    {
+      "epoch": 18,
+      "loss": 0.14194357674568892,
+      "validation_pr_auc": 0.76881182550683
+    }
+  ],
+  "heldout_test_evaluated": false,
+  "versions": {
+    "torch": "2.12.0+cpu",
+    "numpy": "2.4.4",
+    "python": "3.11.9"
+  },
+  "warnings": [],
+  "meaning": "Activity for the target, endpoint and threshold in provenance; never P(advance).",
+  "reference_records_sha256": "91f15c745151a793493487f0e92de564ee0e0f9a787331738ab1f0d5ebbb4ed3",
+  "runtime_ready": true,
+  "release_status": "experimental_not_biologically_validated"
+}

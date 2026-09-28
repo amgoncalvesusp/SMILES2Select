@@ -177,12 +177,15 @@ class ScenarioDialog(QDialog):
     def capture_spec(self):
         workspace = self.workspace
         previous = self.snapshots.get(self.slot.currentText())
+        strategy = Strategy(self.strategy.currentData())
         return ScenarioSpec(
             self.slot.currentText(), dict(self._draft_thresholds),
-            previous.spec.objectives if previous else tuple(workspace.objectives()),
+            (() if strategy is Strategy.QED_ONLY else
+             previous.spec.objectives if previous and previous.spec.objectives
+             else tuple(workspace.objectives())),
             replace(previous.spec.constraints if previous else workspace.constraints(),
                     target_count=self.count.value()),
-            Strategy(self.strategy.currentData()),
+            strategy,
         )
 
     def preview(self):
