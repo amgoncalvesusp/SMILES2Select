@@ -21,9 +21,20 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
     """Everything the export needs, assembled from the current session."""
     selected_ids = self.basket.final_ids()
     snapshot = self._active_snapshot()
+    applied = self._active_applied_selection()
+    model_scores = None
+    if applied and snapshot is None and applied.strategy in {"experimental_model", "contextual_policy"}:
+        for index in range(len(self.basket.log.applied) - 1, -1, -1):
+            if self._applied_selections.get(index) is applied:
+                scores = getattr(self, "_model_scores_by_action", {}).get(index)
+                if scores is not None:
+                    model_scores = scores.copy(deep=True)
+                break
     scaffolds = self.candidates["murcko_scaffold"]
     if snapshot is not None and snapshot.scaffolds is not None:
         scaffolds = snapshot.scaffolds.combine_first(scaffolds)
+    elif model_scores is not None and "session_scaffold" in model_scores:
+        scaffolds = model_scores.session_scaffold.combine_first(scaffolds)
     selected_set = set(selected_ids)
     selected = self.candidates.reindex(selected_ids)
     reasons = {
@@ -67,7 +78,6 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
         cluster_usage=selected["cluster_id"].dropna().astype(int).value_counts().to_dict(),
         strategy=strategy,
     )
-    applied = self._active_applied_selection()
     selected_constraints = (snapshot.spec.constraints if snapshot else applied.constraints
                             if applied else SelectionConstraints(
                                 target_count=self.result.config.final_count or None,
@@ -76,14 +86,6 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
     objective_values = (tuple(obj.as_dict() for obj in snapshot.spec.objectives)
                         if snapshot else applied.objectives if applied else ())
     metadata = self._provenance()
-    model_scores = None
-    if applied and snapshot is None and applied.strategy == "experimental_model":
-        for index in range(len(self.basket.log.applied) - 1, -1, -1):
-            if self._applied_selections.get(index) is applied:
-                scores = getattr(self, "_model_scores_by_action", {}).get(index)
-                if scores is not None:
-                    model_scores = scores.copy(deep=True)
-                break
     projection = self._projection_results.get((
         str(self.projection_selector.currentData()),
         bool(self.reference_overlay.isChecked() and self.result.reference_libraries),
@@ -154,8 +156,10 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
                     "model_sha256", "model_manifest_sha256", "reference_records_sha256",
                     "target", "endpoint", "threshold", "estimator",
                     "calibration_status", "chemistry_hash", "preview_sha256", "ranking_method",
+                    "context", "evidence_context", "policy_settings", "revisited_profiles",
+                    "risk_model", "information_queue",
                 ) if (value := applied.provenance.get(key)) is not None}
-                if applied and snapshot is None and applied.strategy == "experimental_model" else {}
+                if applied and snapshot is None and applied.strategy in {"experimental_model", "contextual_policy"} else {}
             ),
         ),
         pareto=applied.pareto if applied and not snapshot else None,

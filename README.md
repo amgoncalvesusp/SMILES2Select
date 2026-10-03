@@ -6,6 +6,41 @@ Author: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA)
 
 ## English
 
+### New in 3.5.0: Methods and experimental contextual selection
+
+Open the **Methods** tab or menu for an offline English guide to every chemical
+strategy, model family, training dataset, calibration step and selection limit.
+The workspace shows the criteria that produced the current basket separately
+from settings for the next selection. AI selection and training remain
+**experimental and need broader independent validation**.
+
+All twelve trained ONNX alternatives, including Tiny, remain available through
+**Prioritize by model**. The optional **Contextual policy (experimental)** panel
+also includes trained local models for human CA2/Ki, AChE/IC50 and BACE1/IC50.
+Select an included package and load it, inspect the preview, then adopt it
+explicitly. Nine packages contain three logistic predictors with three
+calibration variants each; they are not nine independent biological models.
+Their positive label is an exact measurement at or below 1,000 nM.
+
+Contextual controls expose rule and alert evidence, policy settings, optional
+SMARTS patterns and a separate review budget. An optional included risk model
+covers **SH-SY5Y ATP viability at 48 hours** only. It does not predict general
+safety. Decisions, model hashes and context remain available in saved sessions
+and exports. A requested molecule count is a budget, not a fixed percentage;
+hard constraints may limit the achievable count.
+
+The larger contextual feature model did not consistently improve retrospective
+recovery over its simpler logistic baseline. Hit, lead and fragment settings
+configure policies; no stage-success model was trained. Broad multitask and Von
+experiments are documented research work, not extra shipped GUI rankers.
+Training new models uses the separately configured Python runtime; the included
+models run locally without a training environment.
+
+Windows and Linux installers include the Methods guide and model resources.
+See [contextual selection](docs/CONTEXTUAL_SELECTION.md),
+[Methods](src/smiles2select/assets/methods.md) and the
+[3.5.0 release notes](docs/RELEASE_NOTES_3.5.0.md).
+
 ### New in 3.4.1: complete model choices and selection controls
 
 SMILES2Select now includes S2S-Decision in one installation and workspace.
@@ -67,6 +102,12 @@ ONNX Runtime CPU for inference, but omit PyTorch and training converters.
 Source installations need `smiles2select[inference]` to use models. The legacy
 `s2s-decision` CLI remains available; `s2s-decision-gui` opens the unified app.
 See the [GUI guide](docs/GUI_GUIDE.md) for the full workflow.
+
+Version 3.5.0 also provides an opt-in **Contextual policy (experimental)**
+workflow with included and imported research JSON models, per-rule and per-alert evidence,
+optional SMARTS and endpoint-specific risk predictions, and a separate review budget.
+See [contextual selection and review](docs/CONTEXTUAL_SELECTION.md) for its
+preview/adoption controls, context restrictions and scientific limits.
 
 ### New in 3.3.1
 
@@ -146,7 +187,7 @@ twelve ONNX packages and work without a separate training installation.
 Linux also has a per-user installer. Download the `.run` asset and execute:
 
 ```bash
-bash SMILES2Select-Setup-3.4.1-linux-x86_64.run
+bash SMILES2Select-Setup-3.5.0-linux-x86_64.run
 ```
 
 It installs the application, command launcher and desktop entry without root.
@@ -377,7 +418,7 @@ registra a verificação dos imports nativos realizada durante a compilação.
 O release Linux fornece um bundle portátil. Os dois bundles desktop incluem
 os 12 modelos ONNX e não exigem instalação de bibliotecas de treinamento.
 Linux também tem instalador por usuário: execute
-`bash SMILES2Select-Setup-3.4.1-linux-x86_64.run`. Ele cria lançador e entrada no
+`bash SMILES2Select-Setup-3.5.0-linux-x86_64.run`. Ele cria lançador e entrada no
 menu de aplicativos, sem root. A desinstalação padrão usa
 `bash ~/.local/share/smiles2select/uninstall.sh`.
 

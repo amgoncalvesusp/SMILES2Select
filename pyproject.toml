@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smiles2select"
-version = "3.4.1"
+version = "3.5.0"
 description = "Multi-rule drug-likeness selector for large SMILES libraries"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,7 +35,7 @@ fastsearch = ["hnswlib>=0.8"]
 build = ["pyinstaller>=6.0", "pefile>=2023.2"]
 inference = ["onnxruntime>=1.18"]
 train = [
-    "torch>=2.10",
+    "torch>=2.13",
     "scikit-learn>=1.4",
     "onnx>=1.16",
     "onnxscript>=0.2",
@@ -59,8 +59,13 @@ smiles2select = [
     "preparability/builtins/*.json",
     "assets/*.png",
     "assets/*.ico",
+    "assets/*.md",
 ]
 s2s_decision = [
+    "bundled_contextual_models/*.json",
+    "bundled_contextual_models/*.md",
+    "bundled_contextual_models/risk/*.json",
+    "bundled_contextual_models/info/*.json",
     "bundled_models/*.md",
     "bundled_models/*.txt",
     "bundled_models/*/*.json",

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QToolButton,
     QWidget,
 )
 
@@ -103,6 +104,16 @@ class ModelDecisionPanel(QGroupBox):
         form.addRow(self.preview_button)
         form.addRow(self.adopt_button)
         form.addRow(self.report)
+        from .contextual_controls import ContextualControls
+
+        self.contextual_toggle = QToolButton()
+        self.contextual_toggle.setText("Contextual policy (experimental)")
+        self.contextual_toggle.setCheckable(True)
+        self.contextual = ContextualControls(workspace, self)
+        self.contextual.hide()
+        self.contextual_toggle.toggled.connect(self.contextual.setVisible)
+        form.addRow(self.contextual_toggle)
+        form.addRow(self.contextual)
 
         self.target.currentIndexChanged.connect(self._target_changed)
         self.endpoint.currentIndexChanged.connect(self._endpoint_changed)

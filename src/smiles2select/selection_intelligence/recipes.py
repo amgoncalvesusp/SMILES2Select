@@ -22,6 +22,7 @@ from smiles2select.selection_intelligence.action_log import utc_timestamp
 
 SCHEMA_VERSION = "3.0"
 MODEL_SCHEMA_VERSION = "4.0"
+CONTEXTUAL_SCHEMA_VERSION = "5.0"
 LEGACY_SCHEMA_VERSIONS = frozenset({"2.0"})
 RECIPE_SUFFIX = ".selection.json"
 
@@ -91,10 +92,11 @@ class SelectionRecipe:
         }
 
     def as_dict(self) -> dict[str, Any]:
-        if (self.strategy == "experimental_model") != bool(self.model):
+        if (self.strategy in {"experimental_model", "contextual_policy"}) != bool(self.model):
             raise RecipeError("model strategy requires model metadata, and model metadata requires model strategy")
         return {
-            "schema_version": MODEL_SCHEMA_VERSION if self.model else SCHEMA_VERSION,
+            "schema_version": (CONTEXTUAL_SCHEMA_VERSION if self.strategy == "contextual_policy"
+                               else MODEL_SCHEMA_VERSION if self.model else SCHEMA_VERSION),
             "app_version": APP_VERSION,
             "name": self.name,
             "input_hash": self.input_hash,
@@ -144,7 +146,8 @@ class SelectionRecipe:
     def summary_rows(self) -> list[tuple[str, object]]:
         """Tabular form for the SELECTION_RECIPE sheet."""
         return [
-            ("schema_version", MODEL_SCHEMA_VERSION if self.model else SCHEMA_VERSION),
+            ("schema_version", CONTEXTUAL_SCHEMA_VERSION if self.strategy == "contextual_policy"
+             else MODEL_SCHEMA_VERSION if self.model else SCHEMA_VERSION),
             ("name", self.name),
             ("input_hash", self.input_hash or "-"),
             ("descriptor_version", self.descriptor_version),
@@ -178,7 +181,7 @@ class SelectionRecipe:
 def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRecipe:
     """Rebuild a recipe, refusing a schema this version does not understand."""
     schema = payload.get("schema_version", SCHEMA_VERSION)
-    if schema not in {SCHEMA_VERSION, MODEL_SCHEMA_VERSION, *LEGACY_SCHEMA_VERSIONS}:
+    if schema not in {SCHEMA_VERSION, MODEL_SCHEMA_VERSION, CONTEXTUAL_SCHEMA_VERSION, *LEGACY_SCHEMA_VERSIONS}:
         raise RecipeError(
             f"{source}: schema '{schema}' is not supported (this version reads '{SCHEMA_VERSION}')"
         )
@@ -197,10 +200,21 @@ def from_dict(payload: dict[str, Any], *, source: str = "<dict>") -> SelectionRe
         ))
     ):
         raise RecipeError(f"{source}: model recipe requires model/reference hashes, target and endpoint")
-    if schema != MODEL_SCHEMA_VERSION and model:
+    if schema == CONTEXTUAL_SCHEMA_VERSION:
+        context = model.get("context", {}) if isinstance(model, dict) else {}
+        if (not isinstance(context, dict)
+                or not all(context.get(key) for key in (
+                    "target", "species", "endpoint", "stage", "assay_context", "source_version",
+                    "model_version", "chemistry_version"))
+                or not model.get("model_sha256") or not model.get("preview_sha256")
+                or not isinstance(model.get("policy_settings"), dict)):
+            raise RecipeError(f"{source}: contextual recipe requires hashes, context and policy settings")
+    if schema not in {MODEL_SCHEMA_VERSION, CONTEXTUAL_SCHEMA_VERSION} and model:
         raise RecipeError(f"{source}: model metadata requires schema '{MODEL_SCHEMA_VERSION}'")
     if (schema == MODEL_SCHEMA_VERSION) != (final.get("strategy") == "experimental_model"):
         raise RecipeError(f"{source}: model schema requires experimental_model strategy")
+    if (schema == CONTEXTUAL_SCHEMA_VERSION) != (final.get("strategy") == "contextual_policy"):
+        raise RecipeError(f"{source}: contextual schema requires contextual_policy strategy")
 
     return SelectionRecipe(
         name=payload.get("name", "selection"),

@@ -154,6 +154,78 @@ def test_snapshot_preserves_pinned_chemical_exception_and_manual_exclusion():
     assert snapshot.excluded_ids == (12,)
 
 
+def test_contextual_snapshot_recovers_optional_failures_not_manual_or_hard_failures():
+    result, candidates, _basket = workspace()
+    basket = SelectionBasket([
+        MoleculeState(11, ChemicalStatus.AUTO_FAIL),
+        MoleculeState(12, ChemicalStatus.AUTO_PASS, SelectionStatus.MANUALLY_EXCLUDED),
+        MoleculeState(13, ChemicalStatus.AUTO_FAIL),
+    ])
+    result.descriptors.loc[13, "evaluable"] = False
+    candidates = candidates.drop(index=13)
+    constraints = SelectionConstraints(target_count=2)
+    snapshot = snapshot_from_workspace(
+        result, candidates, basket, constraints, candidate_scope="all_valid",
+    )
+    rows = snapshot.prepared().records.set_index("record_id")
+    assert rows.eligible.to_dict() == {11: True, 12: False, 13: False}
+    assert snapshot.candidate_scope == "all_valid"
+    assert snapshot.prepared().manifest["candidate_scope"] == "all_valid"
+    assert not basket.final_ids()
+    with pytest.raises(ValueError, match="candidate_scope"):
+        snapshot_from_workspace(result, candidates, basket, constraints, candidate_scope="bad")
+
+
+def test_contextual_snapshot_keeps_reference_constraints_and_distinct_revision():
+    result, candidates, basket = workspace()
+    result.config.exclude_reference_duplicates = True
+    result.descriptors["is_reference_duplicate"] = [False, True, False]
+    constraints = SelectionConstraints(target_count=2)
+    normal = snapshot_from_workspace(result, candidates, basket, constraints)
+    broad = snapshot_from_workspace(
+        result, candidates, basket, constraints, candidate_scope="all_valid",
+    )
+    assert not broad.prepared().records.set_index("record_id").loc[12, "eligible"]
+    assert normal.revision != broad.revision
+
+
+def test_contextual_snapshot_respects_explicit_excluding_alerts():
+    from smiles2select.alerts.policies import AlertPolicy
+    from smiles2select.decision.policies import DecisionPolicy
+
+    result, candidates, basket = workspace()
+    result.config.policy = DecisionPolicy(alert_policy=AlertPolicy(actions={"brenk": "exclude"}))
+    result.evaluation = SimpleNamespace(status=pd.DataFrame(index=result.descriptors.index))
+    result.alerts = pd.DataFrame({"record_id": [12], "catalog_id": ["brenk"]})
+    snapshot = snapshot_from_workspace(
+        result, candidates, basket, SelectionConstraints(target_count=2), candidate_scope="all_valid",
+    )
+    assert snapshot.prepared().records.eligible.tolist() == [True, False, True]
+
+
+def test_contextual_snapshot_only_revisits_named_profiles():
+    from smiles2select.decision.policies import DecisionPolicy
+
+    result, candidates, basket = workspace()
+    result.profiles = (SimpleNamespace(id="lipinski", as_dict=lambda: {}),
+                       SimpleNamespace(id="custom", as_dict=lambda: {}))
+    result.config.policy = DecisionPolicy(roles={"lipinski": "mandatory", "custom": "mandatory"})
+    result.evaluation = SimpleNamespace(status=pd.DataFrame({
+        "lipinski__passed": [False, False, True], "custom__passed": [True, False, True],
+    }, index=result.descriptors.index))
+    snapshot = snapshot_from_workspace(result, candidates, basket, SelectionConstraints(3),
+        candidate_scope="all_valid", revisited_profiles=("lipinski",))
+    assert snapshot.prepared().records.eligible.tolist() == [True, False, True]
+    with pytest.raises(ValueError, match="unknown profiles"):
+        snapshot_from_workspace(result, candidates, basket, SelectionConstraints(3),
+            candidate_scope="all_valid", revisited_profiles=("absent",))
+    result.config.policy = DecisionPolicy(roles={"lipinski": "consensus", "custom": "consensus"},
+                                         consensus_min_pass=1)
+    with pytest.raises(ValueError, match="coupled consensus"):
+        snapshot_from_workspace(result, candidates, basket, SelectionConstraints(3),
+            candidate_scope="all_valid", revisited_profiles=("lipinski",))
+
+
 def test_snapshot_joins_native_state_by_record_id_after_reordering():
     result, candidates, basket = workspace()
     result.descriptors = result.descriptors.loc[[13, 11, 12]]

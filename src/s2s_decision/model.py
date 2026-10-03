@@ -11,15 +11,20 @@ def _branch(inputs, hidden, outputs):
 
 
 class Tiny(nn.Module):
-    def __init__(self, fingerprint_bits=2048):
+    """Scale all internal widths; input features and two outputs remain unchanged."""
+
+    def __init__(self, fingerprint_bits=2048, width_multiplier=1):
         super().__init__()
         if fingerprint_bits not in (1024, 2048):
             raise ValueError("fingerprint_bits must be 1024 or 2048")
-        self.properties = _branch(40, 32, 16)
-        self.fingerprint = _branch(fingerprint_bits, 128, 64)
-        self.context = _branch(14, 32, 16)
-        self.fusion = _branch(96, 64, 32)
-        self.heads = nn.Linear(32, 2)
+        if type(width_multiplier) is not int or width_multiplier not in (1, 2):
+            raise ValueError("width_multiplier must be integer 1 or 2")
+        width = width_multiplier
+        self.properties = _branch(40, 32 * width, 16 * width)
+        self.fingerprint = _branch(fingerprint_bits, 128 * width, 64 * width)
+        self.context = _branch(14, 32 * width, 16 * width)
+        self.fusion = _branch(96 * width, 64 * width, 32 * width)
+        self.heads = nn.Linear(32 * width, 2)
 
     def forward(self, properties, fingerprint, context):
         fused = torch.cat(

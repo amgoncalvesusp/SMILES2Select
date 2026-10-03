@@ -41,7 +41,7 @@ try {
     }
     $env:S2S_FROZEN_BUNDLE = $installDir
     $env:QT_QPA_PLATFORM = "offscreen"
-    & $Python -m pytest -q (Join-Path $projectRoot "tests/test_frozen_inference.py")
+    & $Python -m pytest -q (Join-Path $projectRoot "tests/test_frozen_inference.py") (Join-Path $projectRoot "tests/test_frozen_desktop_resources.py")
     if ($LASTEXITCODE -ne 0) { throw "Installed model inference failed with exit code $LASTEXITCODE." }
 }
 finally {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 
+from smiles2select.gui.desktop_self_check import desktop_resources_dispatch
 from smiles2select.gui.worker_launch import worker_dispatch
 
 
@@ -15,6 +16,9 @@ def main(argv: list[str] | None = None) -> int:
     worker_status = worker_dispatch(arguments)
     if worker_status is not None:
         return worker_status
+    desktop_status = desktop_resources_dispatch(arguments)
+    if desktop_status is not None:
+        return desktop_status
 
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication

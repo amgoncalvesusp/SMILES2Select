@@ -1,4 +1,6 @@
 src/s2s_decision/bundled_models/*/manifest.json -text whitespace=cr-at-eol
 src/s2s_decision/bundled_models/*/references/manifest.json -text whitespace=cr-at-eol
 src/s2s_decision/bundled_models/*/references/records.jsonl -text whitespace=cr-at-eol
+src/s2s_decision/bundled_contextual_models/**/*.json -text whitespace=cr-at-eol
+src/s2s_decision/bundled_contextual_models/*.json -text whitespace=cr-at-eol
 *.sh text eol=lf

@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, field, replace
 
 import pandas as pd
 
+from smiles2select.decision.engine import DecisionEngine
 from smiles2select.pipeline.runner import RunResult
 from smiles2select.selection_intelligence.basket import SelectionBasket
 from smiles2select.selection_intelligence.constrained_selection import (
@@ -31,6 +32,8 @@ class SessionSnapshot:
     constraints: SelectionConstraints
     _records: pd.DataFrame = field(repr=False, compare=False)
     _records_hash: str = field(repr=False, compare=False)
+    candidate_scope: str = "screened"
+    revisited_profiles: tuple[str, ...] = ()
 
     def prepared(self, bits: int = 2048) -> FeatureSet:
         """Return fresh model features; never expose mutable snapshot rows."""
@@ -42,6 +45,8 @@ class SessionSnapshot:
             "session_id": self.session_id,
             "session_revision": self.revision,
             "original_ids": list(self.original_ids),
+            "candidate_scope": self.candidate_scope,
+            "revisited_profiles": list(self.revisited_profiles),
         }
         return featurize(records, bits)
 
@@ -61,8 +66,16 @@ def snapshot_from_workspace(
     constraints: SelectionConstraints,
     *,
     session_id: str | None = None,
+    candidate_scope: str = "screened",
+    revisited_profiles: tuple[str, ...] = (),
 ) -> SessionSnapshot:
     """Freeze the full eligible pool, current basket and native quota labels."""
+    if candidate_scope not in {"screened", "all_valid"}:
+        raise ValueError("candidate_scope must be screened or all_valid")
+    if not isinstance(revisited_profiles, tuple) or any(
+        not isinstance(value, str) or not value for value in revisited_profiles
+    ):
+        raise ValueError("revisited_profiles must contain profile IDs")
     if result.zone_allocation is not None:
         raise ValueError("Model proposals are unavailable for runs with zone allocation")
     if not result.descriptors.index.is_unique or not candidates.index.is_unique:
@@ -73,8 +86,35 @@ def snapshot_from_workspace(
     eligible_ids = [
         record_id
         for record_id, state in states.items()
-        if state.chemical_status.passed or (state.pinned and state.is_selected)
+        if (state.chemical_status.passed or (state.pinned and state.is_selected))
     ]
+    if candidate_scope == "all_valid":
+        hard_valid = (
+            result.descriptors.valid.fillna(False).astype(bool)
+            & result.descriptors.evaluable.fillna(False).astype(bool)
+        )
+        policy = getattr(result.config, "policy", None)
+        if policy is not None:
+            known = {profile.id for profile in result.profiles}
+            if set(revisited_profiles) - known:
+                raise ValueError("Cannot revisit unknown profiles")
+            retained = {
+                key: ("mandatory" if value == "exclusion" else value)
+                for key, value in policy.roles.items()
+                if key not in revisited_profiles or value == "exclusion"
+            }
+            consensus = set(policy.consensus_profiles())
+            if consensus & set(revisited_profiles) and consensus - set(revisited_profiles):
+                raise ValueError("Cannot partially revisit a coupled consensus policy")
+            hard_policy = replace(
+                policy, roles=retained,
+                consensus_min_pass=(policy.consensus_min_pass
+                                    if consensus - set(revisited_profiles) else None),
+            )
+            hard_valid &= DecisionEngine(hard_policy).decide(
+                result.evaluation.status, result.scores, result.alerts,
+            ).decisions.selected
+        eligible_ids = result.descriptors.index[hard_valid].tolist()
     allowed = _reference_mask(result, pd.Index(eligible_ids))
     eligible = set(allowed.index[allowed]) - set(basket.excluded_ids())
     if not eligible:
@@ -107,6 +147,8 @@ def snapshot_from_workspace(
     records_hash = _frame_hash(frozen_records)
     revision_input = {
         "source_hash": source_hash,
+        "candidate_scope": candidate_scope,
+        "revisited_profiles": revisited_profiles,
         "records_hash": records_hash,
         "basket": [state.as_row() for state in basket.states()],
         "constraints": asdict(constraints),
@@ -125,6 +167,8 @@ def snapshot_from_workspace(
         constraints=constraints,
         _records=frozen_records,
         _records_hash=records_hash,
+        candidate_scope=candidate_scope,
+        revisited_profiles=revisited_profiles,
     )
 
 

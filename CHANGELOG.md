@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.5.0 - 2026-10-03
+
+- Add an offline English Methods tab and menu covering chemical methods, all model families, actual training procedures and experimental limits.
+- Separate applied basket criteria from settings for the next selection in the workspace.
+- Integrate experimental contextual selection with rule and alert evidence, optional SMARTS, endpoint-specific risk predictions, explicit preview/adoption, review budgets and saved-session provenance.
+- Include nine contextual activity packages (three predictors, each with three calibration variants) and one endpoint-specific risk package alongside the existing twelve ONNX models, including Tiny.
+- Preserve retrospective study limitations and unfavorable comparisons; no model was refitted for this release.
+- Add reproducible contextual, multitask, target-panel and comparator research tooling and regression tests.
+- Raise the optional training dependency minimum to PyTorch 2.13 to exclude a known TorchScript vulnerability; desktop inference does not use PyTorch.
+- Verify Methods resources and contextual/risk inference in frozen executables and installed Windows/Linux builds.
+
 ## 3.4.1 - 2026-09-28
 
 - Restore all twelve trained task-specific ONNX alternatives, including three Tiny packages; preserve the original validation-selected baselines and historical model hashes.

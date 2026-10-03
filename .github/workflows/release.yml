@@ -85,7 +85,7 @@ jobs:
         env:
           S2S_FROZEN_BUNDLE: dist/SMILES2Select
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest -q tests/test_frozen_inference.py tests/test_windows_bundle_verifier.py
+        run: python -m pytest -q tests/test_frozen_inference.py tests/test_frozen_desktop_resources.py tests/test_windows_bundle_verifier.py
 
       - name: Verify Windows native dependencies
         if: runner.os == 'Windows'
@@ -131,7 +131,7 @@ jobs:
           printf 'User-owned session sentinel' > "$RUNNER_TEMP/s2s-install-test/example.s2s.sqlite"
           bash dist/SMILES2Select-Setup-*-linux-x86_64.run
           export S2S_FROZEN_BUNDLE="$XDG_DATA_HOME/smiles2select"
-          python -m pytest -q tests/test_frozen_inference.py
+          python -m pytest -q tests/test_frozen_inference.py tests/test_frozen_desktop_resources.py
           bash "$XDG_DATA_HOME/smiles2select/uninstall.sh"
           test ! -e "$XDG_DATA_HOME/smiles2select"
           test ! -e "$XDG_BIN_HOME/smiles2select"

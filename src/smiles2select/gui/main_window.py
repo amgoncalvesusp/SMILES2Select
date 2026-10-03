@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStackedWidget,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
 from smiles2select.app_metadata import APP_NAME, APP_VERSION, DISCLAIMER, app_icon_path
 from smiles2select.gui.pages.columns_page import ColumnsPage
 from smiles2select.gui.pages.files_page import FilesPage
+from smiles2select.gui.pages.methods_page import MethodsPage, experimental_notice
 from smiles2select.gui.pages.policy_page import PolicyPage
 from smiles2select.gui.pages.profiles_page import ProfilesPage
 from smiles2select.gui.pages.results_page import ResultsPage
@@ -111,7 +113,18 @@ class MainWindow(QMainWindow):
 
         container = QWidget()
         container.setLayout(layout)
-        self.setCentralWidget(container)
+        self.navigation = QTabWidget()
+        self.navigation.addTab(container, "Screening")
+        self.methods_page = MethodsPage()
+        self.navigation.addTab(self.methods_page, "Methods")
+        self.methods_action = self.menuBar().addAction("Methods")
+        self.methods_action.triggered.connect(lambda: self.navigation.setCurrentWidget(self.methods_page))
+        self.experimental_notice = experimental_notice(self)
+        root = QWidget()
+        root_layout = QVBoxLayout(root)
+        root_layout.addWidget(self.experimental_notice)
+        root_layout.addWidget(self.navigation, 1)
+        self.setCentralWidget(root)
         self._highlight_step(0)
 
     def _go(self, index: int) -> None:

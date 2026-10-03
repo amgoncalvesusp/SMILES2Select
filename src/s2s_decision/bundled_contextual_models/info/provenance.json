@@ -1,0 +1,76 @@
+{
+  "study": "B15",
+  "distribution_version": "3.5.0",
+  "status": "Experimental; explicit user choice; no default model promotion",
+  "activity_packages": 9,
+  "distinct_activity_predictors": 3,
+  "calibration_seeds": [
+    42,
+    43,
+    44
+  ],
+  "risk_packages": 1,
+  "source_study_completion_sha256": "7352c79d4b3f934431e97f76b11e1d7acbefa2c10d1fbc5f340fc01917276d52",
+  "files": [
+    {
+      "path": "P00918_HUMAN_Ki-seed42.json",
+      "source": "run/training/bundles/P00918_HUMAN_Ki-seed42.json",
+      "sha256": "7d3490b345f60588aafd86d69e75ec4b704b8dd70384832c49e3dcdb06ea46c3"
+    },
+    {
+      "path": "P00918_HUMAN_Ki-seed43.json",
+      "source": "run/training/bundles/P00918_HUMAN_Ki-seed43.json",
+      "sha256": "e04f563e70a630109d332616723d44be00ccc40b5d403b358c744df5c04a4053"
+    },
+    {
+      "path": "P00918_HUMAN_Ki-seed44.json",
+      "source": "run/training/bundles/P00918_HUMAN_Ki-seed44.json",
+      "sha256": "e87f887abb4b78aee70f2551eb24b87221956392f7cdfdc83fb5679b60126dd3"
+    },
+    {
+      "path": "P22303_HUMAN_IC50-seed42.json",
+      "source": "run/training/bundles/P22303_HUMAN_IC50-seed42.json",
+      "sha256": "b5052bfa87b8148f3e169913d3a2262c5d91c7e05981f17490f4562e3ba43f0f"
+    },
+    {
+      "path": "P22303_HUMAN_IC50-seed43.json",
+      "source": "run/training/bundles/P22303_HUMAN_IC50-seed43.json",
+      "sha256": "ed050711b240a3d9fa2e139e60d690bbed6e28a8535d62ff0561a47d76163376"
+    },
+    {
+      "path": "P22303_HUMAN_IC50-seed44.json",
+      "source": "run/training/bundles/P22303_HUMAN_IC50-seed44.json",
+      "sha256": "ec65cf5196d3f76ba68522af631fb0cf9ee746805c44064cdfdf7f37682bccba"
+    },
+    {
+      "path": "P56817_HUMAN_IC50-seed42.json",
+      "source": "run/training/bundles/P56817_HUMAN_IC50-seed42.json",
+      "sha256": "899259e89f9ae61d96c4dadfabedd590e0cbd3a4cceb979a95e93d1b4748b731"
+    },
+    {
+      "path": "P56817_HUMAN_IC50-seed43.json",
+      "source": "run/training/bundles/P56817_HUMAN_IC50-seed43.json",
+      "sha256": "b65e6df4449ce6faa59aeae67a267043fe49fa549b1c7f47d55d6f2a33b3fb3c"
+    },
+    {
+      "path": "P56817_HUMAN_IC50-seed44.json",
+      "source": "run/training/bundles/P56817_HUMAN_IC50-seed44.json",
+      "sha256": "bf0b3a0b7b9a8aa2b9ce97735fc83e4b9dd28cd5919f43f9849f527227316e7c"
+    },
+    {
+      "path": "risk/shsy5y_atp_viability_48h.json",
+      "source": "packages/risk-shsy5y/model.json",
+      "sha256": "e83862128fb6228d89174af2daf0c1b79a23b9920c57d45b414c9e525274c3fd",
+      "source_sha256": "53f700c9ad8930d61353b2f4124d1de796e60e46411531976da884013cfa8daf",
+      "metadata_amendment": "Replace developer-local data_source path with public PubChem assay URL; numerical parameters and all other metadata unchanged."
+    }
+  ],
+  "limits": [
+    "Activity tasks: human CA2 Ki, AChE IC50, BACE1 IC50, exact threshold <=1000nM.",
+    "Three seeds vary calibration partitions; nine packages are not nine independent biological models.",
+    "Full explicit-feature model did not consistently outperform matched logistic activity baseline.",
+    "No learned stage-success outcomes; stages configure policies.",
+    "Risk model: SH-SY5Y ATP viability48h only; applicability unknown.",
+    "Activity packages are copied byte-for-byte. Risk source path is replaced with public assay URL; numerical parameters are unchanged. Distribution is not a new experiment."
+  ]
+}

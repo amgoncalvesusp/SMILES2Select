@@ -62,6 +62,7 @@ def parser():
             sub.add_argument("--patience", type=int, default=20)
             sub.add_argument("--learning-rate", type=float, default=1e-3)
             sub.add_argument("--weight-decay", type=float, default=1e-4)
+            sub.add_argument("--width-multiplier", type=int, choices=(1, 2), default=1)
             sub.add_argument("--threads", type=int, default=4)
             sub.add_argument("--resume", action="store_true")
         if name in ("train", "predict"):
@@ -152,6 +153,7 @@ def _run(args):
             learning_rate=args.learning_rate,
             weight_decay=args.weight_decay,
             resume=args.resume,
+            width_multiplier=args.width_multiplier,
         )
         return workflows.train_dataset(args.input, args.output, config, args.threads)
     if name == "predict":

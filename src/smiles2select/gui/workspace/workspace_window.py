@@ -32,7 +32,8 @@ from smiles2select.decision.engine import DecisionEngine
 from smiles2select.explainability.consequences import explain_change
 from smiles2select.explainability.method_cards import get_method_card
 from smiles2select.export import selection_export
-from smiles2select.gui.workspace import criteria_state
+from smiles2select.gui.pages.methods_page import install_methods_action
+from smiles2select.gui.workspace import active_criteria, criteria_state
 from smiles2select.gui.workspace.guided_controls import build_layout
 from smiles2select.gui.workspace.jobs import ComputationJob
 from smiles2select.gui.workspace.map_compute import compute_map
@@ -76,6 +77,7 @@ class WorkspaceWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle(f"{APP_NAME} - Chemical Space Hub")
         self.resize(1440, 900)
+        install_methods_action(self)
 
         self._job = None
         self._job_completed = None
@@ -221,11 +223,12 @@ class WorkspaceWindow(QMainWindow):
         if self.strategy.currentData() == "qed_only":
             objectives = "Descending QED; property objectives are ignored"
         self.criteria_summary.setText(
-            f"Current criteria: {self.target_count.value():,} molecules; "
+            f"Next Create selection: {self.target_count.value():,} molecules; "
             f"{self.strategy.currentText()}. {objectives}. "
             f"Scaffold limit: {self.per_scaffold.value() or 'none'}; "
             f"Minimum molecular cores: {self.min_scaffolds.value() or 'none'}; "
             f"cluster limit: {self.per_cluster.value() or 'none'}. "
+            "These controls apply to chemical ranking. Model previews use their own score. "
             "Chemical screening rules remain in effect."
         )
         self._update_selection_summary()
@@ -248,7 +251,11 @@ class WorkspaceWindow(QMainWindow):
                if target is not None and count != target else "")
             + ("Edited criteria not applied; click Create selection. " if pending else "")
             + "Clicking a point only inspects it; Select changes the final library."
+            + "\n" + active_criteria.compact(self)
         )
+        dialog = getattr(self, "_criteria_dialog", None)
+        if dialog is not None and dialog.isVisible():
+            dialog.text.setPlainText(active_criteria.details(self))
         criteria_state.update_export_buttons(self)
 
     def has_pending_criteria(self) -> bool:
@@ -406,6 +413,7 @@ class WorkspaceWindow(QMainWindow):
             event.ignore()
             return
         self.model_panel.clear_preview()
+        self.model_panel.contextual.invalidate()
         super().closeEvent(event)
 
     def _switch_view(self, name: str) -> None:
@@ -504,6 +512,18 @@ class WorkspaceWindow(QMainWindow):
                     extras["Papyrus interpretation"] = "No evidence in this index; activity unknown"
             except Exception as exc:
                 extras["Papyrus query unavailable"] = str(exc)
+        applied = self._active_applied_selection()
+        if applied is not None and applied.strategy == "contextual_policy":
+            from .contextual_controls import molecule_evidence
+
+            for index, value in self._applied_selections.items():
+                if value is applied:
+                    evidence = self._model_scores_by_action.get(index)
+                    if evidence is not None and record_id in evidence.index:
+                        extras.update(molecule_evidence(evidence.loc[record_id],
+                            applied.provenance.get("context"),
+                            applied.provenance.get("policy_settings", {}).get("risk_evidence")))
+                    break
         self.inspector.show_molecule(record_id, self.candidates, extras)
 
     def _shortlist_region(self, record_ids: list[int]) -> None:

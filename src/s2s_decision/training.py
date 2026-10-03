@@ -30,8 +30,11 @@ class TrainingConfig:
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
     resume: bool = False
+    width_multiplier: int = 1
 
     def __post_init__(self):
+        if type(self.width_multiplier) is not int or self.width_multiplier not in (1, 2):
+            raise ValueError("width_multiplier must be integer 1 or 2")
         if min(self.epochs, self.batch_size, self.patience) < 1:
             raise ValueError("epochs, batch_size and patience must be positive")
         if (
@@ -218,8 +221,17 @@ def train_model(frame, output_dir, config=TrainingConfig(), fingerprint_bits=204
         if config.resume
         else None
     )
-    if checkpoint and checkpoint["contract"] != contract:
-        raise ValueError("Resume incompatible with dataset, schema, configuration or provenance")
+    if checkpoint:
+        saved_contract = checkpoint["contract"]
+        # Historical checkpoints used the original width without an explicit size field.
+        saved_contract = {
+            **saved_contract,
+            "config": {"width_multiplier": 1, **saved_contract["config"]},
+        }
+        if saved_contract != contract:
+            raise ValueError(
+                "Resume incompatible with dataset, schema, configuration or provenance"
+            )
     # Seal test features as well as labels before any transform, forward pass, or export.
     # Retain development order and the full-input resume contract above.
     frame = frame.loc[~frame.split.eq("test")].copy()
@@ -238,7 +250,7 @@ def train_model(frame, output_dir, config=TrainingConfig(), fingerprint_bits=204
     activity = torch.tensor((regression - mean) / scale, dtype=torch.float32)
     train_indices = torch.tensor(np.flatnonzero(frame.split.eq("train")), dtype=torch.long)
     validation_indices = np.flatnonzero(frame.split.eq("validation"))
-    model = Tiny(fingerprint_bits)
+    model = Tiny(fingerprint_bits, width_multiplier=config.width_multiplier)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
     )

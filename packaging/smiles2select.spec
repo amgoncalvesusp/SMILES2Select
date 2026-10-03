@@ -29,6 +29,11 @@ datas = [
     ),
     (str(ASSET_ROOT / "SMILES2Select.png"), "smiles2select/assets"),
     (str(ASSET_ROOT / "SMILES2Select.ico"), "smiles2select/assets"),
+    (str(ASSET_ROOT / "methods.md"), "smiles2select/assets"),
+    (
+        str(SOURCE_ROOT / "s2s_decision" / "bundled_contextual_models"),
+        "s2s_decision/bundled_contextual_models",
+    ),
     (
         str(SOURCE_ROOT / "s2s_decision" / "bundled_models"),
         "s2s_decision/bundled_models",

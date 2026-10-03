@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from smiles2select.app_metadata import APP_VERSION
+from smiles2select.gui.pages.methods_page import experimental_notice, install_methods_action
 from smiles2select.gui.worker_launch import worker_command
 
 
@@ -108,6 +109,7 @@ class Studio(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("SMILES2Select — Advanced model tools")
         self.resize(900, 850)
+        install_methods_action(self)
         self.cancelled = False
         self.close_after_finish = False
         self.decoder = codecs.getincrementaldecoder("utf-8")("replace")
@@ -122,12 +124,8 @@ class Studio(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        warning = QLabel(
-            "Experimental models. Priority ranks candidates; it is not P(advance). "
-            "Outputs do not prove biological activity. CLI rules and provenance remain authoritative."
-        )
-        warning.setWordWrap(True)
-        layout.addWidget(warning)
+        self.experimental_notice = experimental_notice(self)
+        layout.addWidget(self.experimental_notice)
         self.editor = QWidget()
         form = QFormLayout(self.editor)
         self.mode = QComboBox()

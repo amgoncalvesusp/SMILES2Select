@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QProgressBar,
     QPushButton,
@@ -19,6 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from smiles2select.gui.pages.methods_page import experimental_notice
+from smiles2select.gui.workspace import active_criteria
 from smiles2select.gui.workspace.selection_help import (
     DIRECTION_HELP,
     OBJECTIVE_HELP,
@@ -142,9 +143,8 @@ def build_layout(window, objective_candidates):
     for label, widget in (("Number of molecules", window.target_count),
                           ("Selection strategy", window.strategy)):
         form.addRow(label, widget)
-    for widget in (window.strategy_help, window.selection_help_button,
+    for widget in (window.criteria_summary, window.strategy_help, window.selection_help_button,
                    window.select_button, window.compare_button, window.model_panel,
-                   window.criteria_summary, window.selection_summary,
                    window.save_session_button, window.open_session_button):
         form.addRow(widget)
 
@@ -246,6 +246,12 @@ def build_layout(window, objective_candidates):
     splitter.addWidget(window.basket_panel)
     splitter.setSizes([570, 200])
     container = QWidget()
-    layout = QHBoxLayout(container)
+    layout = QVBoxLayout(container)
+    window.experimental_notice = experimental_notice(window)
+    window.applied_criteria_button = QPushButton("Inspect applied criteria and screening rules...")
+    window.applied_criteria_button.clicked.connect(lambda: active_criteria.show_details(window))
+    layout.addWidget(window.experimental_notice)
+    layout.addWidget(window.selection_summary)
+    layout.addWidget(window.applied_criteria_button)
     layout.addWidget(splitter)
     return container
