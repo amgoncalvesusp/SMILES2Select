@@ -35,6 +35,7 @@ fastsearch = ["hnswlib>=0.8"]
 build = ["pyinstaller>=6.0", "pefile>=2023.2"]
 inference = ["onnxruntime>=1.18"]
 train = [
+    "requests>=2.32.5",
     "torch>=2.13",
     "scikit-learn>=1.4",
     "onnx>=1.16",
