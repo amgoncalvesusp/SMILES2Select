@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 from PySide6.QtCore import QProcess, QProcessEnvironment, QTimer
 from PySide6.QtWidgets import (
@@ -32,18 +33,20 @@ from smiles2select.gui.pages.methods_page import experimental_notice, install_me
 from smiles2select.gui.worker_launch import worker_command
 
 
-def _verify_training_python(executable: str) -> None:
+def _verify_training_python(executable: str, *, tolerance: bool = False) -> None:
     path = Path(executable)
     if not path.is_file() or (
         getattr(sys, "frozen", False) and path.resolve() == Path(sys.executable).resolve()
     ):
         raise ValueError("Choose an external Python 3.11+ executable for training")
+    dependencies = ("numpy", "pandas", "rdkit") if tolerance else (
+        "torch", "sklearn", "onnx", "onnxscript", "onnxruntime", "skl2onnx")
     script = (
         "import importlib.util,json,sys; from importlib import metadata; "
         "print(json.dumps({'python':sys.version_info[:2],"
         "'version':metadata.version('smiles2select'),"
         "'missing':[name for name in "
-        "('torch','sklearn','onnx','onnxscript','onnxruntime','skl2onnx') "
+        f"{dependencies!r} "
         "if importlib.util.find_spec(name) is None]}))"
     )
     try:
@@ -72,17 +75,105 @@ def _verify_training_python(executable: str) -> None:
         raise ValueError(f"Training Python is missing dependencies: {', '.join(missing)}")
 
 
+class ToleranceResourceEstimate(TypedDict):
+    recipe: str
+    provisional: bool
+    input_bytes: int | None
+    row_count: int | None
+    fit_row_upper_bound: int | None
+    feature_dimension: int | None
+    representation_extra_dimension: int
+    matrix_bytes_upper_bound: int | None
+    fit_matrix_bytes_upper_bound: int | None
+    advisory: str
+
+
+def _resource_count(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 10**12 else None
+
+
+def tolerance_resource_estimate(source: str | Path, recipe: str) -> ToleranceResourceEstimate:
+    """Read at most 1 MiB of metadata; never scan input rows on the GUI thread."""
+    extra = {"A": 0, "B": 2049, "C": 316, "D": 2049}[recipe]
+    estimate: ToleranceResourceEstimate = {"recipe": recipe, "provisional": True, "input_bytes": None,
+        "row_count": None, "fit_row_upper_bound": None, "feature_dimension": None,
+        "representation_extra_dimension": extra, "matrix_bytes_upper_bound": None,
+        "fit_matrix_bytes_upper_bound": None, "advisory": "Prepare data to obtain row and base-feature counts."}
+    path = Path(source)
+    try:
+        data = path / "records.jsonl" if path.is_dir() else path
+        if data.is_file():
+            estimate["input_bytes"] = data.stat().st_size
+        if not path.is_dir():
+            return estimate
+        manifest = path / "manifest.json"
+        with manifest.open("rb") as stream:
+            payload = stream.read(1024 * 1024 + 1)
+        if len(payload) > 1024 * 1024:
+            estimate["advisory"] = "Manifest exceeds the 1 MiB preview limit; counts await worker validation."
+            return estimate
+        metadata = json.loads(payload)
+        if not isinstance(metadata, dict) or metadata.get("schema") != "s2s-tolerance-custom-data/1":
+            raise ValueError("not prepared tolerance metadata")
+        rows = _resource_count(metadata.get("row_count"))
+        audit = metadata.get("audit", {})
+        fit = _resource_count(audit.get("split_counts", {}).get("fit"))
+        positives = _resource_count(audit.get("exact_positive_rows"))
+        bounds = [value for value in (rows, fit, positives) if value is not None]
+        schema = metadata.get("annotation_schema", {})
+        numeric, binary = schema.get("numeric_columns"), schema.get("binary_columns")
+        dimension = 2 * (len(numeric) + len(binary)) + extra if (
+            isinstance(numeric, list) and isinstance(binary, list)) else None
+        estimate = {**estimate, "row_count": rows,
+                    "fit_row_upper_bound": min(bounds) if bounds else None,
+                    "feature_dimension": dimension,
+                    "advisory": "Counts come from metadata, not a GUI row scan; "
+                    "the worker reports actual fit rows after validity, activity, conflict and context filtering."}
+        if rows is not None and dimension is not None:
+            estimate["matrix_bytes_upper_bound"] = rows * dimension * 4
+        if estimate["fit_row_upper_bound"] is not None and dimension is not None:
+            estimate["fit_matrix_bytes_upper_bound"] = estimate["fit_row_upper_bound"] * dimension * 4
+    except (OSError, ValueError, TypeError, AttributeError, RecursionError) as exc:
+        estimate["advisory"] = f"Metadata estimate unavailable ({exc}); inspect the worker validation report."
+    return estimate
+
+
+def resource_estimate_text(estimate: ToleranceResourceEstimate) -> str:
+    def size(value: int | None) -> str:
+        return "unknown" if value is None else f"{value:,} bytes ({value / 1024**2:.2f} MiB)"
+
+    rows, fit, dimension = estimate["row_count"], estimate["fit_row_upper_bound"], estimate["feature_dimension"]
+    return ("Preliminary resource estimate (provisional)\n"
+        f"Input data: {size(estimate['input_bytes'])}; rows: {rows if rows is not None else 'unknown'}; "
+        f"custom fit rows: at most {fit if fit is not None else 'unknown'}.\n"
+        f"Recipe {estimate['recipe']}: {dimension if dimension is not None else 'unknown'} total features; "
+        f"representation adds {estimate['representation_extra_dimension']} values (with a missingness mask when present).\n"
+        f"One float32 matrix for all input rows: at most {size(estimate['matrix_bytes_upper_bound'])}; "
+        f"custom fit-only matrix: at most {size(estimate['fit_matrix_bytes_upper_bound'])}. "
+        "This is not peak RAM; chemistry, pandas, copies, support references, shared-profile adaptation "
+        "and calibration add memory. Training time and peak RAM are not measured.\n" + estimate["advisory"])
+
+
 class Studio(QMainWindow):
     MODES = {
         "Selection": ("prepare", "predict", "select"),
         "Training": ("audit", "dataset", "train", "train-baseline"),
         "Benchmark": ("benchmark", "evaluate"),
+        "Chemical tolerance": ("tolerance-prepare", "tolerance-train"),
     }
     OPTIONS = {
         "threshold": ("audit", "dataset"),
         "fingerprint-bits": ("prepare", "dataset"),
-        "target": ("dataset",),
-        "endpoint": ("dataset",),
+        "target": ("dataset", "tolerance-train", "tolerance-prepare"),
+        "endpoint": ("dataset", "tolerance-train", "tolerance-prepare"),
+        "species": ("tolerance-train", "tolerance-prepare"),
+        "mode": ("tolerance-train",),
+        "recipe": ("tolerance-train",),
+        "positive-cal": ("tolerance-train",),
+        "background-cal": ("tolerance-train",),
+        "target-retention": ("tolerance-train",),
+        "max-expansion": ("tolerance-train",),
+        "reconsider-criteria": ("tolerance-train",),
         "split": ("dataset",),
         "max-rows": ("dataset",),
         "seed": ("dataset", "train", "train-baseline"),
@@ -102,7 +193,7 @@ class Studio(QMainWindow):
         "pins": ("select",),
         "exclude": ("select",),
     }
-    FILE_INPUTS = {"audit", "prepare", "dataset"}
+    FILE_INPUTS = {"audit", "prepare", "dataset", "tolerance-prepare", "tolerance-train"}
     FILE_OUTPUTS = {"audit", "benchmark", "evaluate"}
 
     def __init__(self, parent=None):
@@ -139,6 +230,17 @@ class Studio(QMainWindow):
         self.input_label = QLabel()
         self.output_label = QLabel()
         form.addRow(self.input_label, self.path_row(self.input_path, self.browse_input))
+        self.prepared_tolerance = QCheckBox("Browse a prepared tolerance dataset folder")
+        form.addRow(self.prepared_tolerance)
+        self.custom_fit = QComboBox()
+        self.custom_fit.addItems(["Scratch", "Adapt shared profile"])
+        self.custom_fit_label = QLabel("Custom training")
+        form.addRow(self.custom_fit_label, self.custom_fit)
+        self.base_profile = QLineEdit()
+        self.base_profile.setPlaceholderText("Shared tolerance package directory or profile JSON")
+        self.base_profile_row = self.path_row(self.base_profile, self.browse_base_profile)
+        self.base_profile_label = QLabel("Base tolerance package")
+        form.addRow(self.base_profile_label, self.base_profile_row)
         form.addRow(self.output_label, self.path_row(self.output_path, self.browse_output))
         self.model_row = self.path_row(self.model_path, self.browse_model)
         self.model_label = QLabel("Model directory")
@@ -163,6 +265,18 @@ class Studio(QMainWindow):
         self.help_text = QLabel()
         self.help_text.setWordWrap(True)
         layout.addWidget(self.help_text)
+        self.resource_estimate = QLabel()
+        self.resource_estimate.setWordWrap(True)
+        self.resource_estimate_button = QPushButton("Refresh preliminary resource estimate")
+        self.resource_estimate_button.clicked.connect(self.refresh_resource_estimate)
+        form.addRow(self.resource_estimate_button)
+        form.addRow(self.resource_estimate)
+        self.resource_timer = QTimer(self)
+        self.resource_timer.setSingleShot(True)
+        self.resource_timer.setInterval(350)
+        self.resource_timer.timeout.connect(self.refresh_resource_estimate)
+        self.input_path.textChanged.connect(lambda: self.resource_timer.start())
+        self.fields["recipe"].currentTextChanged.connect(lambda: self.resource_timer.start())
         buttons = QHBoxLayout()
         self.run_button = QPushButton("Run")
         self.cancel_button = QPushButton("Cancel job")
@@ -184,6 +298,8 @@ class Studio(QMainWindow):
         layout.addWidget(self.log, 1)
         self.mode.currentTextChanged.connect(self.change_mode)
         self.action.currentTextChanged.connect(self.change_action)
+        self.prepared_tolerance.toggled.connect(lambda: self.change_action(self.action.currentText()))
+        self.custom_fit.currentTextChanged.connect(lambda: self.change_action(self.action.currentText()))
         self.change_mode(self.mode.currentText())
 
     @staticmethod
@@ -205,23 +321,34 @@ class Studio(QMainWindow):
             "fingerprint-bits": ("2048", "1024"),
             "endpoint": ("Ki", "Kd", "IC50", "EC50"),
             "split": ("scaffold", "temporal", "random"),
+            "mode": ("general", "fixed", "hierarchical", "contextual"),
+            "recipe": ("A", "B", "C", "D"),
         }
         if name in choices:
             field = QComboBox()
             field.addItems(choices[name])
             return field
-        if name in {"target", "pins", "exclude"}:
+        if name in {"target", "species", "pins", "exclude", "positive-cal", "background-cal", "reconsider-criteria"}:
             field = QLineEdit()
             if name in {"pins", "exclude"}:
                 field.setPlaceholderText("Optional integer IDs, separated by commas or spaces")
+            elif name == "species":
+                field.setText("unknown")
+            elif name in {"positive-cal", "background-cal"}:
+                field.setPlaceholderText("Optional separate calibration CSV; supply both files together")
+            elif name == "reconsider-criteria":
+                field.setPlaceholderText("Optional criterion IDs separated by spaces; blank uses standard calibration scope")
             return field
         if name == "resume":
             return QCheckBox("Resume existing model checkpoint")
-        defaults = {"threshold": 6.0, "learning-rate": 0.001, "weight-decay": 0.0001}
+        defaults = {"threshold": 6.0, "learning-rate": 0.001, "weight-decay": 0.0001,
+                    "target-retention": .95, "max-expansion": .1}
         if name in defaults:
             field = QDoubleSpinBox()
             field.setDecimals(6)
             field.setRange(0.000001 if name == "learning-rate" else 0.0, 100.0)
+            if name in {"target-retention", "max-expansion"}:
+                field.setMaximum(1.)
         else:
             field = QSpinBox()
             field.setRange(
@@ -251,6 +378,14 @@ class Studio(QMainWindow):
     def change_action(self, action):
         if not action:
             return
+        endpoint = self.fields["endpoint"]
+        index = endpoint.findText("Keep input endpoints")
+        tolerance = action in {"tolerance-train", "tolerance-prepare"}
+        if tolerance and index < 0:
+            endpoint.addItem("Keep input endpoints")
+            endpoint.setCurrentIndex(endpoint.count() - 1)
+        elif not tolerance and index >= 0:
+            endpoint.removeItem(index)
         for name, field in self.fields.items():
             relevant = action in self.OPTIONS[name]
             field.setVisible(relevant)
@@ -260,12 +395,22 @@ class Studio(QMainWindow):
         self.model_row.setVisible(model)
         self.model_row.setEnabled(model)
         self.model_label.setVisible(model)
-        training = action in {"train", "train-baseline", "benchmark"}
+        training = action in {"train", "train-baseline", "benchmark", "tolerance-train"}
         self.training_runtime_row.setVisible(training)
         self.training_runtime_row.setEnabled(training)
         self.training_runtime_label.setVisible(training)
+        self.prepared_tolerance.setVisible(action == "tolerance-train")
+        self.custom_fit.setVisible(action == "tolerance-train")
+        self.custom_fit_label.setVisible(action == "tolerance-train")
+        adapting = action == "tolerance-train" and self.custom_fit.currentText() == "Adapt shared profile"
+        self.base_profile_row.setVisible(adapting)
+        self.base_profile_row.setEnabled(adapting)
+        self.base_profile_label.setVisible(adapting)
+        self.resource_estimate.setVisible(action == "tolerance-train")
+        self.resource_estimate_button.setVisible(action == "tolerance-train")
         self.input_label.setText(
-            "Input table file" if action in self.FILE_INPUTS else "Input bundle directory"
+            "Input CSV or prepared tolerance folder" if action == "tolerance-train"
+            else "Input table file" if action in self.FILE_INPUTS else "Input bundle directory"
         )
         self.output_label.setText(
             "New report JSON file" if action in self.FILE_OUTPUTS else "New output directory"
@@ -280,11 +425,36 @@ class Studio(QMainWindow):
             "train-baseline": "Input: prepared measured dataset. Fit logistic regression or gradient boosting, then export a portable model for guided selection.",
             "benchmark": "Input: prepared measured dataset. Compare baselines; results are not biological proof.",
             "evaluate": "Evaluate held-out data with an existing model. Keep test data out of model selection.",
+            "tolerance-prepare": "Validate measured CSV rows before training. Include SMILES and exact pActivity "
+                "or activity values with units, endpoint, relation and provenance. Unknown activity remains unknown. "
+                "Set context defaults before preparing a folder; its curated rows and split are then frozen. "
+                "Inspect the validation report before choosing a fit partition.",
+            "tolerance-train": "Fit chemical compatibility from observed actives at pActivity >= 6.5. "
+                "The CLI fixes scaffold partitions before fitting and reports curation and counts. "
+                "Scratch learns a new profile; Adapt shared profile keeps the base recipe and transforms, "
+                "adds custom fit references, and requires recalibration rather than inheriting its threshold. "
+                "Separate positive and unlabeled-background calibration CSVs are optional and must be supplied together. "
+                "A profile without held-out policy calibration cannot automatically rescue exclusions. "
+                "The optional criterion IDs bind calibration to this exact selection scope; blank uses "
+                "Lipinski, Veber, PAINS and Brenk entries. "
+                "Load the completed package into the workspace to inspect it.",
         }
         self.help_text.setText(messages[action])
+        if action == "tolerance-train":
+            self.refresh_resource_estimate()
+
+    def refresh_resource_estimate(self) -> str:
+        if self.action.currentText() != "tolerance-train":
+            return ""
+        report = resource_estimate_text(tolerance_resource_estimate(
+            self.input_path.text().strip(), self.fields["recipe"].currentText()))
+        self.resource_estimate.setText(report)
+        return report
 
     def browse_input(self):
-        if self.action.currentText() in self.FILE_INPUTS:
+        if self.action.currentText() == "tolerance-train" and self.prepared_tolerance.isChecked():
+            path = QFileDialog.getExistingDirectory(self, "Select prepared tolerance dataset")
+        elif self.action.currentText() in self.FILE_INPUTS:
             path, _ = QFileDialog.getOpenFileName(self, "Select input table")
         else:
             path = QFileDialog.getExistingDirectory(self, "Select input bundle directory")
@@ -295,6 +465,24 @@ class Studio(QMainWindow):
         path = QFileDialog.getExistingDirectory(self, "Select trained model directory")
         if path:
             self.model_path.setText(path)
+
+    def browse_base_profile(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Choose base tolerance package manifest or profile",
+                                            "", "Tolerance JSON (*.json)")
+        if path:
+            selected = Path(path)
+            if selected.name == "manifest.json" or (selected.name == "profile.json"
+                    and (selected.parent / "manifest.json").is_file()):
+                selected = selected.parent
+            self.base_profile.setText(str(selected))
+            try:
+                from s2s_decision.tolerance_profile import read_tolerance_package
+
+                profile = read_tolerance_package(selected)
+                self.fields["mode"].setCurrentText(profile["mode"])
+                self.fields["recipe"].setCurrentText(profile["recipe"])
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                self.log.appendPlainText(f"Cannot inspect the base tolerance package: {exc}")
 
     def browse_training_python(self):
         path, _ = QFileDialog.getOpenFileName(self, "Select training Python executable")
@@ -316,10 +504,18 @@ class Studio(QMainWindow):
 
     def command_arguments(self):
         action = self.action.currentText()
+        tolerance = action in {"tolerance-train", "tolerance-prepare"}
         source, output = self.input_path.text().strip(), self.output_path.text().strip()
         if not source or not output:
             raise ValueError("Input and output paths are required")
+        if action == "tolerance-train" and bool(self.fields["positive-cal"].text().strip()) != bool(self.fields["background-cal"].text().strip()):
+            raise ValueError("Supply positive and background calibration CSVs together")
         args = ["-m", "s2s_decision", action, "--input", source, "--output", output]
+        if action == "tolerance-train" and self.custom_fit.currentText() == "Adapt shared profile":
+            base = self.base_profile.text().strip()
+            if not base:
+                raise ValueError("Adaptation requires a base tolerance package")
+            args += ["--base-profile", base]
         if action in {"predict", "evaluate"}:
             if not self.model_path.text().strip():
                 raise ValueError("Model directory is required")
@@ -343,6 +539,16 @@ class Studio(QMainWindow):
                 if value:
                     args += [f"--{name}", *[str(int(v)) for v in value.replace(",", " ").split()]]
                 continue
+            if name == "reconsider-criteria":
+                if value:
+                    args += ["--reconsider-criteria", *value.replace(",", " ").split()]
+                continue
+            if tolerance and name in {"target", "endpoint"} and not value:
+                continue
+            if tolerance and name == "endpoint" and value == "Keep input endpoints":
+                continue
+            if name in {"positive-cal", "background-cal"} and not value:
+                continue
             if name in {"max-per-scaffold", "min-scaffolds", "max-per-cluster"} and value == "0":
                 continue
             if not value:
@@ -361,7 +567,7 @@ class Studio(QMainWindow):
     def run_command(self):
         if self.process.state() != QProcess.ProcessState.NotRunning:
             return
-        training = self.action.currentText() in {"train", "train-baseline", "benchmark"}
+        training = self.action.currentText() in {"train", "train-baseline", "benchmark", "tolerance-train"}
         runtime_check = False
         try:
             args = self.command_arguments()
@@ -370,9 +576,13 @@ class Studio(QMainWindow):
                 Path(self.output_path.text().strip()),
             )
             file_input = self.action.currentText() in self.FILE_INPUTS
-            if not (source.is_file() if file_input else source.is_dir()):
+            tolerance_input = self.action.currentText() == "tolerance-train"
+            exists = (source.is_file() or source.is_dir()) if tolerance_input else (
+                source.is_file() if file_input else source.is_dir())
+            if not exists:
                 raise ValueError(
-                    "Input must be an existing table file"
+                    "Input must be an existing CSV or prepared tolerance dataset folder" if tolerance_input
+                    else "Input must be an existing table file"
                     if file_input
                     else "Input must be an existing bundle directory"
                 )
@@ -381,10 +591,15 @@ class Studio(QMainWindow):
                 raise ValueError(
                     "output already exists; choose a new path (train supports --resume)"
                 )
+            if tolerance_input:
+                self.log.appendPlainText(self.refresh_resource_estimate())
             runtime_check = True
             external_python = (self.training_python.text().strip() or None) if training else None
             if external_python:
-                _verify_training_python(external_python)
+                if self.action.currentText() == "tolerance-train":
+                    _verify_training_python(external_python, tolerance=True)
+                else:
+                    _verify_training_python(external_python)
             program, worker_args = worker_command(
                 args=args[2:], python_executable=external_python
             )

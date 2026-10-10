@@ -1,6 +1,6 @@
 # PyInstaller spec for SMILES2Select.
 #
-# Author: Adriano Marques Goncalves - Universidade de Araraquara (UNIARA)
+# Authors: Adriano Marques Goncalves - UNIARA; Daniel Andres Grajales Ruiz - IQ-UNESP
 #
 # One spec for both platforms: PyInstaller cannot cross-compile, so the Windows
 # binary is built on Windows and the Linux one on Linux (see the release
@@ -37,6 +37,10 @@ datas = [
     (
         str(SOURCE_ROOT / "s2s_decision" / "bundled_models"),
         "s2s_decision/bundled_models",
+    ),
+    (
+        str(SOURCE_ROOT / "s2s_decision" / "bundled_tolerance_models"),
+        "s2s_decision/bundled_tolerance_models",
     ),
 ]
 
@@ -130,6 +134,15 @@ analysis = Analysis(
     ],
     noarchive=False,
 )
+
+if sys.platform == "win32":
+    # Qt uses Windows' unversioned ICU API. A third-party icuuc.dll on PATH
+    # (for example Poppler's versioned ICU build) can shadow that system DLL
+    # and make QtGui fail with a missing-procedure error in the frozen app.
+    analysis.binaries = [
+        entry for entry in analysis.binaries
+        if Path(entry[0]).name.casefold() != "icuuc.dll"
+    ]
 
 pyz = PYZ(analysis.pure, analysis.zipped_data)
 

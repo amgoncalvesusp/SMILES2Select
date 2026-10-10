@@ -34,6 +34,9 @@ class SessionSnapshot:
     _records_hash: str = field(repr=False, compare=False)
     candidate_scope: str = "screened"
     revisited_profiles: tuple[str, ...] = ()
+    revisited_alert_entries: tuple[str, ...] = ()
+    tolerance_rule_definitions_json: str = ""
+    tolerance_criteria_json: str = ""
 
     def prepared(self, bits: int = 2048) -> FeatureSet:
         """Return fresh model features; never expose mutable snapshot rows."""
@@ -47,6 +50,10 @@ class SessionSnapshot:
             "original_ids": list(self.original_ids),
             "candidate_scope": self.candidate_scope,
             "revisited_profiles": list(self.revisited_profiles),
+            **({"revisited_alert_entries": list(self.revisited_alert_entries)}
+               if self.revisited_alert_entries else {}),
+            **({"tolerance_rule_definitions": json.loads(self.tolerance_rule_definitions_json)}
+               if self.tolerance_rule_definitions_json else {}),
         }
         return featurize(records, bits)
 

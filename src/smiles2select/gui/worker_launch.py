@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 _WORKER_FLAG = "--s2s-worker"
 _DECISION_MODULE = "s2s_decision"
-_TRAINING_COMMANDS = frozenset({"train", "train-baseline", "benchmark"})
+_TRAINING_COMMANDS = frozenset({"train", "train-baseline", "benchmark", "tolerance-train"})
 
 
 def worker_command(

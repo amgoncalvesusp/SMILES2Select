@@ -136,6 +136,42 @@ def test_existing_source_features_remain_evidence_and_do_not_override_model_chem
     assert "y_active" not in row.index
 
 
+def test_featurize_preserves_metadata_without_copying_it_into_column_operations():
+    source = pd.DataFrame({
+        "record_id": [19, 7, 31, 404],
+        "molecule_id": ["original-α", "original-β", "duplicate-γ", "invalid-δ"],
+        "original_smiles": ["CCO", "CCN", "CCO", "not-a-smiles"],
+        "eligible": [True, False, True, True],
+        "valid": [True, True, False, True],
+        "duplicate_of": [None, None, 19, None],
+        "mol_wt": [999., 888., 777., None],
+    })
+    before = source.copy(deep=True)
+    expected = featurize(source)
+    copies = []
+
+    class WatchedMetadata(dict):
+        def __deepcopy__(self, memo):
+            copies.append(True)
+            return dict(self)
+
+    metadata = WatchedMetadata({"criterion_columns": {"fixture": {"definition": [1, 2, 3]}}})
+    provenance = {"source_config": {"seed": 42}, "source_sha256": "source-fixture"}
+    source.attrs.update({"tolerance_annotation_schema": metadata, "provenance": provenance})
+
+    actual = featurize(source)
+
+    assert not copies, "Featurization must not deep-copy large metadata for each column"
+    assert source.attrs["tolerance_annotation_schema"] is metadata
+    assert source.attrs["provenance"] == provenance
+    assert actual.records.attrs["tolerance_annotation_schema"] is metadata
+    assert actual.records.attrs["provenance"] == actual.manifest
+    assert actual.manifest == {**expected.manifest, **provenance}
+    pd.testing.assert_frame_equal(pd.DataFrame(source, copy=False), before)
+    pd.testing.assert_frame_equal(pd.DataFrame(actual.records, copy=False),
+                                  pd.DataFrame(expected.records, copy=False))
+
+
 def test_invalid_smiles_never_becomes_eligible():
     result = featurize(pd.DataFrame({"original_smiles": ["not SMILES", "", None]}))
     assert not result.records["valid"].any()

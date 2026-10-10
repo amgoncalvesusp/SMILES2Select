@@ -114,6 +114,16 @@ class ModelDecisionPanel(QGroupBox):
         self.contextual_toggle.toggled.connect(self.contextual.setVisible)
         form.addRow(self.contextual_toggle)
         form.addRow(self.contextual)
+        from .tolerance_controls import ToleranceControls
+
+        self.tolerance_toggle = QToolButton()
+        self.tolerance_toggle.setText("Chemical tolerance (experimental)")
+        self.tolerance_toggle.setCheckable(True)
+        self.tolerance = ToleranceControls(workspace, self)
+        self.tolerance.hide()
+        self.tolerance_toggle.toggled.connect(self.tolerance.setVisible)
+        form.addRow(self.tolerance_toggle)
+        form.addRow(self.tolerance)
 
         self.target.currentIndexChanged.connect(self._target_changed)
         self.endpoint.currentIndexChanged.connect(self._endpoint_changed)

@@ -28,10 +28,29 @@ def parser():
         "models",
         "preview",
         "adopt",
+        "tolerance-prepare",
+        "tolerance-train",
+        "tolerance-predict",
+        "tolerance-inspect",
     ):
         sub = commands.add_parser(name)
         sub.add_argument("--input", required=True, type=Path)
         sub.add_argument("--output", required=True, type=Path)
+        if name.startswith("tolerance-"):
+            sub.add_argument("--target")
+            sub.add_argument("--species", default="unknown")
+            sub.add_argument("--endpoint", choices=("Ki", "Kd", "IC50", "EC50"))
+        if name == "tolerance-train":
+            sub.add_argument("--base-profile", type=Path)
+            sub.add_argument("--reconsider-criteria", nargs="*")
+            sub.add_argument("--mode", choices=("fixed", "general", "hierarchical", "contextual"), default="general")
+            sub.add_argument("--recipe", choices=("A", "B", "C", "D"), default="A")
+            sub.add_argument("--positive-cal", type=Path)
+            sub.add_argument("--background-cal", type=Path)
+            sub.add_argument("--target-retention", type=float, default=.95)
+            sub.add_argument("--max-expansion", type=float, default=.1)
+        if name == "tolerance-predict":
+            sub.add_argument("--model", type=Path, required=True)
         if name in ("audit", "dataset"):
             sub.add_argument("--threshold", type=float, default=6.0)
         if name in ("prepare", "dataset"):
@@ -87,6 +106,34 @@ def _run(args):
     name = args.command
     if args.output.exists() and not (name == "train" and args.resume):
         raise ValueError("output already exists; choose a new path (train supports --resume)")
+    if name.startswith("tolerance-"):
+        from .tolerance_workflows import (
+            predict_tolerance_file,
+            prepare_tolerance,
+            tolerance_context,
+            train_tolerance,
+        )
+
+        settings = {"target_id": args.target, "species": args.species, "endpoint": args.endpoint}
+        if name == "tolerance-prepare":
+            return prepare_tolerance(args.input, args.output, **settings)
+        if name == "tolerance-train":
+            return train_tolerance(args.input, args.output, mode=args.mode, recipe=args.recipe,
+                positive_cal=args.positive_cal, background_cal=args.background_cal,
+                target_retention=args.target_retention, max_expansion=args.max_expansion,
+                base_profile=args.base_profile, reconsidered_criteria=args.reconsider_criteria, **settings)
+        if name == "tolerance-predict":
+            return predict_tolerance_file(args.input, args.output, args.model,
+                context=tolerance_context(args.target, args.species, args.endpoint))
+        from .tolerance_profile import read_tolerance_package
+
+        profile = read_tolerance_package(args.input)
+        report = {"schema": profile.get("schema"), "mode": profile.get("mode"),
+            "recipe": profile.get("recipe"), "context": profile.get("context"),
+            "calibration": profile.get("policy"), "training_counts": profile.get("training_counts"),
+            "meaning": "Experimental chemical compatibility, not activity or safety probability"}
+        write_json(args.output, report)
+        return report
     if name == "train-baseline":
         return workflows.train_baseline_dataset(
             args.input,

@@ -184,6 +184,7 @@ class WorkspaceWindow(QMainWindow):
         self.strategy.currentTextChanged.connect(self._recompute_pareto)
         for widget in (self.target_count, self.per_scaffold, self.per_cluster, self.min_scaffolds):
             widget.valueChanged.connect(self._update_summary)
+            widget.valueChanged.connect(self.model_panel.tolerance.invalidate)
         for editor in self.objective_editors:
             editor.direction.currentIndexChanged.connect(self._recompute_pareto)
             editor.low.valueChanged.connect(self._recompute_pareto)
@@ -404,6 +405,10 @@ class WorkspaceWindow(QMainWindow):
         )
 
     def closeEvent(self, event) -> None:
+        if self.model_panel.tolerance.training_busy:
+            self.warnings.setText("Custom training is running. Finish or cancel that worker before closing the workspace.")
+            event.ignore()
+            return
         if self._job is not None and self._job.isRunning():
             self.warnings.setText("Computation is finishing. Close the workspace when it completes.")
             event.ignore()
@@ -414,6 +419,7 @@ class WorkspaceWindow(QMainWindow):
             return
         self.model_panel.clear_preview()
         self.model_panel.contextual.invalidate()
+        self.model_panel.tolerance.invalidate()
         super().closeEvent(event)
 
     def _switch_view(self, name: str) -> None:
@@ -513,16 +519,22 @@ class WorkspaceWindow(QMainWindow):
             except Exception as exc:
                 extras["Papyrus query unavailable"] = str(exc)
         applied = self._active_applied_selection()
-        if applied is not None and applied.strategy == "contextual_policy":
-            from .contextual_controls import molecule_evidence
-
+        if applied is not None and applied.strategy in {"contextual_policy", "chemical_tolerance"}:
             for index, value in self._applied_selections.items():
                 if value is applied:
                     evidence = self._model_scores_by_action.get(index)
                     if evidence is not None and record_id in evidence.index:
-                        extras.update(molecule_evidence(evidence.loc[record_id],
-                            applied.provenance.get("context"),
-                            applied.provenance.get("policy_settings", {}).get("risk_evidence")))
+                        if applied.strategy == "chemical_tolerance":
+                            from .tolerance_controls import molecule_evidence
+
+                            extras.update(molecule_evidence(evidence.loc[record_id],
+                                                           applied.provenance.get("context")))
+                        else:
+                            from .contextual_controls import molecule_evidence
+
+                            extras.update(molecule_evidence(evidence.loc[record_id],
+                                applied.provenance.get("context"),
+                                applied.provenance.get("policy_settings", {}).get("risk_evidence")))
                     break
         self.inspector.show_molecule(record_id, self.candidates, extras)
 

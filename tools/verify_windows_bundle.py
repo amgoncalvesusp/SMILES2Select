@@ -145,6 +145,8 @@ def verify(bundle: Path) -> dict[str, object]:
     required_names = {"qwindows.dll", "qt6core.dll", "qt6gui.dll", "qt6widgets.dll"}
     present_names = set(by_name)
     missing_runtime = sorted(name for name in required_names if name not in present_names)
+    if "icuuc.dll" in present_names:
+        missing_runtime.append("icuuc.dll must use the Windows system copy (Qt ICU ABI)")
     if not required_profiles:
         missing_runtime.append("smiles2select/profiles/builtins/*.json")
     if not required_engines:

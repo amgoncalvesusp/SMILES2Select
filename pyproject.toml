@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smiles2select"
-version = "3.5.0"
+version = "3.6.0"
 description = "Multi-rule drug-likeness selector for large SMILES libraries"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [
     { name = "Adriano Marques Gonçalves", email = "adrianogoncalves.bio@gmail.com" },
+    { name = "Daniel Andres Grajales Ruiz" },
 ]
 maintainers = [{ name = "Adriano Marques Gonçalves" }]
 keywords = ["cheminformatics", "drug-likeness", "rdkit", "virtual screening", "pareto"]
@@ -37,6 +38,7 @@ inference = ["onnxruntime>=1.18"]
 train = [
     "requests>=2.32.5",
     "torch>=2.13",
+    "safetensors>=0.4",
     "scikit-learn>=1.4",
     "onnx>=1.16",
     "onnxscript>=0.2",
@@ -63,6 +65,10 @@ smiles2select = [
     "assets/*.md",
 ]
 s2s_decision = [
+    "bundled_tolerance_models/*.json",
+    "bundled_tolerance_models/*.md",
+    "bundled_tolerance_models/*/*.json",
+    "bundled_tolerance_models/*/*.md",
     "bundled_contextual_models/*.json",
     "bundled_contextual_models/*.md",
     "bundled_contextual_models/risk/*.json",

@@ -127,8 +127,12 @@ def final_selected_sheet(artifacts: SessionArtifacts) -> pd.DataFrame:
         frame["Scaffold_ID"] = artifacts.scaffolds.reindex(frame.index)
     if artifacts.model_scores is not None:
         for field, label in (
-            ("priority_score", "Model_Priority_Score"),
+            ("priority_score", "QED_Selection_Priority" if artifacts.recipe.strategy == "chemical_tolerance"
+             else "Model_Priority_Score"),
             ("calibration_status", "Model_Calibration_Status"),
+            ("tolerance_state", "Tolerance_State"),
+            ("tolerance_eligible", "Tolerance_Eligible"),
+            ("tolerance_nonconformity", "Tolerance_Nonconformity"),
         ):
             if field in artifacts.model_scores:
                 frame[label] = artifacts.model_scores[field].reindex(frame.index)

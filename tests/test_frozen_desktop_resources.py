@@ -32,11 +32,33 @@ def test_frozen_desktop_resources(tmp_path):
     assert report["schema"] == "smiles2select-desktop-resources/1"
     assert len(report["contextual_models"]) == 9
     assert len(report["risk_models"]) == 1
+    assert len(report["tolerance_models"]) == 3
+    assert report["tolerance_gui"]["mounted"] and report["tolerance_gui"]["rendered"]
+    assert report["tolerance_gui"]["workflow_choices"] == ["General", "Target-conditioned", "Custom"]
+    assert report["tolerance_gui"]["experimental"] and report["tolerance_gui"]["basket_unchanged"]
+    assert report["tolerance_gui"]["activity_model_count"] == 12
+    assert report["tolerance_gui"]["tiny_model_count"] == 3
+    assert report["tolerance_gui"]["contextual_model_count"] == 9
+    assert report["tolerance_gui"]["about_checked"]
+    assert report["tolerance_gui"]["about_action"] == "About SMILES2Select"
+    assert all(value in report["tolerance_gui"]["authorship"] for value in (
+        "Adriano", "UNIARA", "Daniel Andres Grajales Ruiz", "IQ-UNESP",
+    ))
+    assert {item["mode"] for item in report["tolerance_models"]} == {
+        "general", "hierarchical", "contextual",
+    }
+    for item in report["tolerance_models"]:
+        assert item["policy_status"] == "infeasible"
+        assert item["automatic_rescue_enabled"] is False
+        assert item["training_counts"]["identities"] > 0
+        assert item["recipe"] == "A"
+        assert item["preview_enabled"] and not item["adopt_enabled"]
     assert report["methods"]["section_count"] >= 5
     assert report["methods"]["rendered_characters"] > 1000
     assert "experimental" in report["methods"]["rendered_snippet"].lower()
     resources = bundle / "_internal"
-    for item in [report["methods"], *report["contextual_models"], *report["risk_models"]]:
+    for item in [report["methods"], *report["contextual_models"], *report["risk_models"],
+                 *report["tolerance_models"]]:
         resource = resources / item["resource"]
         assert item["sha256"] == hashlib.sha256(resource.read_bytes()).hexdigest()
     for item in [*report["contextual_models"], *report["risk_models"]]:

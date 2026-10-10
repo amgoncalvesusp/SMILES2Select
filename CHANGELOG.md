@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.6.0 - 2026-10-10
+
+- Integrate Chemical tolerance (experimental) into the graphical workspace, with general, target-conditioned and custom profiles, explicit rule/native-alert criteria, bounded resource estimates and per-molecule evidence.
+- Include three recipe A statistical profiles trained on 3,829 molecular identities across ten tasks. Their calibration constraints were infeasible; automatic rescue stays disabled rather than implying validated activity prediction.
+- Add data validation, custom profile fitting, adaptation and calibration commands to the cancelable Decision Studio workflow; frozen training requires a separately configured compatible Python runtime.
+- Preserve absolute molecule-count selection, QED priority, quotas, mandatory exclusions, locked SMARTS, preview/adoption, undo/redo, sessions and exported evidence.
+- Add an optional durable chemistry cache with verified recipes and bounded, validated payloads. Keep biological context outside shared cache entries.
+- Retain all twelve ONNX model alternatives, including Tiny, and the nine existing contextual packages. Update offline English Methods with the statistical algorithms, training counts, interpretation and benchmark limitations.
+- Add reproducible tolerance studies and controlled comparison tooling. No contextual recovery gain was demonstrated; the included profiles remain experimental.
+- Fix Windows native bundling so Poppler's versioned ICU library cannot shadow Qt's incompatible unversioned ICU dependency. Extend frozen and installed Windows/Linux tolerance checks.
+- Add an About menu with both software authors and affiliations; add Daniel Andres Grajales Ruiz (IQ-UNESP) to package metadata, citation, Zenodo metadata and installer information.
+
 ## 3.5.0 - 2026-10-03
 
 - Add an offline English Methods tab and menu covering chemical methods, all model families, actual training procedures and experimental limits.

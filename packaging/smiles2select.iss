@@ -1,9 +1,9 @@
 ; Inno Setup definition for the portable PyInstaller onedir bundle.
 ; Build the bundle first, then compile this file with:
-;   ISCC.exe /DAppVersion=3.5.0 /DSourceDir=...\dist\SMILES2Select packaging\smiles2select.iss
+;   ISCC.exe /DAppVersion=3.6.0 /DSourceDir=...\dist\SMILES2Select packaging\smiles2select.iss
 
 #ifndef AppVersion
-  #define AppVersion "3.5.0"
+  #define AppVersion "3.6.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\SMILES2Select"
@@ -17,7 +17,7 @@ AppId={{B1D0B6C7-6D51-4F18-9D15-6D9CEB390300}
 AppName=SMILES2Select
 AppVersion={#AppVersion}
 AppVerName=SMILES2Select {#AppVersion}
-AppPublisher=Adriano Marques Goncalves - UNIARA
+AppPublisher=Adriano Marques Goncalves (UNIARA), Daniel Andres Grajales Ruiz (IQ-UNESP)
 AppPublisherURL=https://github.com/amgoncalvesusp/SMILES2Select
 AppSupportURL=https://github.com/amgoncalvesusp/SMILES2Select/issues
 AppUpdatesURL=https://github.com/amgoncalvesusp/SMILES2Select/releases

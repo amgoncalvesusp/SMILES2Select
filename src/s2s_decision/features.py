@@ -209,7 +209,8 @@ def featurize(frame: pd.DataFrame, fingerprint_bits: int = 2048) -> FeatureSet:
     chemistry = chemistry_manifest(fingerprint_bits)
     if "original_smiles" not in frame:
         raise ValueError("original_smiles is required")
-    source = frame.copy(deep=True)
+    # ponytail: keep large annotations out of pandas column/row copies; restore them once below.
+    source = pd.DataFrame(frame, copy=False).copy(deep=True)
     if "record_id" not in source:
         source["record_id"] = np.arange(1, len(source) + 1)
     ids = pd.to_numeric(source.record_id, errors="raise")
@@ -256,7 +257,6 @@ def featurize(frame: pd.DataFrame, fingerprint_bits: int = 2048) -> FeatureSet:
         records["eligible"] &= upstream_valid.fillna(False).astype(bool)
     if "duplicate_of" in source:
         records["eligible"] &= source.duplicate_of.isna()
-    records.attrs.update(frame.attrs)
     manifest = {
         **frame.attrs.get("provenance", {}),
         **chemistry,
@@ -267,5 +267,6 @@ def featurize(frame: pd.DataFrame, fingerprint_bits: int = 2048) -> FeatureSet:
             name: int(records.loc[records.valid, name].isna().sum()) for name in PROPERTY_NAMES
         },
     }
+    records.attrs.update(frame.attrs)
     records.attrs["provenance"] = manifest
     return FeatureSet(records, manifest)

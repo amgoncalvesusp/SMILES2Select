@@ -27,6 +27,10 @@ def ranking_source(window):
         context = metadata.get("context", {})
         return (f"Experimental contextual ranking: {context.get('target', 'undeclared target')} / "
                 f"{context.get('endpoint', 'undeclared endpoint')} / {context.get('stage', 'undeclared stage')}")
+    if strategy == "chemical_tolerance":
+        context = metadata.get("context", {})
+        return (f"Experimental chemical tolerance; final priority: QED / "
+                f"{context.get('target_id', 'general profile')} / {context.get('endpoint', 'declared training endpoints')}")
     return f"Chemical ranking: {strategy}"
 
 
@@ -53,7 +57,8 @@ def _screening(window, metadata):
     for profile in window.result.profiles:
         role = policy.roles.get(profile.id, "not in policy")
         note = ("; explicit exclusion retained; cannot be relaxed" if role == "exclusion" else
-                "; reconsidered by contextual policy") if profile.id in revisited else ""
+                "; reconsidered by chemical tolerance" if metadata.get("source") == "chemical_tolerance"
+                else "; reconsidered by contextual policy") if profile.id in revisited else ""
         lines.append(f"{profile.name} [{profile.id}]: {role}; {profile.policy_label()}{note}")
         for original in profile.rules:
             rule = replace(original, threshold=changes[original.id]) if original.id in changes else original
@@ -112,7 +117,7 @@ def details(window):
              f"Manually excluded record IDs: {window.basket.excluded_ids() or 'none'}"]
     if window.has_pending_criteria():
         lines.append("Edited chemical criteria are not applied. Create selection replaces the basket using those controls.")
-    if strategy in {"experimental_model", "contextual_policy", "qed_only"}:
+    if strategy in {"experimental_model", "contextual_policy", "chemical_tolerance", "qed_only"}:
         lines.append("For this applied ranking, property objectives are ignored.")
     elif objectives:
         lines.append("Applied property objectives")
@@ -125,6 +130,18 @@ def details(window):
         lines.append("The chemical-strategy dropdown and another chosen model do not change this adopted ranking.")
     if strategy == "contextual_policy":
         lines.extend(_contextual(metadata))
+    if strategy == "chemical_tolerance":
+        profile = metadata.get("tolerance_profile", {})
+        policy = profile.get("policy", {})
+        lines.extend(["Tolerance profile status: " + str(metadata.get("profile_status", "not recorded")),
+                      f"Tolerance algorithm: {profile.get('mode', 'not recorded')}; recipe {profile.get('recipe', 'not recorded')}",
+                      "Recorded support gates: " + json.dumps(profile.get("support_settings", {})),
+                      "Recorded calibration policy: " + json.dumps(policy),
+                      "Observed training counts: " + json.dumps(metadata.get("training_counts", {})),
+                      "Explicitly reconsidered criteria: " + ", ".join(metadata.get("revisited_criteria", ())),
+                      "Requested tolerance context: " + json.dumps(metadata.get("context", {})),
+                      "Compatibility with observed active chemistry does not establish activity or safety. "
+                      "Unsupported review cases remain outside automatic selection."])
     lines.extend(_screening(window, metadata))
     config = window.result.config
     lines.append(f"Reference constraints: similarity {config.reference_min_similarity:g} to {config.reference_max_similarity:g}; "

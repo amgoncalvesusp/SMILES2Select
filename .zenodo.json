@@ -2,11 +2,15 @@
   "title": "SMILES2Select",
   "upload_type": "software",
   "description": "Multi-rule drug-likeness and chemical-space selection tool for large SMILES libraries.",
-  "version": "3.3.1",
+  "version": "3.6.0",
   "creators": [
     {
       "name": "Adriano Marques Gonçalves",
       "affiliation": "Universidade de Araraquara (UNIARA)"
+    },
+    {
+      "name": "Daniel Andres Grajales Ruiz",
+      "affiliation": "IQ-UNESP"
     }
   ],
   "keywords": [

@@ -6,8 +6,11 @@ authors:
   - family-names: "Marques Gonçalves"
     given-names: "Adriano"
     affiliation: "Universidade de Araraquara (UNIARA)"
-version: "3.4.1"
-date-released: 2026-09-28
+  - family-names: "Grajales Ruiz"
+    given-names: "Daniel Andres"
+    affiliation: "IQ-UNESP"
+version: "3.6.0"
+date-released: 2026-10-10
 license: MIT
 abstract: >-
   Seletor multirregra de drug-likeness para grandes bibliotecas de SMILES, com

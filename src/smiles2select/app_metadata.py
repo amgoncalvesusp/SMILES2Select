@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import Any
 
 APP_NAME = "SMILES2Select"
-APP_VERSION = "3.5.0"
+APP_VERSION = "3.6.0"
 
 AUTHOR = "Adriano Marques Gonçalves"
 AFFILIATION = "Universidade de Araraquara (UNIARA)"
-AUTHORSHIP = f"{AUTHOR} — {AFFILIATION}"
+AUTHORSHIP = (
+    f"{AUTHOR} — {AFFILIATION}; Daniel Andres Grajales Ruiz — IQ-UNESP"
+)
 
 DISCLAIMER = (
     "Drug-likeness profiles are heuristics. A molecule that passes every "

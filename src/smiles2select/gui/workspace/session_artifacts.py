@@ -23,7 +23,7 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
     snapshot = self._active_snapshot()
     applied = self._active_applied_selection()
     model_scores = None
-    if applied and snapshot is None and applied.strategy in {"experimental_model", "contextual_policy"}:
+    if applied and snapshot is None and applied.strategy in {"experimental_model", "contextual_policy", "chemical_tolerance"}:
         for index in range(len(self.basket.log.applied) - 1, -1, -1):
             if self._applied_selections.get(index) is applied:
                 scores = getattr(self, "_model_scores_by_action", {}).get(index)
@@ -158,8 +158,10 @@ def build_artifacts(self: WorkspaceWindow) -> selection_export.SessionArtifacts:
                     "calibration_status", "chemistry_hash", "preview_sha256", "ranking_method",
                     "context", "evidence_context", "policy_settings", "revisited_profiles",
                     "risk_model", "information_queue",
+                    "tolerance_settings", "profile_status", "training_counts", "revisited_criteria",
+                    "revisited_alert_entries", "profile_sha256", "tolerance_profile",
                 ) if (value := applied.provenance.get(key)) is not None}
-                if applied and snapshot is None and applied.strategy in {"experimental_model", "contextual_policy"} else {}
+                if applied and snapshot is None and applied.strategy in {"experimental_model", "contextual_policy", "chemical_tolerance"} else {}
             ),
         ),
         pareto=applied.pareto if applied and not snapshot else None,

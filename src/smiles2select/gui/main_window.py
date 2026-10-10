@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from smiles2select.app_metadata import APP_NAME, APP_VERSION, DISCLAIMER, app_icon_path
+from smiles2select.app_metadata import APP_NAME, APP_VERSION, AUTHORSHIP, DISCLAIMER, app_icon_path
 from smiles2select.gui.pages.columns_page import ColumnsPage
 from smiles2select.gui.pages.files_page import FilesPage
 from smiles2select.gui.pages.methods_page import MethodsPage, experimental_notice
@@ -119,6 +119,11 @@ class MainWindow(QMainWindow):
         self.navigation.addTab(self.methods_page, "Methods")
         self.methods_action = self.menuBar().addAction("Methods")
         self.methods_action.triggered.connect(lambda: self.navigation.setCurrentWidget(self.methods_page))
+        self.about_action = self.menuBar().addAction(f"About {APP_NAME}")
+        self.about_action.triggered.connect(lambda: QMessageBox.about(
+            self, f"About {APP_NAME}",
+            f"{APP_NAME} {APP_VERSION}\n\nAuthors:\n{AUTHORSHIP}\n\n{DISCLAIMER}",
+        ))
         self.experimental_notice = experimental_notice(self)
         root = QWidget()
         root_layout = QVBoxLayout(root)
