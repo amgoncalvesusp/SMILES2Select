@@ -17,8 +17,29 @@ PROFILE_MODES = {
 }
 
 
+@pytest.fixture(autouse=True)
+def preexisting_widget(qapp):
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtWidgets import QWidget
+
+    marker = QWidget()
+    marker.setObjectName("preexisting-diagnostic-widget")
+    try:
+        yield marker
+        assert marker in qapp.topLevelWidgets(), "Diagnostic disposed an unrelated widget"
+    finally:
+        if marker in qapp.topLevelWidgets():
+            marker.close()
+            marker.deleteLater()
+            QCoreApplication.sendPostedEvents(marker, QEvent.Type.DeferredDelete)
+
+
 def test_real_workspace_discovers_and_loads_included_tolerance_profiles(qapp, result):
+    existing_windows = set(qapp.topLevelWidgets())
     report = desktop_self_check._check_tolerance_gui(result)
+    assert set(qapp.topLevelWidgets()) == existing_windows, (
+        "Desktop diagnostic must dispose its windows without an application event loop"
+    )
     gui = report["tolerance_gui"]
     assert gui["mounted"] and gui["rendered"]
     assert gui["workflow_choices"] == ["General", "Target-conditioned", "Custom"]
@@ -53,5 +74,9 @@ def test_missing_or_corrupt_included_tolerance_profiles_fail(qapp, result, tmp_p
             (directory / name).write_text("{}", encoding="utf-8")
     monkeypatch.setattr(tolerance_controls, "files", lambda _name: tmp_path)
     message = "failed to load" if corrupt else "included tolerance profiles"
+    existing_windows = set(qapp.topLevelWidgets())
     with pytest.raises(ValueError, match=message):
         desktop_self_check._check_tolerance_gui(result)
+    assert set(qapp.topLevelWidgets()) == existing_windows, (
+        "Failed desktop diagnostic must dispose its workspace"
+    )

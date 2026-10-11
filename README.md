@@ -6,7 +6,7 @@ Authors: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA); Dan
 
 ## English
 
-### New in 3.6.0: Chemical tolerance (experimental)
+### New in 3.6.1: Chemical tolerance (experimental)
 
 The **Chemical tolerance (experimental)** panel learns chemical compatibility
 from recorded actives at pActivity >= 6.5. General, target-conditioned and custom
@@ -46,13 +46,13 @@ uses an external compatible Python runtime. See the offline [Methods guide](src/
 for algorithms, representations A–D, calibration and benchmark interpretation.
 The [chemical-tolerance workflow](docs/CHEMICAL_TOLERANCE.md) documents custom
 training, adaptation, package validation and interpretation of decisions.
-Windows and Linux 3.6.0 installers include this panel and all three statistical profiles.
+Windows and Linux 3.6.1 installers include this panel and all three statistical profiles.
 Three included recipe A profiles contain 3,829 fitted identities across ten tasks.
 Their retention/expansion constraints were infeasible, so automatic rescue is
 disabled; descriptive evidence and custom adaptation remain available. See the
 [included model card](src/s2s_decision/bundled_tolerance_models/MODEL_CARD.md).
 The twelve ONNX choices, including Tiny, and the nine contextual packages remain
-available in the same workspace. See the [3.6.0 release notes](docs/RELEASE_NOTES_3.6.0.md).
+available in the same workspace. See the [3.6.1 release notes](docs/RELEASE_NOTES_3.6.1.md).
 
 ### New in 3.5.0: Methods and experimental contextual selection
 
@@ -235,7 +235,7 @@ twelve ONNX packages and work without a separate training installation.
 Linux also has a per-user installer. Download the `.run` asset and execute:
 
 ```bash
-bash SMILES2Select-Setup-3.6.0-linux-x86_64.run
+bash SMILES2Select-Setup-3.6.1-linux-x86_64.run
 ```
 
 It installs the application, command launcher and desktop entry without root.
@@ -466,7 +466,7 @@ registra a verificação dos imports nativos realizada durante a compilação.
 O release Linux fornece um bundle portátil. Os dois bundles desktop incluem
 os 12 modelos ONNX e não exigem instalação de bibliotecas de treinamento.
 Linux também tem instalador por usuário: execute
-`bash SMILES2Select-Setup-3.6.0-linux-x86_64.run`. Ele cria lançador e entrada no
+`bash SMILES2Select-Setup-3.6.1-linux-x86_64.run`. Ele cria lançador e entrada no
 menu de aplicativos, sem root. A desinstalação padrão usa
 `bash ~/.local/share/smiles2select/uninstall.sh`.
 

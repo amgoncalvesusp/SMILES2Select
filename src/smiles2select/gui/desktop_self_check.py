@@ -44,6 +44,24 @@ def _probabilities(values) -> list[float]:
     return probabilities.tolist()
 
 
+def _dispose_widget(widget, existing_widgets) -> None:
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtWidgets import QApplication
+
+    application = QApplication.instance()
+    widget.close()
+    widget.deleteLater()
+    # This diagnostic has no app.exec() loop to deliver DeferredDelete events.
+    QCoreApplication.sendPostedEvents(widget, QEvent.Type.DeferredDelete)
+    # Plot controls also create parentless menus that outlive their owner widget.
+    for orphan in application.topLevelWidgets():
+        if (orphan in application.topLevelWidgets() and orphan not in existing_widgets
+                and orphan.parent() is None):
+            orphan.close()
+            orphan.deleteLater()
+            QCoreApplication.sendPostedEvents(orphan, QEvent.Type.DeferredDelete)
+
+
 def _check_methods() -> dict:
     from PySide6.QtGui import QPixmap
     from PySide6.QtWidgets import QApplication
@@ -52,6 +70,7 @@ def _check_methods() -> dict:
 
     source = methods_text()  # Reject unreadable resources even if the page offers a fallback.
     application = QApplication.instance() or QApplication([])
+    existing_widgets = set(application.topLevelWidgets())
     page = MethodsPage()
     try:
         page.resize(1000, 740)
@@ -75,8 +94,7 @@ def _check_methods() -> dict:
             "rendered_snippet": rendered[:160] + "\n" + rendered[max(0, marker - 100):marker + 260],
         }
     finally:
-        page.close()
-        page.deleteLater()
+        _dispose_widget(page, existing_widgets)
 
 
 def _check_contextual_models(frame) -> list[dict]:
@@ -114,11 +132,13 @@ def _check_risk_models(frame, chemistry_hash: str) -> list[dict]:
 
 
 def _check_about() -> dict:
-    from PySide6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QApplication, QMessageBox
 
     from smiles2select.app_metadata import APP_NAME, APP_VERSION, AUTHORSHIP
     from smiles2select.gui.main_window import MainWindow
 
+    application = QApplication.instance() or QApplication([])
+    existing_widgets = set(application.topLevelWidgets())
     window = MainWindow()
     try:
         action = window.about_action
@@ -134,8 +154,7 @@ def _check_about() -> dict:
             raise ValueError("About dialog does not contain current version and authorship")
         return {"about_action": action.text(), "about_checked": True, "authorship": AUTHORSHIP}
     finally:
-        window.close()
-        window.deleteLater()
+        _dispose_widget(window, existing_widgets)
 
 
 def _check_tolerance_profile(controls, name: str, mode: str) -> dict:
@@ -172,6 +191,7 @@ def _check_tolerance_gui(result) -> dict:
     from smiles2select.gui.workspace.workspace_window import WorkspaceWindow
 
     application = QApplication.instance() or QApplication([])
+    existing_widgets = set(application.topLevelWidgets())
     window = WorkspaceWindow(result)
     try:
         before = tuple(window.basket.final_ids())
@@ -218,8 +238,7 @@ def _check_tolerance_gui(result) -> dict:
             "contextual_model_count": contextual_count, **_check_about(),
         }, "tolerance_models": models}
     finally:
-        window.close()
-        window.deleteLater()
+        _dispose_widget(window, existing_widgets)
 
 
 def verify_desktop_resources() -> dict:

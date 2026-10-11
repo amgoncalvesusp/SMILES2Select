@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.6.1 — 2026-10-11
+
+- Includes the experimental Chemical tolerance GUI, bundled profiles, Methods documentation and both author credits introduced in the 3.6.0 source tag.
+- Fixes Qt window disposal in offscreen diagnostics and GUI test ownership, so shutdown remains part of the test and installer success gates.
+- Preserves the failed 3.6.0 tag: its Linux assertions passed, but Qt teardown exited with code 139 before builds or publication. No 3.6.0 installers were released.
+
 ## 3.6.0 - 2026-10-10
 
 - Integrate Chemical tolerance (experimental) into the graphical workspace, with general, target-conditioned and custom profiles, explicit rule/native-alert criteria, bounded resource estimates and per-molecule evidence.
