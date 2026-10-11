@@ -1,3 +1,4 @@
+import json
 import runpy
 import sys
 from pathlib import Path
@@ -13,6 +14,59 @@ def test_windows_system_dll_classification() -> None:
     assert _is_system_dll("dbghelp.dll")
     assert _is_system_dll("DBGHELP.DLL")
     assert not _is_system_dll("onnxruntime.dll")
+
+
+def test_native_imports_include_normal_and_delayed_dependencies(tmp_path, monkeypatch):
+    native = SimpleNamespace(
+        DIRECTORY_ENTRY_IMPORT=[SimpleNamespace(dll=b"MSCMS.DLL"), SimpleNamespace(dll=None)],
+        DIRECTORY_ENTRY_DELAY_IMPORT=[SimpleNamespace(dll=b"onnxruntime.dll"),
+                                      SimpleNamespace(dll=b"MSCMS.DLL"), SimpleNamespace(dll=None)],
+    )
+
+    def parse(path, fast_load):
+        assert Path(path).name == "qwindows.dll"
+        assert fast_load is False, "All PE import tables must be available for verification"
+        return native
+
+    monkeypatch.setattr(verify_windows_bundle.pefile, "PE", parse)
+    assert verify_windows_bundle._imports(tmp_path / "qwindows.dll") == ["MSCMS.DLL", "onnxruntime.dll"]
+
+
+@pytest.mark.parametrize("dependency, allowed", [
+    ("mscms.dll", True), ("MSCMS.DLL", True),
+    ("mscms_vendor.dll", False), ("onnxruntime.dll", False),
+])
+def test_qt_color_management_import_is_system_only(tmp_path, monkeypatch, dependency, allowed):
+    platforms = (
+        "_internal/PySide6/plugins/platforms/qwindows.dll",
+        "_internal/PySide6/plugins/platforms/qdirect2d.dll",
+    )
+    resources = (
+        "SMILES2Select.exe", "_internal/Qt6Core.dll", "_internal/Qt6Gui.dll",
+        "_internal/Qt6Widgets.dll", *platforms, "_internal/rdkit/Data/BaseFeatures.fdef",
+        "_internal/smiles2select/profiles/builtins/default.json",
+        "_internal/smiles2select/preparability/builtins/default.json",
+    )
+    for name in resources:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"fixture")
+    monkeypatch.setattr(verify_windows_bundle, "_imports", lambda path:
+                        [dependency] if path.name in {"qwindows.dll", "qdirect2d.dll"} else [])
+    manifest = tmp_path.parent / f"{tmp_path.name}-manifest.json"
+    arguments = [str(tmp_path), "--manifest", str(manifest)]
+    if allowed:
+        assert verify_windows_bundle.main(arguments) == 0
+        report = json.loads(manifest.read_text(encoding="utf-8"))
+        assert report["missing_dependencies"] == {}
+        assert report["missing_runtime_requirements"] == []
+        assert all(report["dependencies"][str(Path(name))] == [dependency] for name in platforms)
+    else:
+        with pytest.raises(RuntimeError) as failure:
+            verify_windows_bundle.main(arguments)
+        report = json.loads(str(failure.value))
+        assert report["missing_dependencies"] == {str(Path(name)): [dependency] for name in platforms}
+        assert not manifest.exists(), "A failed bundle must not produce a success manifest"
 
 
 def test_windows_bundle_rejects_shadowed_system_icu(tmp_path, monkeypatch) -> None:

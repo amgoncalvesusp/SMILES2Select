@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.6.2 — 2026-10-11
+
+- Corrects the Windows native-dependency audit: Qt platform plug-ins import `mscms.dll`, an operating-system color-management component. The audit now classifies this exact DLL as a Windows dependency; unknown missing dependencies still block publication.
+- Includes the chemical-tolerance workspace, explicit experimental-model controls, English About/README/Methods and both authors' credits from the preceding source tags.
+- Preserves the failed 3.6.0 and 3.6.1 tags and CI evidence. The 3.6.1 source tests, Linux installer lifecycle and Windows frozen checks passed, but its native-dependency audit blocked installer publication.
+
 ## 3.6.1 — 2026-10-11
 
 - Includes the experimental Chemical tolerance GUI, bundled profiles, Methods documentation and both author credits introduced in the 3.6.0 source tag.

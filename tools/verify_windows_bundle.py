@@ -47,6 +47,7 @@ SYSTEM_DLLS = {
     "OLE32.DLL",
     "OLEAUT32.DLL",
     "MPR.DLL",
+    "MSCMS.DLL",
     "MSIMG32.DLL",
     "NCRYPT.DLL",
     "NETAPI32.DLL",
