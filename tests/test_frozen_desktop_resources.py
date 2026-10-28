@@ -30,6 +30,17 @@ def test_frozen_desktop_resources(tmp_path):
     assert report["status"] == "ok"
     assert report["frozen"] is True
     assert report["schema"] == "smiles2select-desktop-resources/1"
+    hub = report["hub_gui"]
+    assert hub["method_pages"] == ["chemical", "model", "contextual", "tolerance"]
+    assert hub["table"]["record_ids"] == [1, 2, 3]
+    assert hub["table"]["inspected_id"] == 2 and hub["table"]["rendered"]
+    comparison = hub["comparison"]
+    assert comparison["reference_id"] == 1 and comparison["current_id"] == 2
+    assert comparison["reference_smiles"] == "CCO" and comparison["current_smiles"] == "CCN"
+    assert comparison["modeless"] and comparison["read_only"] and comparison["rendered"]
+    assert hub["final_ids_before"] == hub["final_ids_after"] == [1, 2, 3]
+    assert all(hub[key] for key in ("basket_unchanged", "log_unchanged", "cursor_unchanged",
+                                   "pins_unchanged", "criteria_unchanged"))
     assert len(report["contextual_models"]) == 9
     assert len(report["risk_models"]) == 1
     assert len(report["tolerance_models"]) == 3

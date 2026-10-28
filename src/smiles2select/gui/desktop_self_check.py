@@ -184,6 +184,132 @@ def _check_tolerance_profile(controls, name: str, mode: str) -> dict:
     }
 
 
+def _hub_selection_state(window) -> dict:
+    from smiles2select.gui.workspace import criteria_state
+
+    return {
+        "basket": (window.basket.states(), window.basket.target_count),
+        "log": window.basket.log.history(), "cursor": window.basket.log.cursor,
+        "pins": window.basket.pinned_ids(),
+        "criteria": (criteria_state.capture(window), criteria_state.active(window)),
+    }
+
+
+def _check_hub_methods(window, application, before) -> list[str]:
+    from PySide6.QtGui import QPixmap
+
+    methods = [window.method_selector.itemData(index)
+               for index in range(window.method_selector.count())]
+    if methods != ["chemical", "model", "contextual", "tolerance"]:
+        raise ValueError("Hub method pages are incomplete")
+    pages = (window.chemical_controls, window.model_panel,
+             window.model_panel.contextual, window.model_panel.tolerance)
+    for index, page in enumerate(pages):
+        window.method_selector.setCurrentIndex(index)
+        application.processEvents()
+        if (not window.isAncestorOf(page) or not page.isVisible()
+                or any(other.isVisible() for other in pages if other is not page)
+                or not window._method_actions[index].isVisible()
+                or not window.target_count.isVisible()):
+            raise ValueError(f"Hub method page or persistent actions are not visible: {methods[index]}")
+        page.render(QPixmap(page.size()))
+        if _hub_selection_state(window) != before:
+            raise ValueError("Hub method switching changed selection state")
+    return methods
+
+
+def _inspect_hub_table(window, application, record_id: int) -> None:
+    from PySide6.QtCore import QItemSelectionModel
+
+    table = window.table_view
+    index = table.model().index_for_record(record_id)
+    table.selectionModel().setCurrentIndex(
+        index, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+    )
+    application.processEvents()
+    if window.inspector.record_id != record_id:
+        raise ValueError("Table inspection did not reach the workspace inspector by record identity")
+
+
+def _check_hub_comparison(window, application, first: int, second: int) -> dict:
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QPixmap
+    from PySide6.QtWidgets import QPushButton
+
+    window.molecule_compare_button.click()
+    application.processEvents()
+    dialog = window._comparison_dialog
+    if (dialog is None or dialog.parent() is not window or not dialog.isVisible()
+            or dialog.isModal() or dialog.windowModality() != Qt.NonModal):
+        raise ValueError("Comparison did not open as an owned modeless dialog")
+    if dialog.reference_id is not None or dialog.reference_panel.record_id is not None:
+        raise ValueError("Comparison chose reference A without an explicit keep action")
+    dialog.keep_reference_button.click()
+    _inspect_hub_table(window, application, second)
+    if (dialog.reference_id != first or dialog.reference_panel.record_id != first
+            or dialog.current_id != second or dialog.current_panel.record_id != second):
+        raise ValueError("Comparison did not retain explicit A while table inspection updated B")
+    panels = (dialog.reference_panel, dialog.current_panel)
+    smiles = [str(window.candidates.at[record_id, "canonical_smiles"])
+              for record_id in (first, second)]
+    for panel, record_id, structure in zip(panels, (first, second), smiles):
+        details = panel.details.toPlainText()
+        state = window.basket.state(record_id)
+        decisions = (f"Chemical status: {state.chemical_status.value}",
+                     f"Selection status: {state.selection_status.value}",
+                     "Included in docking export: " + ("Yes" if state.is_selected else "No"))
+        if (not panel.isVisible() or not panel.details.isReadOnly() or panel.findChildren(QPushButton)
+                or panel.structure.pixmap().isNull() or panel._structure_smiles != structure
+                or f"record_id: {record_id}" not in details or f"SMILES: {structure}" not in details
+                or not all(decision in details for decision in decisions)):
+            raise ValueError("Comparison did not render read-only structures and applied decisions")
+    if (smiles[0] == smiles[1]
+            or panels[0].structure.pixmap().toImage() == panels[1].structure.pixmap().toImage()):
+        raise ValueError("Comparison structures are not distinct")
+    dialog.render(QPixmap(dialog.size()))
+    return {
+        "reference_id": dialog.reference_id, "current_id": dialog.current_id,
+        "reference_smiles": smiles[0], "current_smiles": smiles[1],
+        "modeless": True, "read_only": True, "rendered": True,
+    }
+
+
+def _check_hub_gui(window) -> dict:
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QPixmap
+    from PySide6.QtWidgets import QApplication
+
+    application = QApplication.instance()
+    before = _hub_selection_state(window)
+    final_ids = list(window.basket.final_ids())
+    methods = _check_hub_methods(window, application, before)
+    window.view_selector.setCurrentText("Table")
+    application.processEvents()
+    table = window.table_view
+    if window.views.currentWidget() is not table or not table.isVisible():
+        raise ValueError("Table view is not mounted and visible in the Hub")
+    table.sortByColumn(0, Qt.DescendingOrder)
+    model = table.model()
+    record_ids = [model.record_id(model.index(row, 0)) for row in range(model.rowCount())]
+    if record_ids != sorted(window.candidates.index, reverse=True) or len(record_ids) < 2:
+        raise ValueError("Table record identity or sort order does not cover the candidate library")
+    first, second = map(int, window.candidates.index[:2])
+    _inspect_hub_table(window, application, first)
+    table.render(QPixmap(table.size()))
+    comparison = _check_hub_comparison(window, application, first, second)
+    after = _hub_selection_state(window)
+    unchanged = {f"{key}_unchanged": before[key] == after[key] for key in before}
+    if not all(unchanged.values()) or final_ids != list(window.basket.final_ids()):
+        raise ValueError("Hub comparison changed selection state, history, pins or criteria")
+    return {
+        "method_pages": methods,
+        "table": {"record_ids": sorted(record_ids), "inspected_id": window.inspector.record_id,
+                  "rendered": True},
+        "comparison": comparison, "final_ids_before": final_ids,
+        "final_ids_after": list(window.basket.final_ids()), **unchanged,
+    }
+
+
 def _check_tolerance_gui(result) -> dict:
     from PySide6.QtGui import QPixmap
     from PySide6.QtWidgets import QApplication
@@ -198,7 +324,7 @@ def _check_tolerance_gui(result) -> dict:
         window.resize(1400, 900)
         window.show()
         panel, controls = window.model_panel, window.model_panel.tolerance
-        panel.tolerance_toggle.click()
+        window.method_selector.setCurrentIndex(window.method_selector.findData("tolerance"))
         application.processEvents()
         window.controls_scroll.ensureWidgetVisible(controls)
         if not window.isAncestorOf(controls) or not controls.isVisible():
@@ -206,7 +332,7 @@ def _check_tolerance_gui(result) -> dict:
         choices = [controls.workflow.itemText(index) for index in range(controls.workflow.count())]
         if choices != ["General", "Target-conditioned", "Custom"]:
             raise ValueError("Tolerance GUI is missing a supported workflow")
-        if "experimental" not in panel.tolerance_toggle.text().lower():
+        if "experimental" not in window.method_selector.currentText().lower():
             raise ValueError("Tolerance GUI must mark included models as experimental")
         names = [Path(controls.included_profiles.itemData(index)).name
                  for index in range(1, controls.included_profiles.count())]
@@ -230,7 +356,8 @@ def _check_tolerance_gui(result) -> dict:
             raise ValueError("Experimental activity/contextual model inventory is incomplete")
         if tuple(window.basket.final_ids()) != before:
             raise ValueError("Loading tolerance profiles changed the native basket")
-        return {"tolerance_gui": {
+        hub = _check_hub_gui(window)
+        return {"hub_gui": hub, "tolerance_gui": {
             "mounted": True, "rendered": True, "workflow_choices": choices,
             "experimental": True, "basket_unchanged": True,
             "criteria_count": controls.criteria.rowCount(),
@@ -271,7 +398,7 @@ def verify_desktop_resources() -> dict:
         result = run(RunConfig(
             sources=(SourceFile(path=source, mapping=ColumnMapping(smiles="SMILES", molecule_id="ID")),),
             profile_ids=("lipinski", "veber"), alert_catalogs=(), compute_sa=True,
-            n_jobs=1, chunk_size=3,
+            n_jobs=1, chunk_size=3, checkpoint_path=Path(temporary) / "checkpoint.sqlite",
         ))
         tolerance = _check_tolerance_gui(result)
     application.processEvents()

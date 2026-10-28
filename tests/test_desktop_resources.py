@@ -20,6 +20,18 @@ def test_real_desktop_resources_render_and_score(qapp):
     assert report["methods"]["section_count"] >= 5
     assert "experimental" in report["methods"]["rendered_snippet"].lower()
     assert report["methods"]["rendered_characters"] > 1000
+    hub = report["hub_gui"]
+    assert hub["method_pages"] == ["chemical", "model", "contextual", "tolerance"]
+    assert hub["table"]["record_ids"] == [1, 2, 3]
+    assert hub["table"]["inspected_id"] == 2
+    assert hub["table"]["rendered"]
+    comparison = hub["comparison"]
+    assert comparison["reference_id"] == 1 and comparison["current_id"] == 2
+    assert comparison["reference_smiles"] == "CCO" and comparison["current_smiles"] == "CCN"
+    assert comparison["modeless"] and comparison["read_only"] and comparison["rendered"]
+    assert hub["final_ids_before"] == hub["final_ids_after"] == [1, 2, 3]
+    assert all(hub[key] for key in ("basket_unchanged", "log_unchanged", "cursor_unchanged",
+                                   "pins_unchanged", "criteria_unchanged"))
     assert len(report["contextual_models"]) == 9
     assert len(report["risk_models"]) == 1
     root = Path(__file__).resolve().parents[1] / "src"

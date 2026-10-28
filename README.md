@@ -6,6 +6,39 @@ Authors: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA); Dan
 
 ## English
 
+### New in 3.7.0: linked candidate inspection and molecule comparison
+
+The **Chemical Space Hub** keeps **Requested N**, the applied method, final count,
+difference from the request and selection/export actions visible while its forms
+scroll. **Configure** shows **Chemical ranking**, **Model (experimental)**,
+**Contextual (experimental)** or **Tolerance (experimental)**. Switching forms
+does not apply a method: use **Create selection** or the chosen method's explicit
+preview/adopt actions. Current chemical-tolerance controls are under
+**Configure → Tolerance (experimental)**. **Refresh map** and **Display...** sit
+beside the map.
+
+Choose **Table** to inspect every evaluable Hub candidate, including chemical
+screening failures. The read-only table uses stable **Record ID** values, so
+sorting and duplicate external molecule IDs do not change the inspected record
+or final membership. Table, Chemical space, Pareto and preview-table inspection
+share the same structured 2D inspector. A green inspection ring is independent
+of the gold final-molecule markers; records absent from a map remain inspectable
+in the table without invented coordinates.
+
+Open **Compare molecules...**, inspect a molecule and choose **Keep current
+molecule as A**, then inspect another record for B. This read-only window stays
+open beside the Hub and refreshes current basket states and applied evidence
+after decisions, adoption, undo and redo. Keeping A is a temporary view reference;
+it does not select, pin or adopt anything. Pending preview evidence stays in the
+main inspector, and comparison calculates no new similarity score.
+
+The existing chemical algorithms, model packages, experimental limits, saved
+sessions and export formats are preserved. Optional SMARTS patterns still match
+locally; external pattern-design help remains optional. AI selection and training
+remain **experimental and need broader independent validation**. See the
+[Hub guide](docs/CHEMICAL_SPACE_HUB.md), [GUI guide](docs/GUI_GUIDE.md) and
+[3.7.0 release notes](docs/RELEASE_NOTES_3.7.0.md).
+
 ### New in 3.6.2: Chemical tolerance (experimental)
 
 The **Chemical tolerance (experimental)** panel learns chemical compatibility
@@ -63,7 +96,7 @@ from settings for the next selection. AI selection and training remain
 **experimental and need broader independent validation**.
 
 All twelve trained ONNX alternatives, including Tiny, remain available through
-**Prioritize by model**. The optional **Contextual policy (experimental)** panel
+**Configure → Model (experimental)**. **Configure → Contextual (experimental)**
 also includes trained local models for human CA2/Ki, AChE/IC50 and BACE1/IC50.
 Select an included package and load it, inspect the preview, then adopt it
 explicitly. Nine packages contain three logistic predictors with three
@@ -76,6 +109,11 @@ covers **SH-SY5Y ATP viability at 48 hours** only. It does not predict general
 safety. Decisions, model hashes and context remain available in saved sessions
 and exports. A requested molecule count is a budget, not a fixed percentage;
 hard constraints may limit the achievable count.
+
+For optional substructure queries, [SMARTS.plus](https://smarts.plus/) helps with
+pattern design and inspection. The [SMARTS guide](docs/CONTEXTUAL_SELECTION.md#optional-smarts)
+explains required, excluded and preferred patterns, local RDKit checks and method
+references. The website is optional; SMILES2Select matches patterns locally.
 
 The larger contextual feature model did not consistently improve retrospective
 recovery over its simpler logistic baseline. Hit, lead and fragment settings
@@ -93,8 +131,8 @@ See [contextual selection](docs/CONTEXTUAL_SELECTION.md),
 
 SMILES2Select now includes S2S-Decision in one installation and workspace.
 Chemical screening remains the default. After processing a SMILES library,
-open **Chemical Space Hub → Prioritize by model**, choose a target, endpoint
-and compatible model, then select **Preview model selection**. The preview
+open **Chemical Space Hub → Configure → Model (experimental)**, choose a target,
+endpoint and compatible model, then select **Preview model selection**. The preview
 scores the chemically eligible pool under the current count, quotas, pins,
 exclusions and reference rules. Compare retained, added and removed molecules
 before **Adopt proposal**. Adoption is explicit and undoable; preview or
@@ -199,6 +237,10 @@ similarity, novelty or selection threshold.
 
 ### Installation
 
+Get version 3.7.0 from [GitHub Releases](https://github.com/amgoncalvesusp/SMILES2Select/releases/tag/v3.7.0).
+The release includes Windows and Linux installers, portable bundles, a Python
+wheel, a Windows native-dependency manifest and `SHA256SUMS-v3.7.0.txt`.
+
 RDKit is easiest to install with conda:
 
 ```bash
@@ -235,7 +277,7 @@ twelve ONNX packages and work without a separate training installation.
 Linux also has a per-user installer. Download the `.run` asset and execute:
 
 ```bash
-bash SMILES2Select-Setup-3.6.2-linux-x86_64.run
+bash SMILES2Select-Setup-3.7.0-linux-x86_64.run
 ```
 
 It installs the application, command launcher and desktop entry without root.
@@ -392,8 +434,8 @@ recipes, persistence, GUI interaction, cancellation and CLI integration.
 
 SMILES2Select e S2S-Decision agora formam um único aplicativo. A seleção
 química continua como padrão. Após processar a biblioteca, abra **Chemical
-Space Hub → Prioritize by model**, escolha alvo, endpoint e modelo compatível,
-e use **Preview model selection**. A prévia pontua todas as moléculas
+Space Hub → Configure → Model (experimental)**, escolha alvo, endpoint e modelo
+compatível, e use **Preview model selection**. A prévia pontua todas as moléculas
 quimicamente elegíveis respeitando quantidade, cotas, moléculas fixadas,
 exclusões e regras de referência. Compare moléculas mantidas, adicionadas e
 removidas antes de **Adopt proposal**. A adoção altera a cesta em uma ação
@@ -466,7 +508,7 @@ registra a verificação dos imports nativos realizada durante a compilação.
 O release Linux fornece um bundle portátil. Os dois bundles desktop incluem
 os 12 modelos ONNX e não exigem instalação de bibliotecas de treinamento.
 Linux também tem instalador por usuário: execute
-`bash SMILES2Select-Setup-3.6.2-linux-x86_64.run`. Ele cria lançador e entrada no
+`bash SMILES2Select-Setup-3.7.0-linux-x86_64.run`. Ele cria lançador e entrada no
 menu de aplicativos, sem root. A desinstalação padrão usa
 `bash ~/.local/share/smiles2select/uninstall.sh`.
 

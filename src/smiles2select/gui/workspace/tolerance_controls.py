@@ -390,6 +390,7 @@ class ToleranceControls(QWidget):
         if item is not None and self._preview is not None:
             record_id = int(item.text())
             rows, summary = self._preview.records, self._preview.summary
+            self.workspace._show_molecule(record_id)
             self.workspace.inspector.show_molecule(record_id, self.workspace.candidates,
                 molecule_evidence(rows.loc[record_id], summary.get("context", {})))
 

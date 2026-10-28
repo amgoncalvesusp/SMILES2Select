@@ -1,9 +1,11 @@
 import numpy as np
 import pandas as pd
+import pytest
 from rdkit import Chem, DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 
 from s2s_decision.context import build_context, training_context
+from s2s_decision.schema import CONTEXT_NAMES
 from s2s_decision.splits import available_dates
 
 
@@ -35,6 +37,21 @@ def test_exact_context_excludes_identity_and_missing_class():
     assert np.isnan(context.iloc[0].similarity_inactive_max)
     assert context.iloc[0].similarity_active_max < 1
     assert context.iloc[0].novelty == 1 - context.iloc[0].similarity_active_max
+
+
+@pytest.mark.parametrize("storage", ["python", "pyarrow"])
+def test_empty_string_reference_frame_has_no_context_and_is_unchanged(storage):
+    if storage == "pyarrow":
+        pytest.importorskip("pyarrow")
+    data = rows().astype({"identity": pd.StringDtype(storage=storage)})
+    queries = data.iloc[[3, 1]]
+    references = data.iloc[:0]
+    original = references.copy(deep=True)
+    context = build_context(queries, references)
+    pd.testing.assert_frame_equal(
+        context, pd.DataFrame(np.nan, index=queries.index, columns=CONTEXT_NAMES),
+    )
+    pd.testing.assert_frame_equal(references, original)
 
 
 def test_oof_excludes_same_scaffold():

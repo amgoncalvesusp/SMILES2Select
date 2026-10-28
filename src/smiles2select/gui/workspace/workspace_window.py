@@ -34,7 +34,8 @@ from smiles2select.explainability.method_cards import get_method_card
 from smiles2select.export import selection_export
 from smiles2select.gui.pages.methods_page import install_methods_action
 from smiles2select.gui.workspace import active_criteria, criteria_state
-from smiles2select.gui.workspace.guided_controls import build_layout
+from smiles2select.gui.workspace.candidate_table import CandidateTableView
+from smiles2select.gui.workspace.guided_controls import MAP_GUIDANCE, build_layout
 from smiles2select.gui.workspace.jobs import ComputationJob
 from smiles2select.gui.workspace.map_compute import compute_map
 from smiles2select.gui.workspace.panels import BasketPanel, InspectorPanel
@@ -64,6 +65,7 @@ from smiles2select.selection_intelligence.states import (
 
 VIEW_MAP = "Chemical space"
 VIEW_PARETO = "Pareto"
+VIEW_TABLE = "Table"
 OBJECTIVE_CANDIDATES = ("qed", "mol_wt", "rdkit_wlogp", "tpsa", "sa_score", "np_score")
 
 
@@ -88,6 +90,7 @@ class WorkspaceWindow(QMainWindow):
         self._map_requested = False
         self._pending_map_refresh = False
         self._scenarios_dialog = None
+        self._comparison_dialog = None
         self.result = result
         self.candidates = self._build_candidates(result)
         self.basket = self._build_basket(result)
@@ -103,9 +106,11 @@ class WorkspaceWindow(QMainWindow):
 
         self.map_view = ChemicalSpaceView()
         self.pareto_view = ParetoView()
+        self.table_view = CandidateTableView()
         self.views = QStackedWidget()
         self.views.addWidget(self.map_view)
         self.views.addWidget(self.pareto_view)
+        self.views.addWidget(self.table_view)
 
         self.inspector = InspectorPanel()
         self.basket_panel = BasketPanel()
@@ -194,6 +199,7 @@ class WorkspaceWindow(QMainWindow):
         for view in (self.map_view, self.pareto_view):
             view.point_clicked.connect(self._show_molecule)
             view.region_selected.connect(self._shortlist_region)
+        self.table_view.molecule_requested.connect(self._show_molecule)
 
         self.inspector.shortlist_requested.connect(lambda rid: self._decide(rid, "shortlist"))
         self.inspector.select_requested.connect(lambda rid: self._decide(rid, "final"))
@@ -246,11 +252,13 @@ class WorkspaceWindow(QMainWindow):
         self.basket.target_count = target
         pending = self.has_pending_criteria()
         self.selection_summary.setText(
-            f"{source}: {count:,} final molecules for export. "
+            f"Requested: {self.target_count.value():,}; {source}: {count:,} final molecules for export. "
+            f"Difference from request: {count - self.target_count.value():+,}. "
             + (f"Applied target: {target:,}. " if target is not None else "No original count limit. ")
             + (f"Count differs by {count - target:+,}; review quotas, pins and manual edits. "
                if target is not None and count != target else "")
-            + ("Edited criteria not applied; click Create selection. " if pending else "")
+            + ("Edited criteria not applied; create a chemical selection or preview and adopt "
+               "a proposal in the chosen method. " if pending else "")
             + "Clicking a point only inspects it; Select changes the final library."
             + "\n" + active_criteria.compact(self)
         )
@@ -287,6 +295,25 @@ class WorkspaceWindow(QMainWindow):
             self._scenarios_dialog = ScenarioDialog(self)
         self._scenarios_dialog.show()
         self._scenarios_dialog.raise_()
+
+    def _open_molecule_comparison(self) -> None:
+        if self.is_busy:
+            self.warnings.setText("Wait for the active computation before comparing molecules.")
+            return
+        record_id = self.inspector.record_id
+        from smiles2select.gui.workspace.molecule_comparison import MoleculeComparisonDialog
+
+        if self._comparison_dialog is None:
+            self._comparison_dialog = MoleculeComparisonDialog(self)
+        self._comparison_dialog.set_current_id(record_id)
+        self._comparison_dialog.show()
+        self._comparison_dialog.raise_()
+
+    def _update_molecule_comparison(self) -> None:
+        record_id = self.inspector.record_id
+        self.molecule_compare_button.setEnabled(not self.is_busy)
+        if self._comparison_dialog is not None and self._comparison_dialog.isVisible():
+            self._comparison_dialog.set_current_id(record_id)
 
     def _request_map(self) -> None:
         if self.is_busy:
@@ -346,10 +373,13 @@ class WorkspaceWindow(QMainWindow):
         self._show_progress(message)
         self.job_progress.show()
         self.controls_scroll.setEnabled(False)
+        self.selection_actions.setEnabled(False)
+        self.map_controls.setEnabled(False)
         self.basket_panel.setEnabled(False)
         self.inspector.setEnabled(False)
         self.views.setEnabled(False)
         self._job = ComputationJob(function, self)
+        self._update_molecule_comparison()
         self._job.completed.connect(self._job_succeeded, Qt.QueuedConnection)
         self._job.failed.connect(self._job_failed, Qt.QueuedConnection)
         self._job.finished.connect(self._finish_job, Qt.QueuedConnection)
@@ -389,11 +419,13 @@ class WorkspaceWindow(QMainWindow):
         self._job_cancel = None
         self.cancel_job_button.hide()
         self.job_progress.hide()
-        for widget in (self.controls_scroll, self.basket_panel, self.inspector, self.views):
+        for widget in (self.controls_scroll, self.selection_actions, self.map_controls,
+                       self.basket_panel, self.inspector, self.views):
             widget.setEnabled(True)
         if job is not None:
             job.deleteLater()
         criteria_state.update_export_buttons(self)
+        self._update_molecule_comparison()
         if self._pending_map_refresh:
             self._pending_map_refresh = False
             QTimer.singleShot(0, self._request_map)
@@ -417,14 +449,27 @@ class WorkspaceWindow(QMainWindow):
             self.warnings.setText("Scenario computation is running; wait for completion before closing.")
             event.ignore()
             return
+        if self._comparison_dialog is not None:
+            self._comparison_dialog.close()
         self.model_panel.clear_preview()
         self.model_panel.contextual.invalidate()
         self.model_panel.tolerance.invalidate()
         super().closeEvent(event)
 
     def _switch_view(self, name: str) -> None:
-        self.views.setCurrentIndex(0 if name == VIEW_MAP else 1)
+        self.views.setCurrentIndex({VIEW_MAP: 0, VIEW_PARETO: 1, VIEW_TABLE: 2}[name])
         self.refresh()
+
+    def _update_view_controls(self) -> None:
+        table = self.views.currentWidget() is self.table_view
+        for widget in (self.projection_selector, self.color_selector,
+                       self.reference_overlay, self.map_button):
+            widget.setEnabled(not table)
+        self.view_notice.setText(
+            f"Table: all {len(self.candidates):,} evaluable candidates, including chemical screening "
+            "failures. Sort headers to compare; inspecting a row does not change the final library."
+            if table else MAP_GUIDANCE
+        )
 
     def _update_method_card(self, strategy: str) -> None:
         """Keep method bias and consequence visible while changing controls."""
@@ -489,7 +534,8 @@ class WorkspaceWindow(QMainWindow):
         self.warnings.setText("\n".join(self.pareto.warnings))
         self.refresh()
 
-    def _show_molecule(self, record_id: int) -> None:
+    def _molecule_extras(self, record_id: int) -> dict[str, object]:
+        """Read current basket and applied evidence without changing inspection or decisions."""
         extras: dict[str, object] = {}
         if self.pareto is not None and record_id in self.pareto.table.index:
             extras["Pareto rank"] = int(self.pareto.table.loc[record_id, "pareto_rank"])
@@ -536,7 +582,13 @@ class WorkspaceWindow(QMainWindow):
                                 applied.provenance.get("context"),
                                 applied.provenance.get("policy_settings", {}).get("risk_evidence")))
                     break
-        self.inspector.show_molecule(record_id, self.candidates, extras)
+        return extras
+
+    def _show_molecule(self, record_id: int) -> None:
+        self.inspector.show_molecule(record_id, self.candidates, self._molecule_extras(record_id))
+        for view in (self.table_view, self.map_view, self.pareto_view):
+            view.set_inspected_id(self.inspector.record_id)
+        self._update_molecule_comparison()
 
     def _shortlist_region(self, record_ids: list[int]) -> None:
         if not record_ids:
@@ -859,6 +911,8 @@ class WorkspaceWindow(QMainWindow):
 
     def refresh(self) -> None:
         """Redraw the active view and the basket from the shared state."""
+        self.table_view.refresh(self.candidates, self.basket)
+        self._update_view_controls()
         selected = self.basket.final_ids()
         self._update_selection_summary()
         ranks = self.pareto.table["pareto_rank"] if self.pareto is not None else None
@@ -881,21 +935,24 @@ class WorkspaceWindow(QMainWindow):
                 self.map_view.set_reference_points(
                     reference_coordinates if self.reference_overlay.isChecked() else None
                 )
-        elif self.pareto is not None:
-            self.pareto_view.show_objectives(
-                self.candidates,
-                self.first_objective.currentText(),
-                self.second_objective.currentText(),
-                self.pareto.table["pareto_rank"],
-                selected,
-            )
-        else:
-            self.pareto_view.set_points(pd.DataFrame(columns=["x", "y"]))
-            self.pareto_view.clear_lasso()
+        elif self.views.currentWidget() is self.pareto_view:
+            if self.pareto is not None:
+                self.pareto_view.show_objectives(
+                    self.candidates,
+                    self.first_objective.currentText(),
+                    self.second_objective.currentText(),
+                    self.pareto.table["pareto_rank"],
+                    selected,
+                )
+            else:
+                self.pareto_view.set_points(pd.DataFrame(columns=["x", "y"]))
+                self.pareto_view.clear_lasso()
         self.basket_panel.refresh(self.basket, self.candidates.get("molecule_id"))
         criteria_state.update_export_buttons(self)
         if self.inspector.record_id is not None:
             self._show_molecule(self.inspector.record_id)
+        else:
+            self._update_molecule_comparison()
 
     def _map_projection(self) -> tuple[ProjectionResult, pd.DataFrame]:
         method = str(self.projection_selector.currentData())

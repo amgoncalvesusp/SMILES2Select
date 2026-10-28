@@ -107,7 +107,8 @@ def from_scenario(window, spec) -> CriteriaState:
 def update_export_buttons(window) -> None:
     pending = window.has_pending_criteria()
     enabled = bool(window.basket.final_ids()) and not pending and not window.is_busy
-    tooltip = ("Create selection to apply the edited criteria before exporting."
+    tooltip = ("Choose Chemical ranking and Create selection, or preview and adopt a proposal "
+               "in the chosen method, before exporting."
                if pending else "Export the current final molecules and their applied criteria.")
     for button in (window.basket_panel.export_button, window.basket_panel.docking_button):
         button.setEnabled(enabled)
@@ -121,13 +122,15 @@ def allow_export(window) -> bool:
         return False
     count = len(window.basket.final_ids())
     if not count:
-        window.warnings.setText("No final molecules to export. Create a selection first.")
+        window.warnings.setText("No final molecules to export. Create a chemical selection "
+                                "or preview and adopt a proposal first.")
         return False
     if window.has_pending_criteria():
         window.warnings.setText(
             f"Export blocked: the edited criteria have not been applied. Requested: "
             f"{window.target_count.value():,}; current final set: {count:,}. "
-            "Click Create selection and wait for completion."
+            "Choose Chemical ranking and Create selection, or preview and adopt a proposal "
+            "in the chosen method. Wait for completion."
         )
         return False
     requested = window.target_count.value()

@@ -209,6 +209,16 @@ class ContextualControls(QWidget):
             widget.setMaximumHeight(55)
             widget.setPlaceholderText("One validated SMARTS per line; leave blank to disable")
             form.addRow(label, widget)
+        smarts_help = QLabel(
+            '<a href="https://smarts.plus/">Design patterns with SMARTS.plus</a> '
+            '(optional external help). Required: all patterns (AND). Excluded: any pattern '
+            '(OR). Preferred: ranking bonus only. Leave fields blank to disable. '
+            'Check matching and nonmatching structures in SMILES2Select/RDKit; '
+            'see Methods for syntax and limits. Matching runs locally.'
+        )
+        smarts_help.setWordWrap(True)
+        smarts_help.setOpenExternalLinks(True)
+        form.addRow(smarts_help)
         self.notice = QLabel(
             "Experimental policy. Activity evidence does not establish absence of interference "
             "or toxicity. Changing stage or assay may require review. Quantity and diversity "

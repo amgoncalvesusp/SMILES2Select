@@ -13,11 +13,10 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QGroupBox,
-    QHBoxLayout,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
-    QToolButton,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -64,7 +63,7 @@ class ModelDecisionPanel(QGroupBox):
     """Choose a task-specific model; preview before replacing the native basket."""
 
     def __init__(self, workspace):
-        super().__init__("Prioritize by model (experimental)", workspace)
+        super().__init__("Model (experimental)", workspace)
         self.workspace = workspace
         self._catalog: list[dict] = []
         self._preview: ModelPreview | None = None
@@ -94,7 +93,7 @@ class ModelDecisionPanel(QGroupBox):
         form.addRow("Endpoint", self.endpoint)
         form.addRow("Model", self.models)
         buttons = QWidget()
-        row = QHBoxLayout(buttons)
+        row = QVBoxLayout(buttons)
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(self.refresh_button)
         row.addWidget(self.import_button)
@@ -106,24 +105,10 @@ class ModelDecisionPanel(QGroupBox):
         form.addRow(self.report)
         from .contextual_controls import ContextualControls
 
-        self.contextual_toggle = QToolButton()
-        self.contextual_toggle.setText("Contextual policy (experimental)")
-        self.contextual_toggle.setCheckable(True)
         self.contextual = ContextualControls(workspace, self)
-        self.contextual.hide()
-        self.contextual_toggle.toggled.connect(self.contextual.setVisible)
-        form.addRow(self.contextual_toggle)
-        form.addRow(self.contextual)
         from .tolerance_controls import ToleranceControls
 
-        self.tolerance_toggle = QToolButton()
-        self.tolerance_toggle.setText("Chemical tolerance (experimental)")
-        self.tolerance_toggle.setCheckable(True)
         self.tolerance = ToleranceControls(workspace, self)
-        self.tolerance.hide()
-        self.tolerance_toggle.toggled.connect(self.tolerance.setVisible)
-        form.addRow(self.tolerance_toggle)
-        form.addRow(self.tolerance)
 
         self.target.currentIndexChanged.connect(self._target_changed)
         self.endpoint.currentIndexChanged.connect(self._endpoint_changed)
@@ -193,7 +178,7 @@ class ModelDecisionPanel(QGroupBox):
             self.info.setPlainText(
                 "Choose target, endpoint and model. Bundled tasks offer logistic regression, "
                 "two gradient-boosting variants and Tiny. All are task-specific. "
-                "Chemical strategies are available under Selection strategy above."
+                "Choose Chemical ranking in Configure to edit chemical strategies."
             )
             return
         self.info.setPlainText(model_guidance_text(item))

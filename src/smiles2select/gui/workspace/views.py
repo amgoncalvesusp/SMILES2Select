@@ -1,8 +1,8 @@
 """Linked scatter views: chemical space and Pareto.
 
 Both are the same widget with different axes, because they answer the same
-question from different angles and must behave identically: hover previews,
-click commits, lasso selects in bulk.
+question from different angles and must behave identically: click inspects,
+lasso proposes a bulk action.
 
 Rendered with pyqtgraph rather than a vector canvas: a vector renderer draws one
 element per molecule and stops being interactive long before the library sizes
@@ -61,6 +61,12 @@ class ScatterView(QWidget):
         self.selected_scatter.setZValue(10)
         self.selected_scatter.sigClicked.connect(self._on_click)
         self.plot.addItem(self.selected_scatter)
+        self.inspected_scatter = pg.ScatterPlotItem(
+            size=21, symbol="o", brush=pg.mkBrush(None), pen=pg.mkPen("#009e73", width=2)
+        )
+        self.inspected_scatter.setZValue(20)
+        self.inspected_scatter.setAcceptedMouseButtons(Qt.NoButton)
+        self.plot.addItem(self.inspected_scatter)
         self.reference_scatter = pg.ScatterPlotItem(
             size=10, symbol="t", brush=pg.mkBrush("#a33a3a"), pen=pg.mkPen("#6e2222", width=1)
         )
@@ -86,16 +92,21 @@ class ScatterView(QWidget):
             "a record for inspection. Coordinates are never shifted for display."
         )
         self.overlap_note.setWordWrap(True)
+        self.inspection_notice = QLabel()
+        self.inspection_notice.setWordWrap(True)
+        self.inspection_notice.setTextFormat(Qt.PlainText)
         layout.addWidget(self.legend_note)
         layout.addWidget(self.selection_summary)
         layout.addWidget(self.selection_only)
         layout.addWidget(self.plot)
         layout.addWidget(self.overlap_note)
+        layout.addWidget(self.inspection_notice)
 
         self._coordinates = pd.DataFrame(columns=["x", "y"])
         self._lasso: list[tuple[float, float]] = []
         self._lasso_item = None
         self._selected_ids: set[int] = set()
+        self._inspected_id: int | None = None
         self._overlap_menu = None
         self.plot.scene().sigMouseClicked.connect(self._on_scene_click)
 
@@ -125,6 +136,7 @@ class ScatterView(QWidget):
             y=selected_coordinates["y"].to_numpy(dtype=float),
             data=[int(value) for value in selected_coordinates.index],
         )
+        self._update_inspection()
         if coordinates.empty:
             self.scatter.setData([])
             self.density_scatter.setData([])
@@ -161,6 +173,34 @@ class ScatterView(QWidget):
         self.scatter.setVisible(not enabled)
         self.density_scatter.setVisible(not enabled)
         self.reference_scatter.setVisible(not enabled)
+        self._update_inspection()
+
+    def set_inspected_id(self, record_id: int | None) -> None:
+        """Outline one inspected record without changing final membership or coordinates."""
+        self._inspected_id = record_id
+        self._update_inspection()
+
+    def _update_inspection(self) -> None:
+        record_id = self._inspected_id
+        self.inspected_scatter.setData([])
+        if record_id is None:
+            self.inspection_notice.clear()
+        elif record_id not in self._coordinates.index:
+            self.inspection_notice.setText(
+                f"Inspected record {record_id} is outside this projection; "
+                "it remains available in the table and inspector."
+            )
+        elif self.selection_only.isChecked() and record_id not in self._selected_ids:
+            self.inspection_notice.setText(
+                f"Inspected record {record_id} is hidden by Show final molecules only."
+            )
+        else:
+            point = self._coordinates.loc[record_id]
+            self.inspected_scatter.setData(x=[float(point["x"])], y=[float(point["y"])],
+                                           data=[int(record_id)])
+            self.inspection_notice.setText(
+                f"Open ring: inspected record {record_id}. Final molecules remain gold squares."
+            )
 
     def set_reference_points(self, coordinates: pd.DataFrame | None) -> None:
         """Show reference compounds as a separate triangular overlay layer."""

@@ -49,7 +49,7 @@ def _references(references, threshold):
     refs = refs.assign(y_active=labels)
     # Conflicting replicates are not evidence for either class.
     consistent = refs.groupby("identity").y_active.nunique().le(1)
-    refs = refs.loc[refs.identity.map(consistent) & refs.y_active.notna()]
+    refs = refs.loc[refs.identity.map(consistent).astype(bool) & refs.y_active.notna()]
     if refs.groupby("identity").fingerprint_hex.nunique().gt(1).any():
         raise ValueError("Same identity has inconsistent fingerprints")
     return refs.drop_duplicates("identity")

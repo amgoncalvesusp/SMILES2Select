@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.7.0 — 2026-10-28
+
+- Keep Requested N, the applied method, final count, count difference and selection/export actions visible above compact method forms. Configure switches among chemical ranking, model, contextual and tolerance controls without applying a method; map display controls now sit beside the map.
+- Add a virtual, read-only Table of every evaluable Hub candidate, including chemical screening failures. Stable internal Record IDs link sorting, keyboard navigation, maps, Pareto and preview-table inspection, independently of external molecule IDs and final membership.
+- Structure the on-demand 2D inspector into identity/properties, selection/decision and evidence/provenance, with escaped display values. Mark inspection with a separate map ring while preserving gold final-molecule markers and explicit notices for records without plotted coordinates.
+- Add a modeless, read-only Compare molecules window: explicitly keep A as a temporary view reference while B follows inspection. Both panes refresh current basket states and applied evidence; pending preview evidence stays in the main inspector. Empty, unavailable and identical records clear their panes, and busy/closing guards preserve the existing workspace lifecycle.
+- Document optional SMARTS.plus pattern-design help, required-pattern AND, excluded-pattern OR and preferred-pattern ranking semantics, and local RDKit matching. External help remains optional.
+- Preserve chemical-selection algorithms, model packages and training, saved-session/export schemas, explicit proposal adoption and undo/redo. No new application dependency or biological-performance claim is introduced.
+- Preserve empty-reference context behavior under pandas 3.1 with an explicit boolean filter mask, without changing context features, thresholds or mathematics or retraining models.
+- Extend desktop resource verification to exercise linked candidate inspection and molecule comparison in frozen and installed Windows/Linux builds.
+- Raise the Pillow runtime minimum to 13.0.0 and the setuptools build minimum to 84.1.0 to exclude known vulnerabilities. Audit the resolved installed runtime, transitive dependencies and build tools with pip-audit before creating release bundles, without re-resolving packages or suppressing advisories.
+
 ## 3.6.2 — 2026-10-11
 
 - Corrects the Windows native-dependency audit: Qt platform plug-ins import `mscms.dll`, an operating-system color-management component. The audit now classifies this exact DLL as a Windows dependency; unknown missing dependencies still block publication.

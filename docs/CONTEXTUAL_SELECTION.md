@@ -127,6 +127,28 @@ priority only; it does not alter the model's activity score or provide evidence
 of activity. Structural similarity, a privileged scaffold and a target-associated
 substructure also do not establish selectivity.
 
+For pattern design and visual inspection, consult [SMARTS.plus](https://smarts.plus/),
+an optional external toolbox described by [Ehrt et al. (2020)](https://doi.org/10.1002/minf.202000216).
+SMARTS describes a chemical query; SMILES describes a molecular structure, so
+copying a SMILES string does not necessarily express the intended query. The
+[Daylight SMARTS manual](https://www.daylight.com/dayhtml/doc/theory/theory.smarts.html)
+explains atom, bond and logical expressions. Check the resulting pattern with
+SMILES2Select's RDKit parser and with structures expected to match and not match,
+especially when aromaticity, hydrogen count, charge or ring membership matters.
+RDKit has [SMARTS extensions and unsupported features](https://www.rdkit.org/docs/RDKit_Book.html#smarts-support-and-extensions),
+so a result in another toolkit does not establish identical local behavior.
+The current contextual matcher does not enforce stereochemical matching; a
+chiral SMARTS must not be treated as a stereoselectivity filter.
+
+SMILES2Select does not contact SMARTS.plus or send molecules to it. The website
+opens only when its link is selected; pattern matching remains local and works
+without the website. Record the exact query, intended chemical feature, matching
+engine/version and control structures in the selection recipe or study notes.
+For a benchmark, define patterns before examining held-out activity labels and
+compare against a run without SMARTS at the same requested count and constraints.
+See the [Methods references](../src/smiles2select/assets/methods.md#smarts-pattern-design-references)
+for visualization, editing, discriminative pattern design and pattern comparison.
+
 ## Activity, risk and uncertainty
 
 `activity_score` retains the imported model output for its declared endpoint.

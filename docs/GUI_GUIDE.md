@@ -1,8 +1,11 @@
 # Guided selection and scenario comparison
 
+**Last updated:** 2026-10-28
+
 ## Model proposals and saved sessions (3.4.1)
 
-After processing, open the Chemical Space Hub and expand **Prioritize by model**.
+After processing, open the Chemical Space Hub and choose **Model (experimental)**
+under **Configure**.
 Choose one of the twelve bundled task-specific models, or import a compatible
 ONNX model folder, then choose its target, endpoint and model.
 The panel shows task threshold, estimator, calibration status and training
@@ -60,14 +63,24 @@ visible while advanced Boolean expressions, consensus and alert controls can be
 expanded. Hiding settings never resets them. Drug-likeness profiles are heuristics;
 the defaults are a starting configuration, not a biological recommendation.
 
-In the Chemical Space Hub, set the number of molecules and choose a strategy.
-Open **How to choose criteria...** beside the strategy for a scrollable guide to
-each strategy, descriptor, ranking direction, quota and reproducibility limit.
+The Chemical Space Hub remains separate from the seven-step wizard. Its top area
+keeps **Requested N**, the applied method, final count and difference from the
+request visible. **Configure** shows **Chemical ranking**, **Model (experimental)**,
+**Contextual (experimental)** or **Tolerance (experimental)**; switching forms does
+not apply that method or change the final library. The chosen method's create or
+preview/adopt actions, **Inspect applied criteria...**, **Undo**, **Redo** and both
+exports remain above the scrolling forms and map.
+
+For **Chemical ranking**, choose a strategy. Open **How to choose criteria...**
+beside the strategy for a scrollable guide to each strategy, descriptor, ranking
+direction, quota and reproducibility limit.
 Each property selector also shows a short explanation of its selected descriptor.
 Changing a descriptor preserves the chosen direction, so review the pair together.
-Expand advanced controls for objective directions, target intervals, scaffold or
-cluster quotas and map settings. Inspect a point to see its structure, properties
-and decision. Molecular drawings are generated only for the inspected molecule.
+Expand **Quotas / objectives** for shared scaffold or cluster quotas, chemical
+property objective directions and target intervals. Use **Refresh map** beside
+the map and **Display...** for projection, color, reference overlay and local
+Papyrus evidence settings. Inspect a point to see its structure, properties and
+decision. Molecular drawings are generated on demand.
 
 **Minimum molecular cores** reserves representatives before filling the remaining
 count. Zero means no minimum. It uses Murcko scaffolds, so acyclic molecules share
@@ -76,10 +89,66 @@ can prevent reaching the minimum. The warning reports unmet coverage, not a proo
 that no feasible alternative exists. The value is saved in sessions and recipes
 and is shared by chemical and model selections.
 
+## Candidate table and linked inspection
+
+Choose **Table** after **Chemical space** and **Pareto** in the view selector.
+It exposes every evaluable Hub candidate, including chemical screening failures,
+without a 5,000-row display cap. These rows are not all necessarily eligible for
+the chosen model or proposal. The existing basket below the views still shows
+decided molecules.
+
+Use the stable **Record ID** to distinguish records whose external **Molecule ID**
+is duplicated. **Final for export** reports current membership separately from
+**Chemical status** and **Selection status**. Descriptor cells retain stored
+precision, missing values appear blank, and all cells are read-only. Click a
+header to sort; numeric columns sort numerically with stable ties and missing
+values last. Sorting changes display order only, leaving ranking and final
+membership unchanged.
+
+Click a row or move between rows with the keyboard to inspect the same record
+across Table, Chemical space, Pareto and the inspector. Inspection retains the
+current table column and horizontal-scroll position. The tolerance review table
+uses this shared inspection too. A green outline ring marks the inspected record
+at its existing plotted coordinates, independently of gold final-molecule squares.
+**Show final molecules only** hides the ring for a nonfinal record. If a record
+has no coordinates in the current projection or sampled context, a notice explains
+its absence; the table and inspector remain available without invented coordinates.
+
+Inspection and sorting do not select molecules. Final-membership cells follow
+explicit selection decisions, proposal adoption, undo and redo. Basket behavior,
+scientific criteria, saved sessions and export formats remain unchanged.
+
+## Compare two molecules
+
+Open **Compare molecules...** in the persistent action row. The comparison window
+stays open while you use the Hub. Opening it before inspecting a record shows
+instructions for the empty panes; it does not choose a molecule automatically.
+
+Inspect a molecule normally, then click **Keep current molecule as A** to keep
+it as a view reference. Inspect another molecule for B using Table mouse or
+keyboard navigation, Chemical space, Pareto, or the contextual or tolerance review
+tables. Both panes follow the stable **Record ID**, including after Table sorting
+or when external molecule IDs repeat. Keeping A does not select, shortlist, pin
+or adopt anything.
+
+The two read-only columns show 2D structures, identity, properties, current basket
+states and applied evidence. They refresh after decisions, adoption, undo and
+redo. The **Applied method** banner identifies the applied ranking, even when
+controls have been edited or a proposal is pending. Pending model, contextual and
+tolerance evidence stays in the main inspector; draft Pareto ranks and map-location
+notices are excluded from the comparison. No similarity metric is calculated.
+
+When A and B refer to the same record, B clears and asks you to inspect another
+molecule. Unavailable records clear their panes instead of leaving stale details.
+Closing and reopening the window retains A within the current Hub workspace;
+closing the Hub also closes the comparison. A is not saved in sessions.
+During computation, opening the window and keeping A are disabled; **Close**
+remains available.
+
 ## Desktop installation
 
-Windows: run `SMILES2Select-Setup-3.4.1.exe`, or extract the portable ZIP.
-Linux x86_64: run `bash SMILES2Select-Setup-3.4.1-linux-x86_64.run` as your normal
+Windows: run `SMILES2Select-Setup-3.7.0.exe`, or extract the portable ZIP.
+Linux x86_64: run `bash SMILES2Select-Setup-3.7.0-linux-x86_64.run` as your normal
 user. The Linux installer places the bundle under
 `${XDG_DATA_HOME:-$HOME/.local/share}/smiles2select`, adds a desktop entry and a
 launcher under `${XDG_BIN_HOME:-$HOME/.local/bin}`. Use the applications menu, or
@@ -153,7 +222,8 @@ identical objectives and quotas. Core coverage retains its first-per-core policy
 weighted property percentiles order alternatives after scaffold rarity. The
 threshold concerns the candidate pool, not the requested final molecule count.
 
-Maps and tables limit display work. Missing scaffolds are computed when needed
+Maps and the decided-molecule basket limit display work; the candidate Table
+exposes all evaluable candidates. Missing scaffolds are computed when needed
 for core coverage or scaffold quotas. Missing structural cluster assignments
 still prevent cluster quotas; the interface reports their unavailability.
 The property PCA cloud is a projection of descriptors, not a set of structural
@@ -187,12 +257,20 @@ record from the inspection menu. Clicking only inspects. The inspector explicitl
 states whether the molecule is included in docking export. Clicking a basket row
 also opens that molecule, and final rows are listed first.
 
-Set **Number of molecules**, strategy and optional quotas, then click **Create
-selection**. The summary distinguishes the applied count from edited criteria
+The inspector groups details into **Identity / properties**, **Selection /
+decision** and **Evidence / provenance**. Its **Shortlist**, **Select**, **Exclude**
+and **Pin** actions remain available.
+
+Set **Requested N** and the chosen method's controls. Use **Create selection** in
+**Chemical ranking**, or preview and explicitly adopt a proposal in the other
+forms. The summary distinguishes the applied method and count from edited criteria
 that have not been applied, and reports count differences. Changing controls alone
-does not alter the final set. Undo restores the previous final library and criteria.
+does not alter the final set. Undo and redo restore the final library and criteria.
 
 Use **Export to SMILES2Docking** for a CSV or XLSX table with `access_code` and
 `smiles`; choose those columns in SMILES2Docking. The adjacent `.docking.json`
 contains the file hash and decision provenance. **Export scientific report** saves
 the full analysis workbook and selection recipe. Both use the current final set.
+Export is blocked during computation, with unapplied criteria or with no final
+molecules. If the final count differs from **Requested N**, review the warning and
+confirm the current set before exporting.

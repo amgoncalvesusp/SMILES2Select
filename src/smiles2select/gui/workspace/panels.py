@@ -7,11 +7,14 @@ screen can disagree with anything else.
 
 from __future__ import annotations
 
+from html import escape
+
 import pandas as pd
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -49,11 +52,12 @@ class InspectorPanel(QWidget):
     exclude_requested = Signal(int)
     pin_requested = Signal(int)
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, *, read_only: bool = False) -> None:
         super().__init__(parent)
         self.record_id: int | None = None
 
         self.title = QLabel("No molecule selected")
+        self.title.setTextFormat(Qt.PlainText)
         self.title.setStyleSheet("font-weight: 600;")
         self.title.setWordWrap(True)
         self.structure = QLabel()
@@ -63,22 +67,30 @@ class InspectorPanel(QWidget):
         self.details = QTextEdit()
         self.details.setReadOnly(True)
 
-        buttons = QHBoxLayout()
-        for label, signal in (
-            ("Shortlist", self.shortlist_requested),
-            ("Select", self.select_requested),
-            ("Exclude", self.exclude_requested),
-            ("Pin", self.pin_requested),
-        ):
-            button = QPushButton(label)
-            button.clicked.connect(lambda _checked=False, emitter=signal: self._emit(emitter))
-            buttons.addWidget(button)
-
         layout = QVBoxLayout(self)
         layout.addWidget(self.title)
         layout.addWidget(self.structure)
         layout.addWidget(self.details, stretch=1)
-        layout.addLayout(buttons)
+        if not read_only:
+            buttons = QGridLayout()
+            for position, (label, signal) in enumerate((
+                ("Shortlist", self.shortlist_requested),
+                ("Select", self.select_requested),
+                ("Exclude", self.exclude_requested),
+                ("Pin", self.pin_requested),
+            )):
+                button = QPushButton(label)
+                button.clicked.connect(lambda _checked=False, emitter=signal: self._emit(emitter))
+                buttons.addWidget(button, position // 2, position % 2)
+            layout.addLayout(buttons)
+
+    def clear(self, message: str = "No molecule selected") -> None:
+        """Remove the previous molecule and its action target."""
+        self.record_id = None
+        self.title.setText(message)
+        self.structure.clear()
+        self._structure_smiles = None
+        self.details.clear()
 
     def _emit(self, signal) -> None:
         if self.record_id is not None:
@@ -93,10 +105,7 @@ class InspectorPanel(QWidget):
         """Fill the panel; missing properties are simply omitted."""
         self.record_id = record_id
         if record_id not in descriptors.index:
-            self.title.setText(f"Record {record_id} not found")
-            self.details.setPlainText("")
-            self.structure.clear()
-            self._structure_smiles = None
+            self.clear(f"Record {record_id} not found")
             return
 
         row = descriptors.loc[record_id]
@@ -125,11 +134,22 @@ class InspectorPanel(QWidget):
                 lines.append(
                     f"{label}: {value:.3f}" if isinstance(value, float) else f"{label}: {value}"
                 )
+        decisions, evidence = [], []
         for label, value in (extras or {}).items():
-            lines.append(f"{label}: {value}")
+            section = decisions if label in (
+                "Pareto rank", "Chemical status", "Selection status", "Included in docking export",
+                "Original run decision", "Decision stage", "Selection explanation",
+            ) else evidence
+            section.append(f"{label}: {value}")
 
         self.title.setText(str(row.get("molecule_id", record_id)))
-        self.details.setPlainText("\n".join(lines))
+        self.details.setHtml("".join(
+            f"<p><b>{heading}</b></p><p style='white-space: pre-wrap;'>"
+            + "<br>".join(escape(line) for line in values) + "</p>"
+            for heading, values in (("Identity / properties", lines),
+                                    ("Selection / decision", decisions),
+                                    ("Evidence / provenance", evidence))
+        ))
 
 
 class BasketPanel(QWidget):
@@ -158,20 +178,22 @@ class BasketPanel(QWidget):
 
         self.undo_button = QPushButton("Undo")
         self.redo_button = QPushButton("Redo")
-        auto_button = QPushButton("Auto-select")
+        self.auto_button = QPushButton("Auto-select")
         self.export_button = QPushButton("Export scientific report...")
         self.docking_button = QPushButton("Export to SMILES2Docking...")
         self.docking_button.clicked.connect(self.docking_export_requested)
         self.undo_button.clicked.connect(self.undo_requested)
         self.redo_button.clicked.connect(self.redo_requested)
-        auto_button.clicked.connect(self.auto_select_requested)
+        self.auto_button.clicked.connect(self.auto_select_requested)
         self.export_button.clicked.connect(self.export_requested)
 
-        buttons = QHBoxLayout()
+        self.actions = QWidget()
+        buttons = QHBoxLayout(self.actions)
+        buttons.setContentsMargins(0, 0, 0, 0)
         buttons.addWidget(self.undo_button)
         buttons.addWidget(self.redo_button)
         buttons.addStretch(1)
-        buttons.addWidget(auto_button)
+        buttons.addWidget(self.auto_button)
         buttons.addWidget(self.export_button)
         buttons.addWidget(self.docking_button)
 
@@ -179,7 +201,7 @@ class BasketPanel(QWidget):
         layout.addWidget(self.counters)
         layout.addWidget(self.display_notice)
         layout.addWidget(self.table, stretch=1)
-        layout.addLayout(buttons)
+        layout.addWidget(self.actions)
 
     def refresh(self, basket: SelectionBasket, identifiers: pd.Series | None = None) -> None:
         """Redraw the counters and the decided molecules."""
