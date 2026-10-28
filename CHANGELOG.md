@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.7.1 — 2026-10-28
+
+- Close pyqtgraph child plots before native widget destruction during final application and test-session cleanup, while QApplication remains alive; preserve ordinary window close/reopen behavior.
+- Preserve the 3.7.0 source tag and failure evidence: Linux CI reported 1,947 passing tests and 18 skips, then emitted a shared-QObject warning and exited with a segmentation fault (139) during process shutdown. Builds and publication were skipped; no 3.7.0 installers were published.
+- Include the 3.7.0 compact Hub controls, linked candidate Table, structured 2D inspector, read-only molecule comparison, SMARTS guidance, pandas 3.1 empty-reference compatibility and security minimums, without changing selection mathematics, model packages or session/export schemas.
+- Pin Linux release jobs to Ubuntu 24.04 to retain the tested runner baseline.
+
 ## 3.7.0 — 2026-10-28
 
 - Keep Requested N, the applied method, final count, count difference and selection/export actions visible above compact method forms. Configure switches among chemical ranking, model, contextual and tolerance controls without applying a method; map display controls now sit beside the map.

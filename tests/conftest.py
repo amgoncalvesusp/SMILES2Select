@@ -64,3 +64,22 @@ def descriptor_frame(rows: dict[str, list[float]]) -> pd.DataFrame:
     frame = pd.DataFrame(rows)
     frame.index = pd.RangeIndex(start=1, stop=len(frame) + 1, name="record_id")
     return frame
+
+
+def pytest_sessionfinish():
+    qt_widgets = sys.modules.get("PySide6.QtWidgets")
+    if qt_widgets is None:
+        return
+    application = qt_widgets.QApplication.instance()
+    if application is None:
+        return
+    from PySide6.QtCore import QCoreApplication, QEvent
+
+    from smiles2select.gui.desktop_self_check import _dispose_widget
+
+    roots = application.topLevelWidgets()
+    if roots:
+        _dispose_widget(roots[0], set())
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    print(f"Qt teardown: topLevel={len(application.topLevelWidgets())} "
+          f"allWidgets={len(application.allWidgets())}", flush=True)

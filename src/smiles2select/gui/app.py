@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from smiles2select.gui.desktop_self_check import desktop_resources_dispatch
+from smiles2select.gui.desktop_self_check import _dispose_widget, desktop_resources_dispatch
 from smiles2select.gui.worker_launch import worker_dispatch
 
 
@@ -29,9 +29,13 @@ def main(argv: list[str] | None = None) -> int:
     application = QApplication(argv if argv is not None else sys.argv)
     application.setApplicationName(APP_NAME)
     application.setWindowIcon(QIcon(str(app_icon_path())))
+    existing_widgets = set(application.topLevelWidgets())
     window = MainWindow()
-    window.show()
-    return application.exec()
+    try:
+        window.show()
+        return application.exec()
+    finally:
+        _dispose_widget(window, existing_widgets)
 
 
 

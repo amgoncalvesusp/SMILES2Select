@@ -45,21 +45,40 @@ def _probabilities(values) -> list[float]:
 
 
 def _dispose_widget(widget, existing_widgets) -> None:
+    from pyqtgraph import PlotWidget
     from PySide6.QtCore import QCoreApplication, QEvent
     from PySide6.QtWidgets import QApplication
+    from shiboken6 import isValid
 
     application = QApplication.instance()
-    widget.close()
-    widget.deleteLater()
-    # This diagnostic has no app.exec() loop to deliver DeferredDelete events.
-    QCoreApplication.sendPostedEvents(widget, QEvent.Type.DeferredDelete)
-    # Plot controls also create parentless menus that outlive their owner widget.
-    for orphan in application.topLevelWidgets():
-        if (orphan in application.topLevelWidgets() and orphan not in existing_widgets
-                and orphan.parent() is None):
-            orphan.close()
-            orphan.deleteLater()
-            QCoreApplication.sendPostedEvents(orphan, QEvent.Type.DeferredDelete)
+
+    def dispose(owner):
+        if not isValid(owner):
+            return
+        if not isinstance(owner, PlotWidget):
+            owner.close()
+        if not isValid(owner):
+            return
+        plots = [owner] if isinstance(owner, PlotWidget) else owner.findChildren(PlotWidget)
+        # pyqtgraph must detach proxy widgets before Qt destroys their scene.
+        for plot in plots:
+            if isValid(plot):
+                if not plot.closed:
+                    plot.close()
+                plot.deleteLater()
+                QCoreApplication.sendPostedEvents(plot, QEvent.Type.DeferredDelete)
+        if isValid(owner):
+            owner.deleteLater()
+            QCoreApplication.sendPostedEvents(owner, QEvent.Type.DeferredDelete)
+
+    roots = [widget] if isValid(widget) else []
+    roots += [orphan for orphan in application.topLevelWidgets()
+              if orphan is not widget and orphan not in existing_widgets and orphan.parent() is None]
+    # Close graph owners before deleting their parentless control menus.
+    roots.sort(key=lambda owner: isinstance(owner, PlotWidget)
+               or owner.findChild(PlotWidget) is not None, reverse=True)
+    for owner in roots:
+        dispose(owner)
 
 
 def _check_methods() -> dict:
