@@ -72,6 +72,26 @@ def _run(arguments, timeout=180):
     return process
 
 
+def test_qt_signal_emission_preserves_bool_references_and_exits_normally():
+    process = _run(["-c", dedent("""
+        import sys
+        from PySide6.QtCore import QObject, Signal
+
+        class Sender(QObject):
+            ping = Signal()
+
+        sender = Sender()
+        sender.ping.emit()
+        before = sys.getrefcount(True)
+        for _ in range(100):
+            assert sender.ping.emit() is True
+        after = sys.getrefcount(True)
+        assert after == before, (before, after)
+        print('signal-refcount-clean', flush=True)
+    """)])
+    assert "signal-refcount-clean" in process.stdout
+
+
 def test_fixed_desktop_diagnostic_exits_normally_after_hub_disposal(tmp_path):
     report_path = tmp_path / "desktop-resources.json"
     _run(["-m", "smiles2select.gui.app", "--verify-desktop-resources", "--output", str(report_path)])

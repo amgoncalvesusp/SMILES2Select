@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.7.2 — 2026-10-28
+
+- Exclude PySide6 6.12.0 only on Linux with Python below 3.12, retaining the existing PySide6 >= 6.5 minimum. An isolated QtCore signal probe reproduced Boolean reference loss and a finalization abort with the official Linux 6.12.0 wheel; 6.11.3 kept the reference count stable and exited normally.
+- Preserve the failed 3.7.1 source tag: Linux CI reported 1,953 passing tests and 18 skips, then aborted in Boolean finalization (exit 134). No 3.7.1 packages were published; 3.7.0 history is also retained.
+- Include the linked Hub table, structured 2D inspector, read-only comparison, compact controls, explicit final Qt/plot cleanup, pandas 3.1 compatibility and security gates from the preceding source tags. Selection mathematics, model packages and saved-session/export schemas remain unchanged.
+
 ## 3.7.1 — 2026-10-28
 
 - Close pyqtgraph child plots before native widget destruction during final application and test-session cleanup, while QApplication remains alive; preserve ordinary window close/reopen behavior.

@@ -147,8 +147,8 @@ remains available.
 
 ## Desktop installation
 
-Windows: run `SMILES2Select-Setup-3.7.1.exe`, or extract the portable ZIP.
-Linux x86_64: run `bash SMILES2Select-Setup-3.7.1-linux-x86_64.run` as your normal
+Windows: run `SMILES2Select-Setup-3.7.2.exe`, or extract the portable ZIP.
+Linux x86_64: run `bash SMILES2Select-Setup-3.7.2-linux-x86_64.run` as your normal
 user. The Linux installer places the bundle under
 `${XDG_DATA_HOME:-$HOME/.local/share}/smiles2select`, adds a desktop entry and a
 launcher under `${XDG_BIN_HOME:-$HOME/.local/bin}`. Use the applications menu, or

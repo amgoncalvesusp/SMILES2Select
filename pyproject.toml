@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smiles2select"
-version = "3.7.1"
+version = "3.7.2"
 description = "Multi-rule drug-likeness selector for large SMILES libraries"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,6 +23,8 @@ dependencies = [
     "joblib>=1.3",
     "psutil>=5.9",
     "PySide6>=6.5",
+    # The Linux 6.12.0 wheel undercounts Signal.emit() bool references on Python 3.11.
+    "PySide6!=6.12.0; sys_platform == 'linux' and python_version < '3.12'",
     "matplotlib>=3.7",
     "Pillow>=13.0.0",
     "pyqtgraph>=0.13",

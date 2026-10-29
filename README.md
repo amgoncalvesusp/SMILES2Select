@@ -6,6 +6,19 @@ Authors: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA); Dan
 
 ## English
 
+### New in 3.7.2: scoped Linux/Python compatibility fix
+
+Version 3.7.2 excludes the official PySide6 6.12.0 wheel on Linux with Python
+below 3.12 after an isolated QtCore signal probe reproduced incorrect Boolean
+reference handling and a finalization abort. The existing PySide6 >= 6.5
+requirement remains in place, with this exclusion limited to the affected scope.
+All Hub changes and final Qt/plot cleanup described below are included.
+
+The 3.7.1 source tag is retained: Linux CI reported 1,953 passing tests and
+18 skips, then aborted during Boolean finalization (exit 134). No 3.7.1 packages
+were published. See the [3.7.2 release notes](docs/RELEASE_NOTES_3.7.2.md) for
+the diagnostic evidence, dependency constraint and release gates.
+
 ### New in 3.7.1: shutdown cleanup and the updated Chemical Space Hub
 
 Version 3.7.1 carries the linked candidate table, structured 2D inspector,
@@ -250,9 +263,9 @@ similarity, novelty or selection threshold.
 
 ### Installation
 
-Get version 3.7.1 from [GitHub Releases](https://github.com/amgoncalvesusp/SMILES2Select/releases/tag/v3.7.1).
+Get version 3.7.2 from [GitHub Releases](https://github.com/amgoncalvesusp/SMILES2Select/releases/tag/v3.7.2).
 The release includes Windows and Linux installers, portable bundles, a Python
-wheel, a Windows native-dependency manifest and `SHA256SUMS-v3.7.1.txt`.
+wheel, a Windows native-dependency manifest and `SHA256SUMS-v3.7.2.txt`.
 
 RDKit is easiest to install with conda:
 
@@ -290,7 +303,7 @@ twelve ONNX packages and work without a separate training installation.
 Linux also has a per-user installer. Download the `.run` asset and execute:
 
 ```bash
-bash SMILES2Select-Setup-3.7.1-linux-x86_64.run
+bash SMILES2Select-Setup-3.7.2-linux-x86_64.run
 ```
 
 It installs the application, command launcher and desktop entry without root.
@@ -521,7 +534,7 @@ registra a verificação dos imports nativos realizada durante a compilação.
 O release Linux fornece um bundle portátil. Os dois bundles desktop incluem
 os 12 modelos ONNX e não exigem instalação de bibliotecas de treinamento.
 Linux também tem instalador por usuário: execute
-`bash SMILES2Select-Setup-3.7.1-linux-x86_64.run`. Ele cria lançador e entrada no
+`bash SMILES2Select-Setup-3.7.2-linux-x86_64.run`. Ele cria lançador e entrada no
 menu de aplicativos, sem root. A desinstalação padrão usa
 `bash ~/.local/share/smiles2select/uninstall.sh`.
 
