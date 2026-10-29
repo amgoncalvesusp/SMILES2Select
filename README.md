@@ -6,6 +6,19 @@ Authors: Adriano Marques Gonçalves — Universidade de Araraquara (UNIARA); Dan
 
 ## English
 
+### New in 3.7.3: self-contained RDKit scorer packaging
+
+Version 3.7.3 makes RDKit SA/NP scorer imports explicit so frozen bundles include
+their Python modules alongside the existing score-data files. Descriptor
+calculations, model data and selection methods are unchanged. The updated Hub,
+shutdown cleanup and scoped Linux/Python Qt compatibility guard remain included.
+
+The 3.7.2 release was withdrawn to a draft after a clean Linux bundle check
+exposed missing scorer modules that host RDKit paths had masked in earlier
+checks. Its tag and history are preserved. Publication of 3.7.3 requires a clean
+local frozen build and child-process checks without host RDKit/Python/Qt/library
+path overrides. See the [3.7.3 release notes](docs/RELEASE_NOTES_3.7.3.md).
+
 ### New in 3.7.2: scoped Linux/Python compatibility fix
 
 Version 3.7.2 excludes the official PySide6 6.12.0 wheel on Linux with Python
@@ -263,9 +276,9 @@ similarity, novelty or selection threshold.
 
 ### Installation
 
-Get version 3.7.2 from [GitHub Releases](https://github.com/amgoncalvesusp/SMILES2Select/releases/tag/v3.7.2).
-The release includes Windows and Linux installers, portable bundles, a Python
-wheel, a Windows native-dependency manifest and `SHA256SUMS-v3.7.2.txt`.
+When published, get version 3.7.3 from [GitHub Releases](https://github.com/amgoncalvesusp/SMILES2Select/releases/tag/v3.7.3).
+Release assets comprise Windows and Linux installers, portable bundles, a Python
+wheel, a Windows native-dependency manifest and `SHA256SUMS-v3.7.3.txt`.
 
 RDKit is easiest to install with conda:
 
@@ -303,7 +316,7 @@ twelve ONNX packages and work without a separate training installation.
 Linux also has a per-user installer. Download the `.run` asset and execute:
 
 ```bash
-bash SMILES2Select-Setup-3.7.2-linux-x86_64.run
+bash SMILES2Select-Setup-3.7.3-linux-x86_64.run
 ```
 
 It installs the application, command launcher and desktop entry without root.
@@ -534,7 +547,7 @@ registra a verificação dos imports nativos realizada durante a compilação.
 O release Linux fornece um bundle portátil. Os dois bundles desktop incluem
 os 12 modelos ONNX e não exigem instalação de bibliotecas de treinamento.
 Linux também tem instalador por usuário: execute
-`bash SMILES2Select-Setup-3.7.2-linux-x86_64.run`. Ele cria lançador e entrada no
+`bash SMILES2Select-Setup-3.7.3-linux-x86_64.run`. Ele cria lançador e entrada no
 menu de aplicativos, sem root. A desinstalação padrão usa
 `bash ~/.local/share/smiles2select/uninstall.sh`.
 

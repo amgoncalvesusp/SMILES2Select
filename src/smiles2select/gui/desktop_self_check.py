@@ -393,6 +393,7 @@ def verify_desktop_resources() -> dict:
     This checks distribution integrity and execution, not predictive performance or
     biological activity. It constructs offscreen windows without an application event loop.
     """
+    import numpy as np
     import pandas as pd
     from PySide6.QtWidgets import QApplication
 
@@ -416,9 +417,14 @@ def verify_desktop_resources() -> dict:
         )
         result = run(RunConfig(
             sources=(SourceFile(path=source, mapping=ColumnMapping(smiles="SMILES", molecule_id="ID")),),
-            profile_ids=("lipinski", "veber"), alert_catalogs=(), compute_sa=True,
+            profile_ids=("lipinski", "veber"), alert_catalogs=(), compute_sa=True, compute_np=True,
             n_jobs=1, chunk_size=3, checkpoint_path=Path(temporary) / "checkpoint.sqlite",
         ))
+        scores = result.descriptors.loc[list(RECORD_IDS), ["sa_score", "np_score"]].to_numpy(dtype=float)
+        if scores.shape != (3, 2) or not np.isfinite(scores).all():
+            raise ValueError("Contrib scorers must return three finite SA and NP values")
+        contrib_scores = {"record_ids": list(RECORD_IDS), "sa_score": scores[:, 0].tolist(),
+                          "np_score": scores[:, 1].tolist()}
         tolerance = _check_tolerance_gui(result)
     application.processEvents()
     return {
@@ -428,6 +434,7 @@ def verify_desktop_resources() -> dict:
         "frozen": bool(getattr(sys, "frozen", False)),
         "scope": "Resource integrity and illustrative inference only; no biological validation.",
         "methods": methods,
+        "contrib_scores": contrib_scores,
         "contextual_models": _check_contextual_models(features.records),
         "risk_models": _check_risk_models(features.records, features.manifest["chemistry_hash"]),
         **tolerance,

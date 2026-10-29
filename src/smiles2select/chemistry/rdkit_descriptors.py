@@ -9,12 +9,10 @@ as if they were interchangeable.
 
 from __future__ import annotations
 
-import sys
 from functools import lru_cache
-from pathlib import Path
 
 from rdkit import Chem
-from rdkit.Chem import QED, Crippen, Descriptors, RDConfig, rdMolDescriptors
+from rdkit.Chem import QED, Crippen, Descriptors, rdMolDescriptors
 
 
 def mol_wt(mol: Chem.Mol) -> float:
@@ -112,11 +110,8 @@ def nitrogen_oxygen_count(mol: Chem.Mol) -> int:
 
 @lru_cache(maxsize=1)
 def _sascorer():
-    """Import the SA_Score contrib module, which is not on the default path."""
-    contrib = Path(RDConfig.RDContribDir) / "SA_Score"
-    if str(contrib) not in sys.path:
-        sys.path.append(str(contrib))
-    import sascorer
+    """Import the packaged RDKit SA scorer."""
+    from rdkit.Contrib.SA_Score import sascorer
 
     return sascorer
 
@@ -124,10 +119,7 @@ def _sascorer():
 @lru_cache(maxsize=1)
 def _npscorer():
     """Import the NP_Score contrib module and read its fragment model once."""
-    contrib = Path(RDConfig.RDContribDir) / "NP_Score"
-    if str(contrib) not in sys.path:
-        sys.path.append(str(contrib))
-    import npscorer
+    from rdkit.Contrib.NP_Score import npscorer
 
     return npscorer, npscorer.readNPModel()
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 APP_NAME = "SMILES2Select"
-APP_VERSION = "3.7.2"
+APP_VERSION = "3.7.3"
 
 AUTHOR = "Adriano Marques Gonçalves"
 AFFILIATION = "Universidade de Araraquara (UNIARA)"

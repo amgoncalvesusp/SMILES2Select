@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.7.3 — 2026-10-28
+
+- Use qualified RDKit Contrib imports so frozen bundles include the SA/NP scorer Python modules alongside their existing data resources. Descriptor mathematics, trained model data and selection behavior are unchanged.
+- Withdraw the 3.7.2 release to a draft while preserving its tag and history: a clean published Linux bundle failed SA-score legacy-reference parity for all twelve ONNX models after host RDKit paths were removed. Passing CI and matching hashes established the tested results and downloaded bytes, but had not established bundle self-containment.
+- Require a clean local frozen build before tagging and clean child environments without host RDKit/Python/Qt/library path overrides for frozen-bundle regressions. Retain the Hub changes, final shutdown cleanup, scoped Linux/Python PySide6 guard, pandas compatibility and security gates.
+
 ## 3.7.2 — 2026-10-28
 
 - Exclude PySide6 6.12.0 only on Linux with Python below 3.12, retaining the existing PySide6 >= 6.5 minimum. An isolated QtCore signal probe reproduced Boolean reference loss and a finalization abort with the official Linux 6.12.0 wheel; 6.11.3 kept the reference count stable and exited normally.

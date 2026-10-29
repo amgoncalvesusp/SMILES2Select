@@ -4,12 +4,36 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.frozen_env import frozen_environment
+
+
+def test_frozen_environment_excludes_external_runtime_paths(monkeypatch):
+    retained = {
+        "PATH": "system-libraries", "SystemRoot": "C:/Windows", "TEMP": "test-temp",
+        "TMPDIR": "test-temp", "XDG_DATA_HOME": "test-data", "XDG_BIN_HOME": "test-bin",
+    }
+    incoming = {
+        **retained,
+        **dict.fromkeys((
+            "RDBASE", "PYTHONPATH", "PYTHONHOME", "QT_PLUGIN_PATH", "QT_QPA_PLATFORM_PLUGIN_PATH",
+            "QT_API", "PYQTGRAPH_QT_LIB", "QML_IMPORT_PATH", "QML2_IMPORT_PATH",
+            "LD_LIBRARY_PATH", "LD_LIBRARY_PATH_ORIG", "LD_PRELOAD", "DYLD_LIBRARY_PATH",
+            "DYLD_FALLBACK_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH", "PythonPath",
+        ), "external-runtime"),
+        "QT_QPA_PLATFORM": "external-platform",
+    }
+    before = dict(incoming)
+    monkeypatch.setattr(os, "environ", incoming)
+    assert frozen_environment() == {**retained, "QT_QPA_PLATFORM": "offscreen"}
+    assert incoming == before
 
 
 def test_frozen_desktop_resources(tmp_path):
@@ -22,7 +46,7 @@ def test_frozen_desktop_resources(tmp_path):
     report_path = tmp_path / "desktop-resources.json"
     process = subprocess.run(
         [str(executable), "--verify-desktop-resources", "--output", str(report_path)],
-        cwd=tmp_path, env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
+        cwd=tmp_path, env=frozen_environment(),
         capture_output=True, text=True, timeout=180, check=False,
     )
     assert process.returncode == 0, process.stderr or process.stdout
@@ -30,6 +54,11 @@ def test_frozen_desktop_resources(tmp_path):
     assert report["status"] == "ok"
     assert report["frozen"] is True
     assert report["schema"] == "smiles2select-desktop-resources/1"
+    contrib = report["contrib_scores"]
+    assert contrib["record_ids"] == [1, 2, 3]
+    for name in ("sa_score", "np_score"):
+        assert len(contrib[name]) == 3
+        assert all(isinstance(value, float) and math.isfinite(value) for value in contrib[name])
     hub = report["hub_gui"]
     assert hub["method_pages"] == ["chemical", "model", "contextual", "tolerance"]
     assert hub["table"]["record_ids"] == [1, 2, 3]

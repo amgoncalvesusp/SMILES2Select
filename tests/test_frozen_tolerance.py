@@ -13,6 +13,7 @@ import pytest
 
 from s2s_decision.artifacts import file_hash
 from s2s_decision.tolerance_profile import read_tolerance_package
+from tests.frozen_env import frozen_environment
 
 MODES = ("general", "hierarchical", "contextual")
 STATES = {"base_eligible", "supported_relaxation", "review", "excluded"}
@@ -50,7 +51,8 @@ def frozen_tolerance_bundle():
 def run_worker(executable: Path, tmp_path: Path, command: str, *args: str) -> None:
     completed = subprocess.run(
         [str(executable), "--s2s-worker", "-m", "s2s_decision", command, *args],
-        cwd=tmp_path, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=tmp_path, env=frozen_environment(),
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         timeout=180, check=False,
     )
     assert completed.returncode == 0, completed.stderr or completed.stdout

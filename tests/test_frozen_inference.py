@@ -14,6 +14,7 @@ import pytest
 from s2s_decision.artifacts import read_bundle, write_bundle
 from s2s_decision.features import chemistry_manifest, featurize
 from s2s_decision.schema import FeatureSet
+from tests.frozen_env import frozen_environment
 
 
 def test_frozen_worker_scores_real_onnx_model(tmp_path: Path) -> None:
@@ -57,6 +58,7 @@ def test_frozen_worker_scores_real_onnx_model(tmp_path: Path) -> None:
             str(model),
         ],
         cwd=tmp_path,
+        env=frozen_environment(),
         capture_output=True,
         text=True,
         timeout=120,
@@ -131,6 +133,7 @@ def test_frozen_bundle_scores_its_distributed_model(tmp_path: Path, model_name: 
             str(model),
         ],
         cwd=tmp_path,
+        env=frozen_environment(),
         capture_output=True,
         text=True,
         timeout=120,

@@ -6,8 +6,10 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from smiles2select.gui import app, desktop_self_check
@@ -17,6 +19,12 @@ def test_real_desktop_resources_render_and_score(qapp):
     report = desktop_self_check.verify_desktop_resources()
     assert report["status"] == "ok"
     assert report["schema"] == "smiles2select-desktop-resources/1"
+    contrib = report["contrib_scores"]
+    assert contrib["record_ids"] == [1, 2, 3]
+    for name in ("sa_score", "np_score"):
+        assert len(contrib[name]) == 3
+        assert all(isinstance(value, float) for value in contrib[name])
+        assert np.isfinite(contrib[name]).all()
     assert report["methods"]["section_count"] >= 5
     assert "experimental" in report["methods"]["rendered_snippet"].lower()
     assert report["methods"]["rendered_characters"] > 1000
@@ -60,6 +68,18 @@ def qapp(monkeypatch):
     from PySide6.QtWidgets import QApplication
 
     return QApplication.instance() or QApplication([])
+
+
+@pytest.mark.parametrize("name, value", [("sa_score", np.nan), ("np_score", np.inf)])
+def test_desktop_check_rejects_unavailable_contrib_scores(qapp, monkeypatch, name, value):
+    from smiles2select.pipeline import runner
+
+    values = {"sa_score": [2.0, 2.0, 2.0], "np_score": [0.0, 0.0, 0.0]}
+    descriptors = pd.DataFrame({**values, name: [value, 0.0, 0.0]}, index=[1, 2, 3])
+    monkeypatch.setattr(runner, "run", lambda _: SimpleNamespace(descriptors=descriptors))
+    monkeypatch.setattr(desktop_self_check, "_check_methods", lambda: {})
+    with pytest.raises(ValueError, match="three finite SA and NP"):
+        desktop_self_check.verify_desktop_resources()
 
 
 @pytest.mark.parametrize("values", [[0.1, 0.2], [0.1, 0.2, np.nan],
